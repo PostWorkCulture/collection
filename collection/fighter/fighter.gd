@@ -72,7 +72,8 @@ var in_aim := false
 var dmg_mul := 1.0               # bots on Easy deal 30% less damage
 var can_headshot := true         # and never land headshots
 var force_input := false         # the autotest presses fire without the mouse captured
-var autopilot := false           # the autotest's bot match: your fighter is driven by a bot brain too
+var autopilot := false
+var invulnerable := false        # the autotest's screenshots: nobody can hurt you           # the autotest's bot match: your fighter is driven by a bot brain too
 
 # movement
 var yaw := 0.0     # web convention: facing (sin yaw, 0, cos yaw)
@@ -134,6 +135,10 @@ var _eye := EYE
 var _jump_held := false
 var _shown_weapon := "?"
 var _look_pad := Vector2.ZERO
+var _step_dist := 0.0
+var _step_n := 0
+var _air_t := 0.0
+var _pad_used := false
 
 func _ready() -> void:
 	collision_layer = LAYER_BODY
@@ -310,6 +315,10 @@ func _now() -> float:
 func _unhandled_input(e: InputEvent) -> void:
 	if not is_player:
 		return
+	if e is InputEventMouseMotion or e is InputEventKey:
+		_pad_used = false
+	elif e is InputEventJoypadButton or e is InputEventJoypadMotion:
+		_pad_used = true
 	if e is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		var s := 0.0006 * (0.5 + Settings.sensitivity * 0.25) * (lerpf(1.0, 0.65, ads_k))
 		yaw -= e.relative.x * s
@@ -337,9 +346,44 @@ func _read_player_input(dt: float) -> void:
 	# controller right stick looks around
 	var look := Input.get_vector("look_left", "look_right", "look_up", "look_down")
 	if look.length() > 0.12:
+		_pad_used = true
 		var r := 2.6 * (0.5 + Settings.sensitivity * 0.15) * lerpf(1.0, 0.6, ads_k)
 		yaw -= look.x * r * dt
 		pitch = clamp(pitch - look.y * r * 0.7 * dt, -1.45, 1.45)
+	_aim_assist(dt)
+
+## controller only, Easy only (plan: "aim assist on Easy"): while you look around with the stick or fire with the
+## trigger, your aim drifts gently onto anyone within 8° of it and 40 m away, in sight
+func _aim_assist(dt: float) -> void:
+	if not _pad_used or Settings.bots != "easy" or game == null:
+		return
+	var pad_active := Input.get_vector("look_left", "look_right", "look_up", "look_down").length() > 0.12 or Input.get_action_strength("fire") > 0.3
+	if not pad_active:
+		return
+	var eye := eye_pos()
+	var fwd := aim_forward()
+	var best: Vector3 = Vector3.INF
+	var best_a := deg_to_rad(8.0)
+	for o in game.fighters:
+		if o == self or not o.alive:
+			continue
+		var tp: Vector3 = o.global_position + Vector3.UP * (0.4 if o.downed else 1.3)
+		var d := tp - eye
+		if d.length() > 40.0:
+			continue
+		var a := fwd.angle_to(d.normalized())
+		if a < best_a:
+			var q := PhysicsRayQueryParameters3D.create(eye, tp, LAYER_WORLD)
+			if get_world_3d().direct_space_state.intersect_ray(q).is_empty():
+				best_a = a
+				best = tp
+	if best == Vector3.INF:
+		return
+	var d2 := best - eye
+	var want_yaw := atan2(d2.x, d2.z)
+	var want_pitch := atan2(d2.y, Vector2(d2.x, d2.z).length())
+	yaw += clampf(wrapf(want_yaw - yaw, -PI, PI), -1.2 * dt, 1.2 * dt)
+	pitch = move_toward(pitch, want_pitch, 0.8 * dt)
 
 func select_slot(s: String) -> void:
 	if s == "gun" and gun_id == "":
@@ -385,7 +429,7 @@ func give_bat() -> void:
 
 ## returns true when this hit put them down or finished them
 func take_damage(amount: float, src: Node, head := false, _gun := "") -> bool:
-	if not alive or shield_t > 0.0:
+	if not alive or shield_t > 0.0 or invulnerable:
 		return false
 	var dmg := maxi(1, roundi(amount))
 	last_hurt = _now()
@@ -734,9 +778,42 @@ func _physics_process(dt: float) -> void:
 	move_and_slide()
 	if not downed:
 		_step_up(before, hv * dt, grounded)
+	_footsteps(dt, grounded)
 	if downed:
 		_set_pose_downed()
 	_update_view(dt)
+
+## footsteps (phase 5): one step every 2.6 m of running, quieter crouched or crawling, softer and lower on the lawns;
+## a thump when you land from a real fall. Bots hear every fourth running step within 10 m.
+func _footsteps(dt: float, was_grounded: bool) -> void:
+	var on := is_on_floor()
+	if not on:
+		_air_t += dt
+		return
+	if _air_t > 0.45 and not was_grounded:
+		Sfx.play(get_parent(), "land", global_position, -6.0 if is_player else -3.0, 1.0, 16.0, 0.06)
+	_air_t = 0.0
+	var sp := Vector2(velocity.x, velocity.z).length()
+	if sp < 1.5:
+		_step_dist = 0.0
+		return
+	_step_dist += sp * dt
+	var stride := 2.6 if not (crouching or downed) else 1.6
+	if _step_dist < stride:
+		return
+	_step_dist = 0.0
+	_step_n += 1
+	var p := global_position
+	var h: Dictionary = game.level.house if game else {}
+	var indoors := not h.is_empty() and absf(p.x) < float(h.x) and absf(p.z) < float(h.z) and p.y < 10.5
+	var vol := -14.0 if is_player else -6.0
+	if crouching or downed:
+		vol -= 12.0
+	if not indoors:
+		vol -= 4.0
+	Sfx.play(get_parent(), "step%d" % (1 + randi() % 5), p, vol, (1.0 if indoors else 0.82), 6.0 if (crouching or downed) else 16.0, 0.05)
+	if game and not (crouching or downed) and _step_n % 4 == 0:
+		game.make_noise(p, 10.0, self)
 
 func _tick_health(dt: float) -> void:
 	if downed:
@@ -782,14 +859,25 @@ func _update_view(dt: float) -> void:
 				hip = Vector3(0.0, -0.2, -0.5)
 				aimed = Vector3(0.0, -0.15, -0.5)
 			elif current_weapon() == "bat":
+				# a full swing from over the right shoulder across to the left, in 0.26 s
 				hip = Vector3(0.24, -0.3, -0.38)
 				aimed = hip
-				_view_model.rotation.x = -0.9 * jab
+				var u := 1.0 - swing_t / 0.26 if swing_t > 0.0 else 0.0
+				var e := u * u * (3.0 - 2.0 * u)
+				_view_model.rotation = Vector3(-0.5 * sin(u * PI), lerpf(0.9, -1.1, e) if swing_t > 0.0 else 0.0, -0.7 * sin(u * PI))
+				hip += Vector3(lerpf(0.0, -0.4, e), 0.08 * sin(u * PI), -0.1 * sin(u * PI)) if swing_t > 0.0 else Vector3.ZERO
 			var zoom_k := tan(deg_to_rad(Settings.fov) * 0.5) / tan(deg_to_rad(cam.fov) * 0.5)
 			_view_model.position = (hip.lerp(aimed, ads_k) + Vector3(0, 0, 0.045 * kick_t)) * zoom_k
+	# third person: the bat sweeps across from the right shoulder when swung; at rest it's held up and back
+	if current_weapon() == "bat" and swing_t > 0.0:
+		var u2 := 1.0 - swing_t / 0.26
+		var e2 := u2 * u2 * (3.0 - 2.0 * u2)
+		_held.rotation = Vector3(0.6 * sin(u2 * PI), PI + lerpf(1.3, -1.4, e2), 0.0)
+	else:
+		_held.rotation = Vector3(0.0, PI, 0.0)
 	_shell.visible = shield_t > 0.0 and _body_mesh.visible
 	if _shell.visible:
-		_shell_mat.albedo_color.a = 0.22 * (shield_t / SHIELD)
+		_shell_mat.albedo_color.a = 0.22 * clampf(shield_t / SHIELD, 0.0, 1.0)
 
 ## stairs and kerbs up to 0.55 m: if we ran into something low while walking, try the same move from 0.55 m higher
 func _step_up(before: Vector3, motion: Vector3, was_grounded: bool) -> void:

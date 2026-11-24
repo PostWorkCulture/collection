@@ -28,10 +28,10 @@ One Godot project in `/collection/` (open `collection/project.godot`). Folders a
 /collection/weapons/       weapon stats (from the web game), block models, hit/gun effects
 /collection/pickups/       weapon pickups
 /collection/stars/         the gold star (mesh, hum, dropped stars)
-/collection/ui/            HUD and minimap
-/collection/audio/         sfx.gd + sfx/ (the web game's own sound files)
+/collection/ui/            HUD, minimap and menus (start, pause, settings, keys)
+/collection/audio/         sfx.gd (buses, wall muffling) + sfx/ and music/ (1v1's own sound and music files)
 /collection/level/         Mansion builder + mansion_layout.json
-/collection/autotest.json  scripted checks ("enabled": true runs them and quits; "combat" and "stars" check fights and Collection rules on standing dummies; "bots_match" plays a whole 8-bot match, with "difficulty", "match_secs" and "speed")
+/collection/autotest.json  scripted checks ("enabled": true runs them and quits; "combat" and "stars" check fights and Collection rules on standing dummies; "bots_match" plays a whole 8-bot match, with "difficulty", "match_secs" and "speed"; "menu" walks the start screen, pause, settings and rebinding)
 /collection/<feature>/     new features get their own folder
 /docs/screenshots/         preview images for Pete, one folder per phase
 ```

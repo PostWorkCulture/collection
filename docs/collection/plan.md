@@ -152,7 +152,7 @@ The HUD and menus copy the web game's monochrome look (black and white, red high
 
 ## Build plan
 
-Six phases (the sixth added 24 Nov, when Pete settled on Godot for Collection as its own game); each ends with Pete playing it, and nothing moves on until he's happy with the last. Status (24 Nov): phases 1–4 are built; phases 2 and 3 are published. Pete played phases 1 and 2 (notes in DESIGN.md → Known issues); phases 3 and 4 wait for him to play.
+Six phases (the sixth added 24 Nov, when Pete settled on Godot for Collection as its own game); each ends with Pete playing it, and nothing moves on until he's happy with the last. Status (24 Nov): phases 1–5 are built; phases 2–4 are published. Pete played phases 1 and 2 (notes in DESIGN.md → Known issues); phases 3–5 wait for him to play. Next: phase 6, the Mansion in full.
 
 | Phase | What gets built | Gate: what Pete plays and checks |
 | --- | --- | --- |
@@ -160,7 +160,7 @@ Six phases (the sixth added 24 Nov, when Pete settled on Godot for Collection as
 | 2 · Combat | Fists, the SMG family, Dual Pistols, bat; 20-bullet pickups; health, downed, death, respawn; test dummies to hit | Fight a few dummies: punches and guns feel right. **Built; waiting for Pete.** |
 | 3 · Collection rules | Stars, shop cash-in, 2 lost when downed, all lost on death; leader outline and minimap marker; HUD and leaderboard | Play a full solo match: find 10 stars and cash in. **Built; waiting for Pete.** |
 | 4 · Bots | Nav mesh, searching by sight, hearing, fighting, targeting; 7 bots at Easy, Normal, Hard; a debug view of what they see | Play full 8-player matches: bots feel fair at every level. **Built; waiting for Pete.** |
-| 5 · Look and sound | Lighting, reflections, fog, post effects, particles, glass; 3D sound through walls, room echo, menus, settings, controller | Play it with everything switched on (Pete decided on 24 Nov to carry on in Godot regardless) |
+| 5 · Look and sound | Lighting, reflections, fog, post effects, particles, glass; 3D sound through walls, room echo, menus, settings, controller | Play it with everything switched on (Pete decided on 24 Nov to carry on in Godot regardless). **Built; waiting for Pete.** |
 | 6 · The Mansion in full | The grey box built out into the real Mansion: every room's look, props, glass, lifts, pole, portals, trampolines, ball pit, pool, lighting per room (DESIGN §9) | Walk every room and play full matches |
 
 How each phase is checked before it reaches Pete:
@@ -168,6 +168,13 @@ How each phase is checked before it reaches Pete:
 - **Headless checks** run on every change: the project opens without errors, a scripted match plays for 2 minutes with 8 bots, stars spawn inside the house, nobody falls through the floor, and the win triggers at the shop.
 - **Screenshots and a short clip** from fixed spots (lawn, hall, upstairs, shop) sent with each phase. Phase 1 shots are in `docs/screenshots/`.
 - **A playable build** on the PC at every gate; Pete's notes go straight into the next phase.
+
+### Phase 5 results (24 Nov 2026)
+
+- Graphics: High 140–160 fps on the RTX 5060 laptop with 8 players (bounce light, reflections, probes and haze on); Medium and Low switch features off as listed in DESIGN.md → Build status; switching quality in Settings applies straight away.
+- Start screen → Play → countdown; Esc pauses the whole game and opens the pause menu; Settings and Keys work from both; rebinding Jump to K and resetting it back both work; volume steps land on the right bus (30% = −10.5 dB).
+- Glass breaks into shards that bounce and lie on the floor; the bat swings in first and third person; footsteps, landings, echo and wall muffling play in matches.
+- All the earlier checks (movement, combat, stars, a full 8-bot match) still pass. Screenshots in `docs/screenshots/phase5/`.
 
 ### Phase 4 results (24 Nov 2026)
 

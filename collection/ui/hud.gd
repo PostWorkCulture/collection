@@ -307,7 +307,7 @@ func _build_phase3() -> void:
 	_results.add_theme_constant_override("h_separation", 24)
 	rv.add_child(_results)
 	_again = _label(14, GREY)
-	_again.text = "Press Enter to play again"
+	_again.text = "Enter: play again · Esc: menu"
 	_again.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	rv.add_child(_again)
 	if game:
@@ -454,7 +454,7 @@ func _process(dt: float) -> void:
 		_center.text = ""
 		_center_sub.text = ""
 	_shield.visible = player.alive and player.shield_t > 0.0
-	_help.text = "imok Collection · Godot grey box (phase 4: bots) · WASD move · Space jump · C crouch · V camera · LMB attack · RMB aim · 1 fists/bat · 2 gun · F3 bot view · Esc mouse · %d fps" % Engine.get_frames_per_second()
+	_help.text = "imok Collection · Godot grey box (phase 5) · WASD move · Space jump · C crouch · V camera · LMB attack · RMB aim · 1 fists/bat · 2 gun · F3 bot view · Esc pause · %d fps" % Engine.get_frames_per_second()
 	_process_phase3(dt)
 	_cross.queue_redraw()
 
@@ -480,7 +480,7 @@ func _process_phase3(dt: float) -> void:
 	_edge_t = maxf(0.0, _edge_t - dt)
 	_edge_mat.set_shader_parameter("amount", clampf(_edge_t / 1.4, 0.0, 1.0) * 0.9)
 	_load_card.visible = game.state == "countdown"
-	_load_bots.text = "Bots: %s · B to change" % String(Settings.bots).capitalize()
+	_load_bots.text = "Bots: %s" % String(Settings.bots).capitalize()
 	_msg_t -= dt
 	# centre message: down / eliminated win over timed messages; the countdown shows its number
 	if player.alive and not player.downed and game.state != "won":

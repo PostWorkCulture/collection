@@ -101,5 +101,6 @@
  "bots_match": false,
  "difficulty": "normal",
  "match_secs": 300,
- "speed": 1
+ "speed": 1,
+ "menu": true
 }

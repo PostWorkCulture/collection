@@ -1,8 +1,9 @@
 extends Node3D
 ## Entry point: builds the lighting, the grey-box Mansion, the match ("Game"), you, seven bots (8 players) and the
 ## HUD, and sets up the controls. Everyone's first spawn is out on the front and back lawns, facing the house.
-## During the countdown B changes the bots' difficulty (Easy / Normal / Hard, saved); F3 shows what each bot is
-## doing; after a win, Enter plays again. If autotest.json says "enabled": true, it runs the scripted checks and
+## The start screen comes first (Play, Bots, Settings, Quit); Esc pauses; F3 shows what each bot is doing; after a
+## win, Enter plays again and Esc goes back to the start screen. Graphics quality, volumes and key bindings come from
+## the saved settings. If autotest.json says "enabled": true, it runs the scripted checks and
 ## screenshots instead: "combat" and "stars" use seven standing test dummies; "bots_match" plays a full 8-bot match
 ## (you on autopilot too) and reports how it went.
 
@@ -17,6 +18,8 @@ const CAST := [
 	["Emo Bunny", "#b79cff"], ["Glitch", "#1fd6ff"], ["Kitty", "#a77bff"], ["Puffa", "#ffd21a"], ["Raven", "#d0202a"], ["Toxic", "#5dff3a"],
 ]
 const Hud := preload("res://ui/hud.gd")
+const Menu := preload("res://ui/menu.gd")
+const Sfx := preload("res://audio/sfx.gd")
 const Weapons := preload("res://weapons/weapons.gd")
 
 ## standing test dummies for the scripted combat and star checks (they never attack or collect): name, spot, facing, strafes?
@@ -36,9 +39,16 @@ var player: CharacterBody3D
 var dummies: Array = []
 var bots: Array = []
 var hud: CanvasLayer
+var menu: CanvasLayer
+var music: AudioStreamPlayer
+var _env: Environment
+var _sun: DirectionalLight3D
+var _probes: Node3D
+var _key_defaults := {}
 
 func _ready() -> void:
 	_inputs()
+	Sfx.setup()
 	_environment()
 	level = LevelBuilder.new()
 	level.name = "Level"
@@ -73,12 +83,70 @@ func _ready() -> void:
 	hud.player = player
 	hud.game = game
 	add_child(hud)
-	await game.start()
+	menu = Menu.new()
+	menu.defaults = _key_defaults
+	add_child(menu)
+	menu.play.connect(_on_play)
+	menu.resume.connect(_on_resume)
+	menu.quit_to_menu.connect(_on_quit_to_menu)
+	menu.settings_changed.connect(_on_settings_changed)
+	music = AudioStreamPlayer.new()
+	music.bus = "Music"
+	add_child(music)
+	game.won.connect(func(_f): _music("matchend"))
+	var skip_menu: bool = (testing and not auto.get("menu", false)) or Settings.play_now
+	Settings.play_now = false
+	await game.start(skip_menu)
 	_lawn_spawns()
+	_add_probes()
 	if testing:
+		if not skip_menu:
+			hud.visible = false
+			menu.show_start()
 		_run_autotest(auto)
-	else:
+	elif skip_menu:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	else:
+		hud.visible = false
+		menu.show_start()
+		_music("menu")
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+
+func _on_play() -> void:
+	hud.visible = true
+	music.stop()
+	game.begin_countdown()
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+func _on_resume() -> void:
+	get_tree().paused = false
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+func _on_quit_to_menu() -> void:
+	get_tree().paused = false
+	get_tree().reload_current_scene()
+
+func _on_settings_changed(what: String) -> void:
+	match what:
+		"quality":
+			_apply_quality()
+		"view":
+			player.apply_camera_mode()
+		"audio":
+			Sfx.apply_volumes()
+		"bots":
+			set_bot_difficulty(Settings.bots)
+
+## the web game's menu and match-end music on the Music bus, looping
+func _music(which: String) -> void:
+	var path := "res://audio/music/%s.mp3" % which
+	var s: AudioStream = load(path) if ResourceLoader.exists(path) else (AudioStreamMP3.load_from_file(path) if FileAccess.file_exists(path) else null)
+	if s == null:
+		return
+	if s is AudioStreamMP3:
+		(s as AudioStreamMP3).loop = true
+	music.stream = s
+	music.play()
 
 func _add_dummies() -> void:
 	for d in DUMMIES:
@@ -173,41 +241,121 @@ func _inputs() -> void:
 		var b := InputEventJoypadButton.new()
 		b.button_index = pair[1]
 		InputMap.action_add_event(pair[0], b)
+	# remember the default key/mouse binding of each action (for "reset"), then apply the saved rebinds
+	for a in InputMap.get_actions():
+		for ev in InputMap.action_get_events(a):
+			if ev is InputEventKey or ev is InputEventMouseButton:
+				_key_defaults[a] = ev
+				break
+	for a in Settings.keys:
+		if not InputMap.has_action(a):
+			continue
+		var code: String = Settings.keys[a]
+		var ev2: InputEvent = null
+		if code.begins_with("k:"):
+			var k := InputEventKey.new()
+			k.physical_keycode = int(code.substr(2))
+			ev2 = k
+		elif code.begins_with("m:"):
+			var mb2 := InputEventMouseButton.new()
+			mb2.button_index = int(code.substr(2))
+			ev2 = mb2
+		if ev2:
+			for old in InputMap.action_get_events(a):
+				if old is InputEventKey or old is InputEventMouseButton:
+					InputMap.action_erase_event(a, old)
+			InputMap.action_add_event(a, ev2)
 
-## lighting: afternoon sun with soft shadows, sky light, bounce light through the windows (SDFGI), ambient occlusion,
-## a touch of glow and filmic tonemapping
+## lighting (DESIGN plan, "Visuals"): afternoon sun with soft shadows, sky light, filmic (AgX) tonemapping, and by
+## quality setting: bounce light through the windows (SDFGI), ambient occlusion (SSAO) and indirect light (SSIL),
+## screen-space reflections, a reflection probe per room, light shafts and haze (volumetric fog), glow on lamps and
+## the SHOP sign, gentle colour grading. No vignette: the design stays minimal and clean.
 func _environment() -> void:
 	var we := WorldEnvironment.new()
-	var env := Environment.new()
+	_env = Environment.new()
 	var sky := Sky.new()
 	var sm := ProceduralSkyMaterial.new()
 	sm.sky_top_color = Color(0.36, 0.55, 0.85)
 	sm.sky_horizon_color = Color(0.72, 0.8, 0.9)
 	sm.ground_horizon_color = Color(0.62, 0.66, 0.6)
 	sky.sky_material = sm
-	env.background_mode = Environment.BG_SKY
-	env.sky = sky
-	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-	env.ambient_light_energy = 0.8
-	env.tonemap_mode = Environment.TONE_MAPPER_AGX
-	env.sdfgi_enabled = true
-	env.sdfgi_use_occlusion = true
-	env.sdfgi_energy = 1.2
-	env.ssao_enabled = true
-	env.ssao_intensity = 1.6
-	env.glow_enabled = true
-	env.glow_intensity = 0.4
-	env.glow_bloom = 0.05
-	we.environment = env
+	_env.background_mode = Environment.BG_SKY
+	_env.sky = sky
+	_env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
+	_env.tonemap_mode = Environment.TONE_MAPPER_AGX
+	_env.adjustment_enabled = true
+	_env.adjustment_contrast = 1.05
+	_env.adjustment_saturation = 1.04
+	we.environment = _env
 	add_child(we)
-	var sun := DirectionalLight3D.new()
-	sun.rotation_degrees = Vector3(-48, 35, 0)
-	sun.light_energy = 1.6
-	sun.light_color = Color(1.0, 0.96, 0.9)
-	sun.shadow_enabled = true
-	sun.shadow_blur = 1.5
-	sun.directional_shadow_max_distance = 120
-	add_child(sun)
+	_sun = DirectionalLight3D.new()
+	_sun.rotation_degrees = Vector3(-48, 35, 0)
+	_sun.light_energy = 1.6
+	_sun.light_color = Color(1.0, 0.96, 0.9)
+	_sun.shadow_enabled = true
+	_sun.shadow_blur = 1.5
+	add_child(_sun)
+	_apply_quality()
+
+## Low / Medium / High (Settings → Graphics)
+func _apply_quality() -> void:
+	var q: String = Settings.quality
+	var high := q == "high"
+	var low := q == "low"
+	# Low has no bounce light, so it uses a neutral warm ambient instead of the blue sky's
+	_env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR if low else Environment.AMBIENT_SOURCE_SKY
+	_env.ambient_light_color = Color(0.66, 0.64, 0.6)
+	_env.ambient_light_energy = 1.0 if low else 0.8
+	_env.sdfgi_enabled = not low
+	_env.sdfgi_use_occlusion = true
+	_env.sdfgi_energy = 1.2
+	_env.ssao_enabled = not low
+	_env.ssao_intensity = 1.6
+	_env.ssil_enabled = high
+	_env.ssil_intensity = 0.8
+	_env.ssr_enabled = high
+	_env.ssr_max_steps = 48
+	_env.ssr_fade_out = 2.5
+	_env.volumetric_fog_enabled = high
+	_env.volumetric_fog_density = 0.005
+	_env.volumetric_fog_albedo = Color(1.0, 0.96, 0.9)
+	_env.volumetric_fog_ambient_inject = 0.05
+	_env.glow_enabled = not low
+	_env.glow_intensity = 0.4
+	_env.glow_bloom = 0.05
+	_sun.light_volumetric_fog_energy = 1.4
+	_sun.directional_shadow_max_distance = 60.0 if low else 120.0
+	_sun.shadow_blur = 1.0 if low else 1.5
+	get_viewport().msaa_3d = Viewport.MSAA_DISABLED if low else Viewport.MSAA_2X
+	if _probes:
+		_probes.visible = high
+
+## one reflection probe per room (5 × 3 a floor), captured once, so glossy floors and glass show the room around
+## them; High only
+func _add_probes() -> void:
+	var h: Dictionary = level.house
+	if h.is_empty():
+		return
+	_probes = Node3D.new()
+	_probes.name = "Probes"
+	add_child(_probes)
+	var hx: float = float(h.x)
+	var hz: float = float(h.z)
+	var cw := hx * 2.0 / 5.0
+	var cd := hz * 2.0 / 3.0
+	for fl in 2:
+		for i in 5:
+			for j in 3:
+				var p := ReflectionProbe.new()
+				p.update_mode = ReflectionProbe.UPDATE_ONCE
+				p.size = Vector3(cw, 5.6, cd)
+				p.box_projection = true
+				p.interior = true
+				p.enable_shadows = false
+				p.intensity = 0.8
+				p.position = Vector3(-hx + cw * (i + 0.5), (0.0 if fl == 0 else 5.8) + 2.8, -hz + cd * (j + 0.5))
+				_probes.add_child(p)
+	_probes.visible = Settings.quality == "high"
 
 ## soft ceiling lights through the house on both floors (no shadows, so 100-odd of them stay cheap), so rooms
 ## away from the windows aren't black; the art pass replaces these with the real lamps
@@ -234,16 +382,21 @@ func _house_lights() -> void:
 			x += 9.0
 
 func _unhandled_input(e: InputEvent) -> void:
+	if menu.visible:
+		return
 	if e.is_action_pressed("pause"):
-		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	elif e is InputEventMouseButton and e.pressed and Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
+		if game.state == "won":
+			_on_quit_to_menu()   # results: Esc goes back to the start screen
+		elif game.state in ["fight", "countdown"]:
+			get_tree().paused = true
+			Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+			menu.show_pause()
+	elif e.is_action_pressed("ui_accept") and game.state == "won":
+		Settings.play_now = true   # play again, straight into the countdown
+		get_tree().reload_current_scene()
+	elif e is InputEventMouseButton and e.pressed and Input.mouse_mode != Input.MOUSE_MODE_CAPTURED and game.state != "won":
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 		get_viewport().set_input_as_handled()   # the click that grabs the mouse doesn't also punch
-	elif e.is_action_pressed("ui_accept") and game.state == "won":
-		get_tree().reload_current_scene()   # play again
-	elif e is InputEventKey and e.pressed and not e.echo and e.physical_keycode == KEY_B and game.state in ["countdown", "won"]:
-		var order := ["easy", "normal", "hard"]
-		set_bot_difficulty(order[(order.find(Settings.bots) + 1) % 3])
 	elif e is InputEventKey and e.pressed and not e.echo and e.physical_keycode == KEY_F3:
 		game.debug = not game.debug
 
@@ -266,6 +419,8 @@ func _log(t: String) -> void:
 
 func _run_autotest(cfg: Dictionary) -> void:
 	await get_tree().create_timer(1.0).timeout
+	if cfg.get("menu", false):
+		await _menu_checks()
 	_log("AUTOTEST boxes=%d ladders=%d spawns=%d" % [level.get_child_count(), level.ladders.size(), level.spawns.size()])
 	while game.state != "fight":   # the 3 s countdown
 		await get_tree().physics_frame
@@ -279,11 +434,24 @@ func _run_autotest(cfg: Dictionary) -> void:
 		await _bots_match(cfg)
 	# screenshots
 	for sh in cfg.get("shots", []):
+		player.invulnerable = true   # nobody spoils a screenshot
+		if sh.has("quality") and sh.quality != Settings.quality:
+			Settings.quality = sh.quality
+			_apply_quality()
 		Settings.camera_mode = sh.get("cam", "third")
 		player.apply_camera_mode()
 		player.place(Vector3(sh.pos[0], sh.pos[1], sh.pos[2]), sh.yaw)
 		player.pitch = sh.get("pitch", 0.0)
 		await get_tree().create_timer(sh.get("wait", 2.5)).timeout
+		if sh.get("bat", false):   # mid-swing with the bat
+			player.force_input = true
+			player.give_bat()
+			player.select_slot("melee")
+			await _wait(0.3)
+			Input.action_press("fire")
+			await _wait(0.12)
+			Input.action_release("fire")
+			player.force_input = false
 		var img := get_viewport().get_texture().get_image()
 		img.save_png(ProjectSettings.globalize_path("res://shots/" + sh.file))
 		_log("AUTOTEST shot " + sh.file)
@@ -658,3 +826,57 @@ func _brain(f: Node) -> Node:
 		if c.has_method("set_difficulty"):
 			return c
 	return null
+
+# ---------------- phase 5: menus, settings, rebinding ----------------
+func _press(key: int) -> void:
+	var k := InputEventKey.new()
+	k.physical_keycode = key
+	k.keycode = key
+	k.pressed = true
+	Input.parse_input_event(k)
+	await get_tree().process_frame
+	var up := k.duplicate()
+	up.pressed = false
+	Input.parse_input_event(up)
+	await get_tree().process_frame
+
+func _menu_checks() -> void:
+	_log("AUTOTEST menu: start screen shown=%s state=%s" % [menu.visible and menu.screen == "start", game.state])
+	await _snap("p5_01_start_menu.png")
+	menu.hide_menu()   # what the PLAY button does before it signals
+	menu.play.emit()
+	await get_tree().process_frame
+	_log("AUTOTEST menu: after Play state=%s hud=%s" % [game.state, hud.visible])
+	while game.state != "fight":
+		await get_tree().physics_frame
+	await _press(KEY_ESCAPE)
+	await _wait(0.2)
+	_log("AUTOTEST pause: paused=%s screen=%s" % [get_tree().paused, menu.screen])
+	menu.show_settings("pause")
+	await get_tree().process_frame
+	await _snap("p5_02_settings.png")
+	for q in ["low", "medium", "high"]:
+		Settings.quality = q
+		_on_settings_changed("quality")
+		await get_tree().process_frame
+		_log("AUTOTEST quality %s: sdfgi=%s ssr=%s fog=%s ssil=%s probes=%s msaa=%d" % [q, _env.sdfgi_enabled, _env.ssr_enabled, _env.volumetric_fog_enabled, _env.ssil_enabled, _probes.visible if _probes else false, get_viewport().msaa_3d])
+	Settings.vol_weapons = 3
+	_on_settings_changed("audio")
+	_log("AUTOTEST volume: Weapons bus %.1f dB (setting 3 = 30%%)" % AudioServer.get_bus_volume_db(AudioServer.get_bus_index("Weapons")))
+	Settings.vol_weapons = 8
+	_on_settings_changed("audio")
+	menu.show_keys()
+	await get_tree().process_frame
+	await _snap("p5_03_keys.png")
+	var before: String = menu.key_name("jump")
+	menu._bind("jump", (func():
+		var k := InputEventKey.new()
+		k.physical_keycode = KEY_K
+		return k).call(), false)
+	_log("AUTOTEST rebind: jump %s -> %s" % [before, menu.key_name("jump")])
+	menu._bind("jump", _key_defaults["jump"], false)
+	_log("AUTOTEST rebind reset: jump %s" % menu.key_name("jump"))
+	menu.hide_menu()
+	_on_resume()
+	await get_tree().process_frame
+	_log("AUTOTEST resume: paused=%s" % get_tree().paused)

@@ -75,8 +75,9 @@ func add_fighter(f: Node) -> void:
 func fighting() -> bool:
 	return state == "fight"
 
-## call once the level is built: waits for physics, finds floor spots, lays out stars and pickups, starts the countdown
-func start() -> void:
+## call once the level is built: waits for physics, finds floor spots, bakes navigation, lays out stars and pickups,
+## then starts the countdown (or, with begin = false, waits on the start screen until begin_countdown())
+func start(begin := true) -> void:
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 	_find_spots()
@@ -100,6 +101,14 @@ func start() -> void:
 		pickups.append(p)
 		place_pickup(p)
 	ready_done = true
+	_add_room_echo()
+	if begin:
+		begin_countdown()
+	else:
+		_set_state("menu")
+
+func begin_countdown() -> void:
+	countdown = COUNTDOWN
 	_set_state("countdown")
 	center_msg.emit("COLLECTION · 8 PLAYERS · THE MANSION", "Start with fists · find 10 hidden stars · cash them in at the shop outside · first to cash in wins", COUNTDOWN)
 
@@ -270,6 +279,43 @@ func _win(f: Node) -> void:
 	Sfx.play_ui(self, "win" if f.is_player else "lose", -4.0)
 	feed_msg.emit("%s cashed in %d stars" % ["You" if f.is_player else f.display_name, STARS], f.is_player)
 	won.emit(f)
+
+# ---------------------------------------------------------------- room echo
+
+## the house is 15 rooms a floor on a 5 × 3 grid: each gets an audio area sending its sounds to an echo bus. The
+## grand hall (centre, double height) rings, ground-floor rooms have some echo, upstairs is soft (carpets), outside
+## stays dry. Phase 6 gives each real room its own echo.
+func _add_room_echo() -> void:
+	Sfx.setup()
+	var h: Dictionary = level.house
+	if h.is_empty():
+		return
+	var hx: float = float(h.x)
+	var hz: float = float(h.z)
+	var cw := hx * 2.0 / 5.0
+	var cd := hz * 2.0 / 3.0
+	for fl in 2:
+		for i in 5:
+			for j in 3:
+				var hall := i == 2 and j == 1
+				if hall and fl == 1:
+					continue   # the hall's one tall area covers both floors
+				var a := Area3D.new()
+				a.collision_layer = Sfx.AREA_LAYER
+				a.collision_mask = 0
+				a.monitoring = false
+				a.reverb_bus_enabled = true
+				a.reverb_bus_name = "Hall" if hall else ("Room" if fl == 0 else "Soft")
+				a.reverb_bus_amount = 0.6 if hall else 0.4
+				a.reverb_bus_uniformity = 0.4
+				var cs := CollisionShape3D.new()
+				var bx := BoxShape3D.new()
+				var tall := 11.0 if hall else 5.6
+				bx.size = Vector3(cw, tall, cd)
+				cs.shape = bx
+				a.add_child(cs)
+				add_child(a)
+				a.global_position = Vector3(-hx + cw * (i + 0.5), (0.0 if fl == 0 else 5.8) + tall * 0.5, -hz + cd * (j + 0.5))
 
 # ---------------------------------------------------------------- navigation
 
@@ -503,13 +549,61 @@ func hit_world(col: Object, pos: Vector3, normal: Vector3, _dir: Vector3) -> voi
 		var upright := minf(size.x, size.z) < size.y or size.y > 0.5
 		var skylight := body.global_position.y > 10.0
 		if upright or skylight:
-			Effects.glass_shards(self, body.global_position, size)
+			_shatter(body.global_position, size)
 			Sfx.play(self, "smash", pos, 0.0, 1.0, 30.0, 0.05)
 			body.queue_free()
 			return
 	Effects.impact(self, pos, normal)
 	if randf() < 0.35:
 		Sfx.play(self, "impact", pos, -10.0, 1.0, 9.0, 0.1)
+
+# ---------------------------------------------------------------- glass
+
+const SHARD_POOL := 360
+var _shards: Array[RigidBody3D] = []
+var _shard_i := 0
+var _shard_mesh: BoxMesh
+var _shard_shape: BoxShape3D
+
+## a pane breaks into tiny clear shards that fall, bounce and settle on the floor (studio rule); the oldest shards
+## are reused once 360 are lying about
+func _shatter(center: Vector3, size: Vector3) -> void:
+	if _shard_mesh == null:
+		_shard_mesh = BoxMesh.new()
+		_shard_mesh.size = Vector3(0.06, 0.006, 0.045)
+		var m := StandardMaterial3D.new()
+		m.albedo_color = Color(0.86, 0.95, 1.0, 0.5)
+		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		m.roughness = 0.05
+		m.metallic = 0.3
+		_shard_mesh.material = m
+		_shard_shape = BoxShape3D.new()
+		_shard_shape.size = Vector3(0.06, 0.02, 0.045)
+	var n := clampi(int(maxf(size.x, size.z) * size.y * 6.0), 14, 40)
+	for k in n:
+		var sh: RigidBody3D
+		if _shards.size() < SHARD_POOL:
+			sh = RigidBody3D.new()
+			sh.collision_layer = 0
+			sh.collision_mask = 1
+			sh.mass = 0.02
+			var cs := CollisionShape3D.new()
+			cs.shape = _shard_shape
+			sh.add_child(cs)
+			var mi := MeshInstance3D.new()
+			mi.mesh = _shard_mesh
+			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			sh.add_child(mi)
+			add_child(sh)
+			_shards.append(sh)
+		else:
+			sh = _shards[_shard_i % SHARD_POOL]
+			_shard_i += 1
+		sh.sleeping = false
+		sh.global_position = center + Vector3(randf_range(-0.5, 0.5) * size.x, randf_range(-0.5, 0.5) * size.y, randf_range(-0.5, 0.5) * size.z)
+		sh.rotation = Vector3(randf() * TAU, randf() * TAU, randf() * TAU)
+		sh.linear_velocity = Vector3(randf_range(-1.5, 1.5), randf_range(0.0, 2.0), randf_range(-1.5, 1.5))
+		sh.angular_velocity = Vector3(randf_range(-12, 12), randf_range(-12, 12), randf_range(-12, 12))
 
 # ---------------------------------------------------------------- leaderboard
 
