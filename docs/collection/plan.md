@@ -152,7 +152,7 @@ The HUD and menus copy the web game's monochrome look (black and white, red high
 
 ## Build plan
 
-Six phases (the sixth added 24 Nov, when Pete settled on Godot for Collection as its own game); each ends with Pete playing it, and nothing moves on until he's happy with the last. Status (24 Nov): phases 1–5 are built; phases 2–4 are published. Pete played phases 1 and 2 (notes in DESIGN.md → Known issues); phases 3–5 wait for him to play. Next: phase 6, the Mansion in full.
+Six phases (the sixth added 24 Nov, when Pete settled on Godot for Collection as its own game); each ends with Pete playing it, and nothing moves on until he's happy with the last. Status (24 Nov): phases 1–5 are built and published; the first part of phase 6 (the Mansion's look and its moving parts) is built. Pete played phases 1 and 2 (notes in DESIGN.md → Known issues); phases 3–6 wait for him to play. Next: the rest of phase 6 (windows, stairs, smashable props, room lighting, culling).
 
 | Phase | What gets built | Gate: what Pete plays and checks |
 | --- | --- | --- |
@@ -168,6 +168,13 @@ How each phase is checked before it reaches Pete:
 - **Headless checks** run on every change: the project opens without errors, a scripted match plays for 2 minutes with 8 bots, stars spawn inside the house, nobody falls through the floor, and the win triggers at the shop.
 - **Screenshots and a short clip** from fixed spots (lawn, hall, upstairs, shop) sent with each phase. Phase 1 shots are in `docs/screenshots/`.
 - **A playable build** on the PC at every gate; Pete's notes go straight into the next phase.
+
+### Phase 6 results, first part (24 Nov 2026)
+
+- The Mansion now looks like the web game's: all 30 rooms with their floors, walls, furniture, lamps and signs, the lawns, hedges, fountain and shop, lined up with the same 1,074 colliders (exported from 1v1 `collection-v1` as `level/mansion.glb`).
+- Checked by script: pole up lands on the playroom floor (5.8 m) and dropping into its hole slides you down; both lifts go up and come back down; the launch trampoline throws you 7.3 m and lands you on the trophy-room floor; a bouncy one bounces you to the gym ceiling; both portal pairs swap corners; wading is slower (5.2 m vs 6.0 m in half a second); the springboard throws you into the pool; landing in the ball pit throws about a third of the balls round the room.
+- Bots ride the lifts and pole, take the launch trampoline and the portals (8-bot matches: 9–25 rides each).
+- About 160 fps on High on the RTX 5060 laptop. All earlier checks still pass. Screenshots in `docs/screenshots/phase6/`.
 
 ### Phase 5 results (24 Nov 2026)
 

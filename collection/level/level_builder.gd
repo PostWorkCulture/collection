@@ -3,9 +3,17 @@ extends Node3D
 ## (every solid box, ladder and spawn point, in the same metres and the same coordinates: x across, y up, z front to back,
 ## the front door facing -z). Grey-box look: light grey with a 1 m grid, a muted tint per room from the web colours,
 ## clear glass. Every box is solid, exactly as in the web game.
+## Phase 6: level/mansion.glb is the web Mansion's own look (rooms, finishes, furniture, lamps), exported from the same build
+## as the layout, so it lines up with these colliders box for box. When it loads, the grey-box drawing is skipped; the colliders,
+## ladders and glass (drawn here so it can break) stay. Moving parts in it are named (lift_car, tramp_mat, disco_*, pool_water,
+## portal_swirl) for level/mansion_features.gd to animate.
 
 var layout: Dictionary = {}
 var ladders: Array[AABB] = []
+var lifts: Array = []            # the 2 lifts and the fireman's pole: {box, nx, nz, rung}; ridden, not climbed
+var dressed := false             # mansion.glb loaded
+var dressing: Node3D = null
+var parts := {}                  # name -> Array of the GLB's named moving parts
 var spawns: Array = []
 var house: Dictionary = {}
 var shop_pos := Vector3.ZERO
@@ -22,12 +30,65 @@ func build() -> void:
 	if sh.size() > 0:
 		shop_pos = Vector3(sh[0].x, sh[0].y, sh[0].z)
 	_grid_tex = _make_grid()
+	_load_dressing()
 	_build_ground()
 	for b in layout.boxes:
 		_add_box(b)
 	for l in layout.ladders:
 		_add_ladder(l)
 	_add_shop()
+
+## the Mansion's look: the imported scene when Godot has imported the .glb, otherwise read straight from the file
+func _load_dressing() -> void:
+	var path := "res://level/mansion.glb"
+	var root: Node = null
+	if ResourceLoader.exists(path):
+		var ps: Resource = load(path)
+		if ps is PackedScene:
+			root = (ps as PackedScene).instantiate()
+	if root == null and FileAccess.file_exists(path):
+		var doc := GLTFDocument.new()
+		var st := GLTFState.new()
+		if doc.append_from_file(ProjectSettings.globalize_path(path), st) == OK:
+			root = doc.generate_scene(st)
+	if root == null or not root is Node3D:
+		return
+	dressing = root as Node3D
+	dressing.name = "Dressing"
+	add_child(dressing)
+	dressed = true
+	_collect_parts(dressing)
+	_fix_materials(dressing, {})
+
+## the web drew its light beams and glows additively (faint, never solid); glTF has no additive blend, so the faint unlit
+## see-through materials go back to additive here
+func _fix_materials(n: Node, seen: Dictionary) -> void:
+	for c in n.get_children():
+		var mi := c as MeshInstance3D
+		if mi and mi.mesh:
+			for si in mi.mesh.get_surface_count():
+				var m := mi.mesh.surface_get_material(si) as StandardMaterial3D
+				if m == null or seen.has(m):
+					continue
+				seen[m] = true
+				if m.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED and m.shading_mode == BaseMaterial3D.SHADING_MODE_UNSHADED and m.albedo_color.a < 0.3:
+					m.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+					m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+					m.cull_mode = BaseMaterial3D.CULL_BACK   # one layer, not both sides of the cone
+					m.albedo_color.a *= 0.5                  # with glow and haze on top, half the web's strength reads the same
+				m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+		_fix_materials(c, seen)
+
+func _collect_parts(n: Node) -> void:
+	for c in n.get_children():
+		var nm := String(c.name)
+		for key in ["lift_car", "tramp_mat", "tramp_arrow", "disco_ball", "disco_floor", "disco_beam", "pool_water", "portal_swirl"]:
+			if nm.begins_with(key):
+				if not parts.has(key):
+					parts[key] = []
+				parts[key].append(c)
+				break
+		_collect_parts(c)
 
 ## a 1 m grid: pale grey squares with a thin darker line, so distances read at a glance
 func _make_grid() -> ImageTexture:
@@ -86,6 +147,11 @@ func _add_box(b: Dictionary) -> void:
 	shape.size = size
 	cs.shape = shape
 	body.add_child(cs)
+	if glass:
+		body.set_meta("glass", true)
+	if dressed and not glass:   # the dressing draws it
+		add_child(body)
+		return
 	var mi := MeshInstance3D.new()
 	var mesh := BoxMesh.new()
 	mesh.size = size
@@ -99,30 +165,37 @@ func _add_box(b: Dictionary) -> void:
 	if glass:
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	body.add_child(mi)
-	if glass:
-		body.set_meta("glass", true)
 	add_child(body)
+
+## the indoor pool is sunk 0.8 m (x 11..21, z -5..5): the ground has a hole there and the pool floor sits below it
+const POOL := Rect2(11, -5, 10, 10)
+const POOL_FLOOR := -0.8
 
 func _build_ground() -> void:
 	var bd: Dictionary = layout.bounds
 	var w: float = bd.x1 - bd.x0 + 80.0
 	var d: float = bd.z1 - bd.z0 + 80.0
-	var body := StaticBody3D.new()
-	body.position = Vector3(0, -0.51, 0)
-	var cs := CollisionShape3D.new()
-	var sh := BoxShape3D.new()
-	sh.size = Vector3(w, 1, d)
-	cs.shape = sh
-	body.add_child(cs)
+	var x0 := -w * 0.5
+	var x1 := w * 0.5
+	var z0 := -d * 0.5
+	var z1 := d * 0.5
+	var pr := POOL
+	for r in [Rect2(x0, z0, w, pr.position.y - z0), Rect2(x0, pr.end.y, w, z1 - pr.end.y),
+			Rect2(x0, pr.position.y, pr.position.x - x0, pr.size.y), Rect2(pr.end.x, pr.position.y, x1 - pr.end.x, pr.size.y)]:
+		_ground_box(r, -1.0, 0.0)
+	_ground_box(pr, POOL_FLOOR - 1.0, POOL_FLOOR)
+	if dressed:
+		_edge_walls(bd, w, d)
+		return
 	var mi := MeshInstance3D.new()
 	var mesh := BoxMesh.new()
 	mesh.size = Vector3(w, 1, d)
 	mi.mesh = mesh
+	mi.position = Vector3(0, -0.51, 0)
 	var m: StandardMaterial3D = _mat("#7fae6a", false).duplicate()
 	m.albedo_color = Color(0.55, 0.66, 0.52)   # lawn: a muted green so outside reads as outside
 	mi.material_override = m
-	body.add_child(mi)
-	add_child(body)
+	add_child(mi)
 	# the house sits on a plain grey floor (the lawn stops at its walls)
 	if not house.is_empty():
 		var fl := MeshInstance3D.new()
@@ -132,7 +205,20 @@ func _build_ground() -> void:
 		fl.position = Vector3(0, -0.01, 0)
 		fl.material_override = _mat("#c8c4bc", false)
 		add_child(fl)
-	# invisible walls round the edge of the grounds
+	_edge_walls(bd, w, d)
+
+func _ground_box(r: Rect2, y0: float, y1: float) -> void:
+	var body := StaticBody3D.new()
+	body.position = Vector3(r.get_center().x, (y0 + y1) * 0.5 - 0.01, r.get_center().y)
+	var cs := CollisionShape3D.new()
+	var sh := BoxShape3D.new()
+	sh.size = Vector3(r.size.x, y1 - y0, r.size.y)
+	cs.shape = sh
+	body.add_child(cs)
+	add_child(body)
+
+## invisible walls round the edge of the grounds
+func _edge_walls(bd: Dictionary, w: float, d: float) -> void:
 	for s in [[Vector3(bd.x0 - 0.5, 5, 0), Vector3(1, 10, d)], [Vector3(bd.x1 + 0.5, 5, 0), Vector3(1, 10, d)],
 			[Vector3(0, 5, bd.z0 - 0.5), Vector3(w, 10, 1)], [Vector3(0, 5, bd.z1 + 0.5), Vector3(w, 10, 1)]]:
 		var wb := StaticBody3D.new()
@@ -148,7 +234,12 @@ func _build_ground() -> void:
 func _add_ladder(l: Dictionary) -> void:
 	var a: Array = l.b
 	var box := AABB(Vector3(a[0], a[1], a[2]), Vector3(a[3] - a[0], a[4] - a[1], a[5] - a[2]))
+	if l.get("lift", false):
+		lifts.append({"box": box, "nx": float(l.nx), "nz": float(l.nz), "rung": float(l.rung)})
+		return
 	ladders.append(box)
+	if dressed:   # the dressing has the white ladders
+		return
 	var m := StandardMaterial3D.new()
 	m.albedo_color = Color(0.97, 0.97, 0.97)
 	var along_x: bool = box.size.x > box.size.z
@@ -176,6 +267,15 @@ func _add_ladder(l: Dictionary) -> void:
 ## the cash-in shop on the front lawn: a grey kiosk with a lit SHOP sign facing the front door (phase 3 makes it work)
 func _add_shop() -> void:
 	var body := StaticBody3D.new()
+	if dressed:   # the dressing has the kiosk; keep it solid
+		body.position = shop_pos + Vector3(0, 1.4, 0)
+		var c2 := CollisionShape3D.new()
+		var s2 := BoxShape3D.new()
+		s2.size = Vector3(2.2, 2.8, 1.2)
+		c2.shape = s2
+		body.add_child(c2)
+		add_child(body)
+		return
 	body.position = shop_pos + Vector3(0, 1.4, 0)
 	var cs := CollisionShape3D.new()
 	var sh := BoxShape3D.new()

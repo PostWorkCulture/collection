@@ -35,55 +35,139 @@
  ],
  "shots": [
   {
-   "file": "01_lawn_third.png",
+   "file": "01_lawn.png",
    "pos": [
     -6,
     0.05,
-    -38
+    -40
    ],
-   "yaw": 0.25,
-   "pitch": -0.05,
+   "yaw": 0.15,
+   "pitch": -0.02,
    "cam": "third",
-   "wait": 3.5
+   "wait": 5
   },
   {
-   "file": "02_hall_third.png",
+   "file": "02_foyer.png",
    "pos": [
     0,
     0.05,
-    -18
+    -24
    ],
    "yaw": 0.0,
    "pitch": 0.0,
-   "cam": "third",
-   "wait": 4
+   "cam": "first",
+   "wait": 3
   },
   {
-   "file": "03_hall_first.png",
+   "file": "03_hall.png",
    "pos": [
     -4,
     0.05,
     -6
    ],
    "yaw": 0.6,
-   "pitch": 0.05,
-   "cam": "first",
-   "wait": 4
-  },
-  {
-   "file": "04_upstairs_first.png",
-   "pos": [
-    13,
-    5.85,
-    1
-   ],
-   "yaw": -2.4,
    "pitch": 0.0,
    "cam": "first",
-   "wait": 4
+   "wait": 3
   },
   {
-   "file": "05_room_first.png",
+   "file": "04_ballroom.png",
+   "pos": [
+    -10,
+    0.05,
+    11
+   ],
+   "yaw": -0.785,
+   "pitch": 0.0,
+   "cam": "first",
+   "wait": 3
+  },
+  {
+   "file": "05_gym.png",
+   "pos": [
+    26,
+    0.05,
+    4
+   ],
+   "yaw": 2.16,
+   "pitch": 0.0,
+   "cam": "first",
+   "wait": 3
+  },
+  {
+   "file": "06_pool.png",
+   "pos": [
+    12,
+    0.05,
+    6
+   ],
+   "yaw": 2.55,
+   "pitch": 0.0,
+   "cam": "first",
+   "wait": 3
+  },
+  {
+   "file": "07_games_room_pole.png",
+   "pos": [
+    -27,
+    0.05,
+    -5
+   ],
+   "yaw": -0.785,
+   "pitch": 0.0,
+   "cam": "first",
+   "wait": 3
+  },
+  {
+   "file": "08_playroom_ball_pit.png",
+   "pos": [
+    -29,
+    5.85,
+    -2
+   ],
+   "yaw": -0.785,
+   "pitch": -0.15,
+   "cam": "first",
+   "wait": 3
+  },
+  {
+   "file": "09_kids_room.png",
+   "pos": [
+    -12,
+    5.85,
+    12
+   ],
+   "yaw": -0.67,
+   "pitch": 0.0,
+   "cam": "first",
+   "wait": 3
+  },
+  {
+   "file": "10_trophy_room.png",
+   "pos": [
+    29,
+    5.85,
+    -5
+   ],
+   "yaw": 0.69,
+   "pitch": 0.0,
+   "cam": "first",
+   "wait": 3
+  },
+  {
+   "file": "11_portal.png",
+   "pos": [
+    -34,
+    0.05,
+    18
+   ],
+   "yaw": -1.5708,
+   "pitch": 0.0,
+   "cam": "first",
+   "wait": 3
+  },
+  {
+   "file": "12_library_third.png",
    "pos": [
     -30,
     0.05,
@@ -91,8 +175,32 @@
    ],
    "yaw": 1.2,
    "pitch": 0.0,
+   "cam": "third",
+   "wait": 3
+  },
+  {
+   "file": "13_bar_portal_third.png",
+   "pos": [
+    -35,
+    0.05,
+    15
+   ],
+   "yaw": -0.9,
+   "pitch": -0.05,
+   "cam": "third",
+   "wait": 3
+  },
+  {
+   "file": "14_upstairs_landing.png",
+   "pos": [
+    13,
+    5.85,
+    1
+   ],
+   "yaw": -2.4,
+   "pitch": 0,
    "cam": "first",
-   "wait": 4
+   "wait": 3
   }
  ],
  "combat": true,
@@ -102,5 +210,7 @@
  "difficulty": "normal",
  "match_secs": 300,
  "speed": 1,
- "menu": true
+ "menu": true,
+ "mansion": true,
+ "bots": false
 }

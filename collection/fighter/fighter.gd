@@ -84,6 +84,13 @@ var stam_rest := 0.0
 var air_jumps := 1
 var ladders: Array[AABB] = []
 var on_ladder := false
+var lifts: Array = []            # lifts and the fireman's pole (level.lifts): ride at 14 m/s, can't steer
+var ride := -1                   # the lift being ridden, or -1
+var ride_dir := 1
+var ride_cd := 0.0               # no getting straight back on for 0.6 s
+var clock := 0.0                 # this fighter's own running time (lift, trampoline and portal cooldowns)
+var wading := false
+var lift_arm := true             # leave a lift before it takes you again              # in the indoor pool: 20% slower (set by the Mansion features)
 
 # health
 var alive := true
@@ -516,6 +523,7 @@ func respawn_at(p: Vector3, y: float) -> void:
 	bloom = 0.0
 	collision_layer = LAYER_BODY
 	collision_mask = LAYER_WORLD | LAYER_BODY
+	ride = -1
 	place(p, y)
 	_set_pose_standing()
 	apply_camera_mode()
@@ -733,6 +741,10 @@ func _physics_process(dt: float) -> void:
 	var grounded := is_on_floor()
 	if grounded:
 		air_jumps = 1
+	clock += dt
+	if _ride_step(dt, wish, jump):
+		_update_view(dt)
+		return
 	on_ladder = false
 	if not downed:   # ladders: inside a ladder zone and pushing forward = climb
 		var feet := global_position
@@ -747,6 +759,8 @@ func _physics_process(dt: float) -> void:
 		speed *= CROUCH_MUL
 	if downed:
 		speed = CRAWL
+	if wading and global_position.y < 0.25:
+		speed *= 0.8
 	var target := wish * speed
 	var acc := ACC_GROUND if grounded else ACC_AIR
 	var hv := Vector3(velocity.x, 0, velocity.z)
@@ -782,6 +796,81 @@ func _physics_process(dt: float) -> void:
 	if downed:
 		_set_pose_downed()
 	_update_view(dt)
+
+## lifts and the pole (web ladderStep for `lift` ladders): walk into one (or drop in from the top) and it carries you
+## 14 m/s to the other end, then steps you out 1.45 m past the top edge; nothing to steer while riding
+func _ride_step(dt: float, wish: Vector3, jump: bool) -> bool:
+	if downed or not alive:
+		ride = -1
+		return false
+	if ride >= 0:   # already riding: keep going to the end, whatever the height
+		_ride_move(dt)
+		return true
+	var p := global_position
+	var near := false
+	for i in lifts.size():
+		var L: Dictionary = lifts[i]
+		var b: AABB = L.box
+		if p.x < b.position.x - RADIUS or p.x > b.end.x + RADIUS or p.z < b.position.z - RADIUS or p.z > b.end.z + RADIUS \
+				or p.y < b.position.y - 0.5 or p.y > b.end.y + 0.05:
+			continue
+		near = true
+		if clock < ride_cd:
+			continue
+		var into := wish.x * float(L.nx) + wish.z * float(L.nz)
+		var at_top := p.y > b.end.y - 0.25 and into < -0.2
+		# step into the car at the bottom (from any side), walk back into the shaft at the top
+		var c := b.get_center()
+		var in_car := lift_arm and p.y < b.position.y + 0.3 and Vector2(p.x - c.x, p.z - c.z).length() < 0.75
+		if not (in_car or into > 0.3 or (jump and into > -0.2) or at_top):
+			continue
+		start_ride(i, -1 if at_top else 1)
+		_ride_move(dt)
+		return true
+	if not near:
+		lift_arm = true
+	return false
+
+var rides := 0                   # lifts and pole taken (autotest)
+
+func start_ride(i: int, dir: int) -> void:
+	ride = i
+	rides += 1
+	lift_arm = false
+	ride_dir = dir
+	velocity = Vector3.ZERO
+	if crouching:
+		_set_crouch(false)
+
+func _ride_move(dt: float) -> void:
+	var L: Dictionary = lifts[ride]
+	var b: AABB = L.box
+	var nx: float = L.nx
+	var nz: float = L.nz
+	var p := global_position
+	var c := b.get_center()
+	var tx := c.x
+	var tz := c.z
+	if nx != 0.0:
+		tx = float(L.rung) - nx * 0.85
+	else:
+		tz = float(L.rung) - nz * 0.85
+	var k := minf(1.0, dt * 10.0)
+	p.x += (tx - p.x) * k
+	p.z += (tz - p.z) * k
+	p.y += 14.0 * ride_dir * dt
+	velocity = Vector3.ZERO
+	if ride_dir < 0 and p.y <= b.position.y:
+		p.y = b.position.y
+		ride = -1
+		ride_cd = clock + 0.6
+	elif ride_dir > 0 and p.y >= b.end.y:
+		p.y = b.end.y + 0.02
+		p.x += nx * 1.45
+		p.z += nz * 1.45
+		ride = -1
+		ride_cd = clock + 0.6
+	global_position = p
 
 ## footsteps (phase 5): one step every 2.6 m of running, quieter crouched or crawling, softer and lower on the lawns;
 ## a thump when you land from a real fall. Bots hear every fourth running step within 10 m.

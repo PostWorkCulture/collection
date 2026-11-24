@@ -60,6 +60,7 @@ var cash_point := Vector3.ZERO       # where you stand to cash in: just in front
 var cash_t := {}                     # fighter → seconds stood at the shop
 var nav_region: NavigationRegion3D
 var ladder_links := 0
+var warp_links := 0
 var debug := false                   # F3: show what every bot is doing, seeing and where it's going
 var _star_back := 0.0
 var _pad_mat: StandardMaterial3D
@@ -364,6 +365,20 @@ func _bake_nav() -> void:
 		link.start_position = foot
 		link.end_position = top
 		ladder_links += 1
+	# one-way short cuts (phase 6): the launch trampoline up to the trophy room and the two portal pairs.
+	# Bots walk to the start, then step onto the trampoline / into the portal (bot_brain._path_dir)
+	for w in level.layout.get("warps", []):
+		var a := _nav_floor(map, Vector3(w.a[0], w.a[1], w.a[2]), Vector3.ZERO)
+		var b := _nav_floor(map, Vector3(w.b[0], w.b[1], w.b[2]), Vector3.ZERO)
+		if a == Vector3.INF or b == Vector3.INF:
+			continue
+		var wl := NavigationLink3D.new()
+		wl.bidirectional = false
+		wl.enter_cost = float(w.c)
+		add_child(wl)
+		wl.start_position = a
+		wl.end_position = b
+		warp_links += 1
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 

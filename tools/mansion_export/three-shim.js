@@ -1,0 +1,2 @@
+const T=window.THREE;
+export const {BufferAttribute,ClampToEdgeWrapping,Color,DoubleSide,InterpolateDiscrete,InterpolateLinear,NoColorSpace,LinearFilter,LinearMipmapLinearFilter,LinearMipmapNearestFilter,MathUtils,Matrix4,MirroredRepeatWrapping,NearestFilter,NearestMipmapLinearFilter,NearestMipmapNearestFilter,PropertyBinding,RGBAFormat,RepeatWrapping,Scene,Source,SRGBColorSpace,CompressedTexture,Vector3,Quaternion}=T;

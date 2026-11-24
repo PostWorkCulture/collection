@@ -454,7 +454,7 @@ func _process(dt: float) -> void:
 		_center.text = ""
 		_center_sub.text = ""
 	_shield.visible = player.alive and player.shield_t > 0.0
-	_help.text = "imok Collection · Godot grey box (phase 5) · WASD move · Space jump · C crouch · V camera · LMB attack · RMB aim · 1 fists/bat · 2 gun · F3 bot view · Esc pause · %d fps" % Engine.get_frames_per_second()
+	_help.text = "imok Collection · Godot (phase 6) · WASD move · Space jump · C crouch · V camera · LMB attack · RMB aim · 1 fists/bat · 2 gun · F3 bot view · Esc pause · %d fps" % Engine.get_frames_per_second()
 	_process_phase3(dt)
 	_cross.queue_redraw()
 

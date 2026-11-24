@@ -401,6 +401,14 @@ func _path_dir() -> Vector3:
 	var nxt := goal
 	if agent.is_inside_tree() and not agent.is_navigation_finished():
 		nxt = agent.get_next_path_position()
+	# taking a short cut (launch trampoline, portal): from its start, head for the trampoline / portal itself
+	for w in game.level.layout.get("warps", []):
+		var b := Vector3(w.b[0], w.b[1], w.b[2])
+		var a := Vector3(w.a[0], w.a[1], w.a[2])
+		if Vector2(nxt.x - b.x, nxt.z - b.z).length() < 1.5 and absf(nxt.y - b.y) < 1.5 \
+				and Vector2(f.global_position.x - a.x, f.global_position.z - a.z).length() < 3.0 and absf(f.global_position.y - a.y) < 1.0:
+			nxt = Vector3(w.t[0], a.y, w.t[1])
+			break
 	var d := nxt - f.global_position
 	d.y = 0
 	if d.length() < 0.3:
@@ -485,6 +493,8 @@ func _unstick(dt: float, move_dir: Vector3) -> void:
 
 func _ladder_here() -> Variant:
 	for l in game.level.layout.get("ladders", []):
+		if l.get("lift", false):
+			continue
 		var a: Array = l.b
 		var box := AABB(Vector3(a[0], a[1], a[2]), Vector3(float(a[3]) - float(a[0]), float(a[4]) - float(a[1]), float(a[5]) - float(a[2])))
 		if box.grow(0.6).has_point(f.global_position + Vector3.UP * 0.6):

@@ -30,10 +30,13 @@ One Godot project in `/collection/` (open `collection/project.godot`). Folders a
 /collection/stars/         the gold star (mesh, hum, dropped stars)
 /collection/ui/            HUD, minimap and menus (start, pause, settings, keys)
 /collection/audio/         sfx.gd (buses, wall muffling) + sfx/ and music/ (1v1's own sound and music files)
-/collection/level/         Mansion builder + mansion_layout.json
-/collection/autotest.json  scripted checks ("enabled": true runs them and quits; "combat" and "stars" check fights and Collection rules on standing dummies; "bots_match" plays a whole 8-bot match, with "difficulty", "match_secs" and "speed"; "menu" walks the start screen, pause, settings and rebinding)
+/collection/level/         Mansion builder + mansion_layout.json (colliders, ladders, lifts, spawns, short cuts), mansion.glb (its look,
+                           exported from the web game with /tools/mansion_export/), mansion_features.gd (lifts, pole, trampolines,
+                           portals, pool, ball pit, ballroom)
+/collection/autotest.json  scripted checks ("enabled": true runs them and quits; "combat" and "stars" check fights and Collection rules on standing dummies; "bots_match" plays a whole 8-bot match, with "difficulty", "match_secs" and "speed"; "menu" walks the start screen, pause, settings and rebinding; "mansion" rides the lifts, pole, trampolines and portals and tries the pool and ball pit; "bots": false leaves the house empty for preview shots)
 /collection/<feature>/     new features get their own folder
 /docs/screenshots/         preview images for Pete, one folder per phase
+/tools/                    helpers outside the game (mansion_export: rebuilds level/mansion.glb from the web game)
 ```
 Update DESIGN.md → "Build status" when a part moves forward.
 
@@ -47,7 +50,7 @@ Update DESIGN.md → "Build status" when a part moves forward.
 - Large binaries (models, audio, textures over ~50 MB): ask before adding; use Git LFS if needed.
 
 ## Before committing
-- Run the checks: set `collection/autotest.json` to `"enabled": true` (with `"combat"` and `"stars"` true), run it (Godot MCP `run_project`, or headless: `godot --headless --path collection`), read the results in `collection/shots/autotest.txt` and any script errors in the console (`get_debug_output`), then set it back to `false`. Headless runs skip the screenshots.
+- Run the checks: set `collection/autotest.json` to `"enabled": true` (with `"combat"`, `"stars"` and `"mansion"` true), run it (Godot MCP `run_project`, or headless: `godot --headless --path collection`), read the results in `collection/shots/autotest.txt` and any script errors in the console (`get_debug_output`), then set it back to `false`. Headless runs skip the screenshots.
 - Commit message: `<area>: <what changed>` e.g. `stars: add spawn spacing`, `bots: add room exploring`, `docs: update DESIGN.md`.
 - Studio rules (DESIGN.md §10) apply to every change: no confetti/coloured particles, red spray + mist for hits, realistic premium look, white ladders.
 

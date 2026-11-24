@@ -9,6 +9,7 @@ extends Node3D
 
 const Fighter := preload("res://fighter/fighter.gd")
 const LevelBuilder := preload("res://level/level_builder.gd")
+const MansionFeatures := preload("res://level/mansion_features.gd")
 const CollectionGame := preload("res://game/collection_game.gd")
 const DummyBrain := preload("res://fighter/dummy_brain.gd")
 const BotBrain := preload("res://fighter/bot_brain.gd")
@@ -34,6 +35,7 @@ const DUMMIES := [
 ]
 
 var level: Node3D
+var features: Node3D
 var game: Node3D
 var player: CharacterBody3D
 var dummies: Array = []
@@ -59,9 +61,14 @@ func _ready() -> void:
 	game.name = "Game"
 	game.level = level
 	add_child(game)
+	features = MansionFeatures.new()
+	features.name = "MansionFeatures"
+	add_child(features)
+	features.setup(game, level)
 	player = Fighter.new()
 	player.name = "Player"
 	player.ladders = level.ladders
+	player.lifts = level.lifts
 	player.game = game
 	add_child(player)
 	game.add_fighter(player)
@@ -74,7 +81,7 @@ func _ready() -> void:
 	var use_dummies: bool = testing and (auto.get("combat", false) or auto.get("stars", false)) and not auto.get("bots_match", false)
 	if use_dummies:
 		_add_dummies()
-	else:
+	elif not (testing and not auto.get("bots", true) and not auto.get("bots_match", false)):   # "bots": false = an empty house for preview shots
 		_add_bots()
 	if testing and auto.get("bots_match", false):
 		player.autopilot = true   # you play as a bot too, so the whole match runs by itself
@@ -177,6 +184,7 @@ func _new_fighter(nm: String, col := Color(0.91, 0.27, 0.23)) -> CharacterBody3D
 	f.display_name = nm
 	f.band_color = col
 	f.ladders = level.ladders
+	f.lifts = level.lifts
 	f.game = game
 	add_child(f)
 	game.add_fighter(f)
@@ -421,11 +429,13 @@ func _run_autotest(cfg: Dictionary) -> void:
 	await get_tree().create_timer(1.0).timeout
 	if cfg.get("menu", false):
 		await _menu_checks()
-	_log("AUTOTEST boxes=%d ladders=%d spawns=%d" % [level.get_child_count(), level.ladders.size(), level.spawns.size()])
+	_log("AUTOTEST boxes=%d ladders=%d lifts=%d spawns=%d dressed=%s" % [level.get_child_count(), level.ladders.size(), level.lifts.size(), level.spawns.size(), level.dressed])
 	while game.state != "fight":   # the 3 s countdown
 		await get_tree().physics_frame
 	if cfg.get("movement", true):
 		await _movement_checks(cfg)
+	if cfg.get("mansion", false):
+		await _mansion_checks()
 	if cfg.get("combat", false):
 		await _combat_checks()
 	if cfg.get("stars", false):
@@ -502,6 +512,78 @@ func _movement_checks(cfg: Dictionary) -> void:
 		await get_tree().create_timer(s.get("secs", 2.0)).timeout
 		Input.action_release("move_forward")
 		_log("AUTOTEST walk %s: ended at %v" % [s.name, player.global_position])
+
+# ---------------- phase 6 Mansion feature checks ----------------
+func _hold(action: String, secs: float) -> void:
+	Input.action_press(action)
+	await get_tree().create_timer(secs).timeout
+	Input.action_release(action)
+
+func _track(secs: float) -> Array:   # [peak y, end position]
+	var peak := player.global_position.y
+	var t := 0.0
+	while t < secs:
+		await get_tree().physics_frame
+		t += get_physics_process_delta_time()
+		peak = maxf(peak, player.global_position.y)
+	return [peak, player.global_position]
+
+func _mansion_checks() -> void:
+	player.invulnerable = true
+	var r: Array
+	player.place(Vector3(-32.5, 0.05, 0), PI / 2)
+	r = await _track(1.5)
+	_log("AUTOTEST pole up: ended at %v (upstairs is 5.8)" % r[1])
+	player.place(Vector3(-32.2, 6.6, 0.2), PI / 2)
+	r = await _track(1.5)
+	_log("AUTOTEST pole down: ended at %v" % r[1])
+	player.place(Vector3(-24.0, 0.05, 25.5), PI / 2)
+	await _hold("move_forward", 0.5)
+	r = await _track(1.0)
+	_log("AUTOTEST lift up (ballroom): ended at %v" % r[1])
+	player.place(Vector3(-20.9, 5.85, 25.5), -PI / 2)
+	await _hold("move_forward", 0.3)
+	r = await _track(1.5)
+	_log("AUTOTEST lift down (kids' room): ended at %v" % r[1])
+	player.place(Vector3(20.0, 0.05, -7.5), PI / 2)
+	await _hold("move_forward", 0.25)
+	r = await _track(1.0)
+	_log("AUTOTEST lift up (pool): ended at %v" % r[1])
+	player.place(Vector3(32.0, 0.05, 0.0), PI / 2)
+	r = await _track(2.5)
+	_log("AUTOTEST launch trampoline: peak %.1f, ended at %v (trophy room floor 5.8)" % [r[0], r[1]])
+	player.place(Vector3(27.5, 0.05, -5.5), 0.0)
+	r = await _track(1.2)
+	_log("AUTOTEST trampoline: peak %.1f m" % r[0])
+	player.place(Vector3(-38.4, 0.05, 18.0), -PI / 2)
+	await _hold("move_forward", 0.6)
+	await get_tree().create_timer(0.3).timeout
+	_log("AUTOTEST portal (conservatory -> bar side): now at %v" % player.global_position)
+	player.place(Vector3(38.4, 5.85, -18.0), PI / 2)
+	await _hold("move_forward", 0.6)
+	await get_tree().create_timer(0.3).timeout
+	_log("AUTOTEST portal upstairs: now at %v" % player.global_position)
+	var runs: Array = []
+	for at in [Vector3(-6, 0.05, -38), Vector3(12.6, -0.75, -3.0)]:
+		player.place(at, 0.0)
+		await get_tree().create_timer(0.6).timeout
+		var p0: Vector3 = player.global_position
+		await _hold("move_forward", 0.5)
+		var d: Vector3 = player.global_position - p0
+		runs.append(Vector2(d.x, d.z).length())
+	_log("AUTOTEST pool: wading=%s, 0.5 s run %.2f m (lawn %.2f m)" % [player.wading, runs[1], runs[0]])
+	player.place(Vector3(10.4, 0.5, -3.0), PI / 2)
+	await _hold("move_forward", 0.3)
+	r = await _track(1.2)
+	_log("AUTOTEST springboard: peak %.1f, ended at %v" % [r[0], r[1]])
+	player.place(Vector3(-36.0, 9.5, 5.0), 0.0)
+	r = await _track(1.5)
+	var moved := 0
+	for i in features._pos.size():
+		if features._pos[i].distance_to(features._home[i]) > 0.5:
+			moved += 1
+	_log("AUTOTEST ball pit: landed at %v, %d of %d balls thrown" % [r[1], moved, features._pos.size()])
+	player.invulnerable = false
 
 # ---------------- phase 2 combat checks ----------------
 func _face(f: Node, target: Vector3) -> void:
@@ -767,7 +849,7 @@ func _star_checks() -> void:
 func _bots_match(cfg: Dictionary) -> void:
 	var limit: float = cfg.get("match_secs", 300.0)
 	Engine.time_scale = float(cfg.get("speed", 1.0))
-	_log("AUTOTEST nav: %d ladder links of %d" % [game.ladder_links, level.ladders.size()])
+	_log("AUTOTEST nav: %d ladder and lift links of %d, %d short cuts of %d" % [game.ladder_links, level.ladders.size() + level.lifts.size(), game.warp_links, level.layout.get("warps", []).size()])
 	_log("AUTOTEST bots: difficulty %s, styles %s" % [Settings.bots, ", ".join(game.fighters.map(func(f): return "%s=%s" % [f.display_name, _brain(f).style]))])
 	var t0: float = game.clock
 	var next_report := 15.0
@@ -817,6 +899,7 @@ func _bots_match(cfg: Dictionary) -> void:
 	_log("AUTOTEST bots match: state=%s winner=%s after %.0f s, kills %d, stars held %d, times stuck (15 s checks) %s, time outside or on the roof %d%% (roof %d%%, outside after the first 10 s %d%%)" % [game.state, game.winner.display_name if game.winner else "none", game.clock - t0, total_kills, total_stars, str(stuck.values()), roundi(100.0 * outdoor[0] / maxf(1.0, outdoor[1])), roundi(100.0 * outdoor[2] / maxf(1.0, outdoor[1])), roundi(100.0 * outdoor[3] / maxf(1.0, outdoor[1]))])
 	for f in game.standings():
 		_log("AUTOTEST   %s: %d stars, %d kills, %d deaths" % [f.display_name, f.stars, f.kills, f.deaths])
+	_log("AUTOTEST Mansion features used: %s" % str(features.uses) + ", lift and pole rides " + str(game.fighters.reduce(func(a, f): return a + f.rides, 0)))
 	if game.state == "won" and cfg.has("end_shot"):
 		await _wait(3.2)
 		await _snap(cfg.end_shot)
