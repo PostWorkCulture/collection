@@ -172,12 +172,26 @@ Mansion rules **(Pete)**:
 | Bots | not started |
 | HUD / minimap / menus | not started |
 
+## Approved improvements (Pete, 23 Nov 2026)
+Agreed with Pete in the rebuild plan ([`docs/collection/plan.md`](docs/collection/plan.md), which also holds the visuals, sound, HUD and phase-gate plan). Not built yet.
+- Lost stars drop where you fell as pickups for 20 s (instead of vanishing).
+- 2 s spawn shield, broken by attacking.
+- Sound cue and screen-edge flash when someone reaches 8 stars.
+- Stars hum quietly in 3D, so you can find one by ear through a wall.
+- Cash-in takes 2 s standing still at the shop (interruptible), replacing the instant win in section 6.
+- Default camera is third person; first person is a setting.
+
 ## Open questions
+- **Reveal threshold 4 or 8?** This spec says 8 (from 1v1 branch `collection-v1`, commit 76738cc, never merged). The live web game on 1v1 `main` and the plan agreed in Pete's 1v1 chat use 4. The 8-star alert improvement above was designed alongside a reveal at 4. Pete to confirm.
+- **Jump 12 or 13.5 m/s?** Section 5 says 13.5, but that is the web file's unused `CFG.jumpV`; the web fighter physics uses `JUMP=12`, and so does the phase 1 Fighter (2.05 m jump, measured).
+- **Downed model:** section 5 (30 downed HP, get up after 5 s) differs from the rebuild plan (crawl and bleed out over 15 s unless finished). Pete to confirm which.
+- **Finishers:** section 5 lists them; the rebuild plan left them out of the first build.
 - Star loss: an early note said "lose 2 stars after respawning". The final build used down = −2, death = all, and this spec follows that. Confirm with Pete.
 - Target platforms (PC / Web / Android) and publishing method: not decided.
 
 ## Decision log
 Newest first. Date — decision — why.
+- 2026-11-24 — Rebuild plan from Pete's 1v1 chat added as `docs/collection/plan.md`, with its approved improvements recorded above — the plan was agreed before this repo existed.
 - 2026-11-24 — Phase 1 committed: Godot project lives in `/collection/`, grouped by feature; `Settings` autoload added — matches the build already started.
 - 2026-11-24 — DESIGN.md replaced with the Collection build spec; repo is one Godot game, not a set of games — Pete supplied the spec.
 - 2026-11-24 — Repo set up with CLAUDE.md + DESIGN.md as the anti-drift source of truth.
