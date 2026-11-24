@@ -1,7 +1,8 @@
 extends Node3D
-## Entry point: builds the lighting, the grey-box Mansion, the match ("Game"), you, six test dummies and the HUD,
-## and sets up the controls. If autotest.json says "enabled": true, it runs the scripted checks and screenshots
-## instead (with "combat": true it also tests punches, guns, going down, dying, respawning and pickups).
+## Entry point: builds the lighting, the grey-box Mansion, the match ("Game"), you, seven test dummies (8 players)
+## and the HUD, and sets up the controls. After a win, Enter plays again. If autotest.json says "enabled": true, it
+## runs the scripted checks and screenshots instead ("combat": true adds the fight checks, "stars": true the
+## Collection rules checks).
 
 const Fighter := preload("res://fighter/fighter.gd")
 const LevelBuilder := preload("res://level/level_builder.gd")
@@ -10,7 +11,7 @@ const DummyBrain := preload("res://fighter/dummy_brain.gd")
 const Hud := preload("res://ui/hud.gd")
 const Weapons := preload("res://weapons/weapons.gd")
 
-## phase 2 test dummies (they never attack): name, spot, facing, strafes?
+## test dummies until the bots arrive in phase 4 (they never attack or collect): name, spot, facing, strafes?
 const DUMMIES := [
 	["Wednesday", Vector3(-9, 0.05, -31), PI, false],
 	["Anti Hero", Vector3(-13, 0.05, -33), PI, true],
@@ -18,6 +19,7 @@ const DUMMIES := [
 	["Starscreen", Vector3(0, 0.05, -18), PI, true],
 	["Crusty", Vector3(-30, 0.05, -15), 1.2, false],
 	["Dracz", Vector3(13, 5.85, 1), -2.4, false],
+	["Gorillaz", Vector3(6, 0.05, 34), PI, true],
 ]
 
 var level: Node3D
@@ -25,7 +27,6 @@ var game: Node3D
 var player: CharacterBody3D
 var dummies: Array = []
 var hud: CanvasLayer
-var _test_gun := -1
 
 func _ready() -> void:
 	_inputs()
@@ -78,7 +79,7 @@ func _inputs() -> void:
 	var keys := {
 		"move_forward": [KEY_W, KEY_UP], "move_back": [KEY_S, KEY_DOWN], "move_left": [KEY_A, KEY_LEFT], "move_right": [KEY_D, KEY_RIGHT],
 		"jump": [KEY_SPACE], "crouch": [KEY_C], "camera_toggle": [KEY_V], "pause": [KEY_ESCAPE, KEY_P],
-		"weapon_melee": [KEY_1], "weapon_gun": [KEY_2], "test_gun": [KEY_G],
+		"weapon_melee": [KEY_1], "weapon_gun": [KEY_2],
 		"fire": [], "aim": [], "weapon_next": [], "weapon_fists": [],
 		"look_left": [], "look_right": [], "look_up": [], "look_down": [],
 	}
@@ -173,20 +174,8 @@ func _unhandled_input(e: InputEvent) -> void:
 	elif e is InputEventMouseButton and e.pressed and Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 		get_viewport().set_input_as_handled()   # the click that grabs the mouse doesn't also punch
-	elif e.is_action_pressed("test_gun"):
-		give_test_weapon()
-
-## phase 2 test aid (G): hands you each gun in turn, then the bat, so every weapon can be tried quickly
-func give_test_weapon() -> void:
-	if not player.alive or player.downed:
-		return
-	_test_gun = (_test_gun + 1) % (Weapons.CO_GUNS.size() + 1)
-	if _test_gun < Weapons.CO_GUNS.size():
-		player.give_gun(Weapons.CO_GUNS[_test_gun])
-	else:
-		player.has_bat = false
-		player.give_bat()
-		player.select_slot("melee")
+	elif e.is_action_pressed("ui_accept") and game.state == "won":
+		get_tree().reload_current_scene()   # play again
 
 # ---------------- scripted checks (autotest.json) ----------------
 func _autotest() -> Dictionary:
@@ -200,6 +189,7 @@ func _log(t: String) -> void:
 	print(t)
 	if _logf == null:
 		DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://shots"))
+		FileAccess.open("res://shots/.gdignore", FileAccess.WRITE)   # keep the editor from importing test screenshots
 		_logf = FileAccess.open("res://shots/autotest.txt", FileAccess.WRITE)
 	_logf.store_line(t)
 	_logf.flush()
@@ -207,10 +197,14 @@ func _log(t: String) -> void:
 func _run_autotest(cfg: Dictionary) -> void:
 	await get_tree().create_timer(1.0).timeout
 	_log("AUTOTEST boxes=%d ladders=%d spawns=%d" % [level.get_child_count(), level.ladders.size(), level.spawns.size()])
+	while game.state != "fight":   # the 3 s countdown
+		await get_tree().physics_frame
 	if cfg.get("movement", true):
 		await _movement_checks(cfg)
 	if cfg.get("combat", false):
 		await _combat_checks()
+	if cfg.get("stars", false):
+		await _star_checks()
 	# screenshots
 	for sh in cfg.get("shots", []):
 		Settings.camera_mode = sh.get("cam", "third")
@@ -409,6 +403,7 @@ func _combat_checks() -> void:
 		_face(player, ppos + Vector3.UP * 0.5)
 		await _wait(0.3)
 		await _snap("p2_06_pickup_first.png")
+		player.ammo = 5   # under 10 bullets left, so the new gun can be taken
 		player.place(ppos + Vector3(0, 0.05, 0), 0.0)
 		await _wait(0.3)
 		_log("AUTOTEST pickup: took %s -> holding %s with %d bullets; pickup active=%s" % [pid, player.gun_id, player.ammo, pk.active])
@@ -444,4 +439,86 @@ func _combat_checks() -> void:
 		nearest = minf(nearest, d.global_position.distance_to(player.global_position))
 	player.dealt_hit.disconnect(count)
 	_log("AUTOTEST you respawned: alive=%s at %v, nearest dummy %.1f m, shield %.1f, weapon %s" % [player.alive, player.global_position, nearest, player.shield_t, player.current_weapon()])
+	player.force_input = false
+
+# ---------------- phase 3 Collection rules checks ----------------
+func _active_stars() -> Array:
+	return game.stars.filter(func(st): return st.active)
+
+func _star_checks() -> void:
+	player.force_input = true
+	await _wait(1.0)
+	# 14 stars, all inside the house (ground or first floor, never the roof), at least 7 m apart
+	var act := _active_stars()
+	var inside := true
+	var gap := 1e9
+	for a in act:
+		var p: Vector3 = a.global_position
+		if absf(p.x) > 40.0 or absf(p.z) > 27.0 or p.y > 7.0:
+			inside = false
+		for b in act:
+			if a != b and absf(p.y - b.global_position.y) < 3.0:
+				gap = minf(gap, Vector2(p.x - b.global_position.x, p.z - b.global_position.z).length())
+	_log("AUTOTEST stars: %d out, all inside=%s, closest pair on a floor %.1f m" % [act.size(), inside, gap])
+	# take one: it's replaced straight away, at least 12 m from where it was
+	var s0: Node = act[0]
+	var at: Vector3 = s0.global_position
+	Settings.camera_mode = "first"
+	player.apply_camera_mode()
+	player.place(at + Vector3(0, 0.05, -2.6), 0.0)
+	await _wait(0.4)
+	_face(player, at + Vector3.UP * 1.0)
+	await _wait(0.3)
+	await _snap("p3_01_star_first.png")
+	player.place(at + Vector3(0, 0.05, 0), 0.0)
+	await _wait(0.2)
+	_log("AUTOTEST take star: you have %d, stars out %d, that star moved %.1f m" % [player.stars, _active_stars().size(), s0.global_position.distance_to(at)])
+	# hold 10 and you can't take an 11th
+	game.add_stars(player, game.STARS - player.stars)
+	var s1: Node = _active_stars()[1]
+	var at1: Vector3 = s1.global_position
+	Settings.camera_mode = "third"
+	player.apply_camera_mode()
+	player.place(at1 + Vector3(0, 0.05, 0), 0.0)
+	await _wait(0.5)
+	await _snap("p3_02_ten_stars_third.png")
+	_log("AUTOTEST at 10: still %d, star still there=%s, marked=%s" % [player.stars, s1.active and s1.global_position == at1, player.marked])
+	# a marked leader shows through walls and on the minimap
+	var crusty: Node = dummies[4]
+	game.add_stars(crusty, 8)
+	_log("AUTOTEST Crusty at 8: marked=%s stencil=%d" % [crusty.marked, crusty._body_mat.stencil_mode])
+	player.place(Vector3(-27, 0.05, -31), 0.0)
+	_face(player, crusty.global_position + Vector3.UP * 1.2)
+	await _wait(1.0)
+	await _snap("p3_03_marked_xray_third.png")
+	# down costs 2 (dropped where you fell), death costs the rest
+	player.place(Vector3(-6, 0.05, -36), 0.0)
+	await _wait(0.3)
+	player.take_damage(150, dummies[1])
+	await _wait(0.4)
+	_log("AUTOTEST down: you have %d, dropped stars %d" % [player.stars, game.drops.size()])
+	await _wait(0.6)
+	await _snap("p3_04_dropped_stars_third.png")
+	player.take_damage(40, dummies[1])
+	await _wait(0.3)
+	_log("AUTOTEST dead: you have %d, dropped stars %d, Anti Hero kills %d" % [player.stars, game.drops.size(), dummies[1].kills])
+	while not player.alive:
+		await get_tree().physics_frame
+	await _wait(0.3)
+	# pick up a dropped star
+	var d0: Node = game.drops[0]
+	player.place(d0.global_position + Vector3(0, 0.05, 0), 0.0)
+	await _wait(0.2)
+	_log("AUTOTEST picked up a dropped star: you have %d, dropped stars left %d" % [player.stars, game.drops.size()])
+	# cash in: 10 stars, stand still at the shop for 2 s
+	game.add_stars(player, game.STARS - player.stars)
+	player.place(game.cash_point + Vector3(0, 0.05, 0), PI)
+	var t0 := Time.get_ticks_msec()
+	await _wait(1.0)
+	await _snap("p3_05_cashing_in_third.png")
+	while game.state != "won" and Time.get_ticks_msec() - t0 < 5000:
+		await get_tree().physics_frame
+	_log("AUTOTEST cash in: state=%s winner=%s after %.1f s" % [game.state, game.winner.display_name if game.winner else "none", (Time.get_ticks_msec() - t0) / 1000.0])
+	await _wait(3.0)
+	await _snap("p3_06_victory_results.png")
 	player.force_input = false

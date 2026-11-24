@@ -93,6 +93,7 @@ var last_by: Node = null
 var respawn_t := 0.0
 var shield_t := 0.0
 var stars := 0
+var marked := false              # 8+ stars: outlined through walls for everyone
 var kills := 0
 var deaths := 0
 
@@ -115,6 +116,7 @@ var shots := 0
 var _shape: CapsuleShape3D
 var _cs: CollisionShape3D
 var _body_mesh: MeshInstance3D
+var _body_mat: StandardMaterial3D
 var _shell: MeshInstance3D
 var _shell_mat: StandardMaterial3D
 var _pivot: Node3D
@@ -148,9 +150,9 @@ func _ready() -> void:
 	cm.height = HEIGHT
 	_body_mesh.mesh = cm
 	_body_mesh.position.y = HEIGHT * 0.5
-	var bm := StandardMaterial3D.new()
-	bm.albedo_color = Color(0.72, 0.72, 0.74)
-	_body_mesh.material_override = bm
+	_body_mat = StandardMaterial3D.new()
+	_body_mat.albedo_color = Color(0.72, 0.72, 0.74)
+	_body_mesh.material_override = _body_mat
 	add_child(_body_mesh)
 	var band := MeshInstance3D.new()
 	var bandm := CylinderMesh.new()
@@ -344,6 +346,14 @@ func select_slot(s: String) -> void:
 	if is_player:
 		Sfx.play(get_parent(), "swap", global_position, -8.0, 1.0, 8.0)
 	_refresh_weapon_models()
+
+## marked (8+ stars): Godot's X-ray stencil draws the body in red wherever a wall hides it, for everyone
+func set_marked(on: bool) -> void:
+	if on == marked:
+		return
+	marked = on
+	_body_mat.stencil_mode = BaseMaterial3D.STENCIL_MODE_XRAY if on else BaseMaterial3D.STENCIL_MODE_DISABLED
+	_body_mat.stencil_color = Color(0.91, 0.16, 0.16, 0.85)
 
 # ---------------------------------------------------------------- pickups
 
@@ -631,6 +641,11 @@ func _set_crouch(on: bool) -> void:
 func _physics_process(dt: float) -> void:
 	if is_player:
 		_read_player_input(dt)
+	if game and not game.fighting():   # countdown and after the win: nobody moves or attacks
+		in_move = Vector2.ZERO
+		in_jump = false
+		in_fire = false
+		in_aim = false
 	if not alive:
 		respawn_t -= dt
 		if respawn_t <= 0.0 and game:

@@ -160,7 +160,7 @@ Mansion rules **(Pete)**:
 |---|---|---|
 | Settings | `collection/autoload/settings.gd` | saved camera mode (third/first), FOV, mouse sensitivity |
 
-CollectionGame is **not** an autoload: it is a node (`collection/game/collection_game.gd`) that `main.gd` creates as "Game" and hands to every fighter. Phase 2: fighters, pickups, respawns, glass, kill feed. Phase 3 adds stars, the shop and the win.
+CollectionGame is **not** an autoload: it is a node (`collection/game/collection_game.gd`) that `main.gd` creates as "Game" and hands to every fighter. It runs the match: countdown (3 s) → fight → won, the count-up clock, fighters, stars, pickups, the shop cash-in, respawns, glass and the kill feed.
 
 ## Build status
 | Part | Status |
@@ -171,12 +171,12 @@ CollectionGame is **not** an autoload: it is a node (`collection/game/collection
 | Weapons + pickups | fists, bat, 6 SMGs + Dual Pistols with the web stats; 20-bullet pickups (6 guns + 2 bats); first-person hands and iron-sight aiming (phase 2) |
 | Health, down, death, respawn | 100 HP + regen, downed (30 HP, crawl, up after 5 s), finished = dead, respawn 3 s furthest from others, 2 s spawn shield (phase 2) |
 | Effects + sound | red spray + mist on hits, muzzle flash, thin tracers, dust, glass shards, dark-red downed wisps; the web game's sound files, 3D positioned (phase 2) |
-| Stars + cash-in | not started |
+| Stars + cash-in | 14 indoor stars with the spacing and replacement rules, 3D hum, down −2 / death all dropped as 20 s pickups, marked at 8 (red X-ray through walls), 2 s cash-in at the shop, win and results, Enter to play again (phase 3) |
 | Bots | not started |
-| HUD / minimap / menus | combat HUD: health, weapon/bullets, crosshair, hit marker, damage numbers, kill feed, down/eliminated messages (phase 2); minimap, leaderboard, star counter and menus not started |
+| HUD / minimap / menus | combat HUD: health, weapon/bullets, crosshair, hit marker, damage numbers, kill feed, down/eliminated messages (phase 2); leaderboard, clock and goal, ★ counter, circular minimap with floor label and gold leader stars, cash-in bar, gold edge flash, loading card and countdown, win and results screens (phase 3); start menu, pause menu and settings not started |
 
 ## Approved improvements (Pete, 23 Nov 2026)
-Agreed with Pete in the rebuild plan ([`docs/collection/plan.md`](docs/collection/plan.md), which also holds the visuals, sound, HUD and phase-gate plan). Built so far: the spawn shield (phase 2) and third person as default.
+Agreed with Pete in the rebuild plan ([`docs/collection/plan.md`](docs/collection/plan.md), which also holds the visuals, sound, HUD and phase-gate plan). Built so far: the spawn shield (phase 2), third person as default, dropped stars, the 8-star cue and edge flash, star hum, and the 2 s cash-in (phase 3).
 - Lost stars drop where you fell as pickups for 20 s (instead of vanishing).
 - 2 s spawn shield, broken by attacking.
 - Sound cue and screen-edge flash when someone reaches 8 stars. With the reveal also at 8, this is the cue for a player becoming marked.
@@ -195,6 +195,7 @@ Agreed with Pete in the rebuild plan ([`docs/collection/plan.md`](docs/collectio
 
 ## Decision log
 Newest first. Date — decision — why.
+- 2026-11-24 — Phase 3 (Collection rules) built, waiting for Pete. Choices made while building, all easy to change: 7 test dummies so there are 8 players on the leaderboard (they don't collect stars until the bots in phase 4); the shop's cash-in spot is 1.7 m in front of it with a pulsing white pad, within 2.2 m counts; cash-in restarts if you move faster than 2 m/s, get hurt or go down; lost stars drop in a ring about 1 m round where you fell, so whoever gets there can scoop several at once; the minimap is 60 m across, turns with you, and shows only you and marked players (nothing else is in the spec); the X-ray is red (the plan's "red outline, as on the web") using Godot 4.7's built-in X-ray material, and you can see your own glow when you're marked; the star hum is a soft two-note tone made in code (the web game has no hum file); marked and 10-star feed lines also show for you ("You have 8 stars: you're marked"); the gong plays when anyone becomes marked; the G test-gun key is gone. Star spots come from the floor grid, not a nav mesh yet, so a star could land somewhere hard to reach until phase 4 bakes one.
 - 2026-11-24 — Phase 2 (combat) built, waiting for Pete's play-through. Choices made while building, all easy to change: a bat dropped by a downed player lies where they fell for 20 s (the plan says "dropped" but not for how long; 20 s matches dropped stars); all upright glass and roof skylights break in one hit, upstairs glass floor panels don't (studio rule + Mansion "bulletproof floor panels"); shards fall and vanish rather than settle (settling comes with the phase 5 glass pass); fighters are solid to each other, downed ones aren't (so you can walk over them); first-person hands push out as the view zooms so the gun keeps its size on screen; 6 test dummies stand on the lawn and in the house (2 strafe) and go back to their spot when they respawn; **G** cycles through every gun and the bat (test aid, removed in phase 3); sounds play from where they happen, but muffling through walls and room echo wait for phase 5.
 - 2026-11-24 — CollectionGame is a node made by `main.gd`, not an autoload; scripts load each other with `preload` instead of `class_name` — the open editor rewrites project.godot, and command-line runs (Godot MCP, headless checks) don't have the editor's class list, so both keep the game runnable either way.
 - 2026-11-24 — Pete settled the four open questions: reveal at 8 stars; jump 12 m/s (the web fighter's real value); downed players get up on their own after 5 s (30 downed HP, 15 s bleed-out only as a backstop); finishers left out of the first build. Star loss confirmed as down = −2, death = all (Pete's instruction in the 1v1 chat, 23 Nov).

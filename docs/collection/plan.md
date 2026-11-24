@@ -152,13 +152,13 @@ The HUD and menus copy the web game's monochrome look (black and white, red high
 
 ## Build plan
 
-Five phases; each ends with Pete playing it, and nothing moves on until he's happy with the last. Status (24 Nov): phases 1 and 2 are built; Pete moved on to phase 2 before his phase 1 walk-through, so both wait for him to play.
+Five phases; each ends with Pete playing it, and nothing moves on until he's happy with the last. Status (24 Nov): phases 1–3 are built. Pete played phases 1 and 2 (notes in DESIGN.md → Known issues) and phase 2 is published; phase 3 waits for his solo match.
 
 | Phase | What gets built | Gate: what Pete plays and checks |
 | --- | --- | --- |
 | 1 · Foundations | Godot project, repo, grey-box Mansion built from the web layout; one Fighter: walk, sprint, crouch, jump, ladders, both cameras | Walk the Mansion: rooms, stairs, scale feel right. **Built; waiting for Pete's walk-through.** |
 | 2 · Combat | Fists, the SMG family, Dual Pistols, bat; 20-bullet pickups; health, downed, death, respawn; test dummies to hit | Fight a few dummies: punches and guns feel right. **Built; waiting for Pete.** |
-| 3 · Collection rules | Stars, shop cash-in, 2 lost when downed, all lost on death; leader outline and minimap marker; HUD and leaderboard | Play a full solo match: find 10 stars and cash in |
+| 3 · Collection rules | Stars, shop cash-in, 2 lost when downed, all lost on death; leader outline and minimap marker; HUD and leaderboard | Play a full solo match: find 10 stars and cash in. **Built; waiting for Pete.** |
 | 4 · Bots | Nav mesh, searching by sight, hearing, fighting, targeting; 7 bots at Easy, Normal, Hard; a debug view of what they see | Play full 8-player matches: bots feel fair at every level |
 | 5 · Look and sound | Lighting, reflections, fog, post effects, particles, glass; 3D sound through walls, room echo, menus, settings, controller | Compare with the web game, then decide: carry on or stop |
 
@@ -167,6 +167,15 @@ How each phase is checked before it reaches Pete:
 - **Headless checks** run on every change: the project opens without errors, a scripted match plays for 2 minutes with 8 bots, stars spawn inside the house, nobody falls through the floor, and the win triggers at the shop.
 - **Screenshots and a short clip** from fixed spots (lawn, hall, upstairs, shop) sent with each phase. Phase 1 shots are in `docs/screenshots/`.
 - **A playable build** on the PC at every gate; Pete's notes go straight into the next phase.
+
+### Phase 3 results (24 Nov 2026)
+
+- 14 stars out at once, all inside the house, closest pair on the same floor 7.2–8 m apart; a taken star comes back straight away 13–47 m away.
+- With 10 stars you can't take an 11th; the counter turns gold with "Cash in at the shop outside".
+- 8 stars marks a player: red X-ray through walls, gold star on the minimap, gong and gold screen-edge flash, feed line.
+- Going down drops 2 stars where you fell; dying drops the rest; they can be picked up for 20 s.
+- Standing still at the shop with 10 stars wins after 2.0 s (2.3–2.4 s with screenshots being saved); Victory, then the results table, Enter plays again.
+- Screenshots in `docs/screenshots/phase3/`.
 
 ### Phase 2 results (24 Nov 2026)
 

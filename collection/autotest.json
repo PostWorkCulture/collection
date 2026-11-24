@@ -96,5 +96,6 @@
   }
  ],
  "combat": true,
- "movement": true
+ "movement": true,
+ "stars": true
 }
