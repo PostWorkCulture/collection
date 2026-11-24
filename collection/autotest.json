@@ -1,0 +1,98 @@
+{
+ "enabled": true,
+ "quit": true,
+ "walks": [
+  {
+   "name": "grand staircase",
+   "from": [
+    0,
+    0.05,
+    -3.5
+   ],
+   "yaw": 0.0,
+   "secs": 1.6
+  },
+  {
+   "name": "into the front door",
+   "from": [
+    0,
+    0.05,
+    -34
+   ],
+   "yaw": 0.0,
+   "secs": 1.2
+  },
+  {
+   "name": "front ladder",
+   "from": [
+    -24,
+    0.05,
+    -29.3
+   ],
+   "yaw": 0.0,
+   "secs": 3.0
+  }
+ ],
+ "shots": [
+  {
+   "file": "01_lawn_third.png",
+   "pos": [
+    -6,
+    0.05,
+    -38
+   ],
+   "yaw": 0.25,
+   "pitch": -0.05,
+   "cam": "third",
+   "wait": 3.5
+  },
+  {
+   "file": "02_hall_third.png",
+   "pos": [
+    0,
+    0.05,
+    -18
+   ],
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "cam": "third",
+   "wait": 4
+  },
+  {
+   "file": "03_hall_first.png",
+   "pos": [
+    -4,
+    0.05,
+    -6
+   ],
+   "yaw": 0.6,
+   "pitch": 0.05,
+   "cam": "first",
+   "wait": 4
+  },
+  {
+   "file": "04_upstairs_first.png",
+   "pos": [
+    13,
+    5.85,
+    1
+   ],
+   "yaw": -2.4,
+   "pitch": 0.0,
+   "cam": "first",
+   "wait": 4
+  },
+  {
+   "file": "05_room_first.png",
+   "pos": [
+    -30,
+    0.05,
+    -15
+   ],
+   "yaw": 1.2,
+   "pitch": 0.0,
+   "cam": "first",
+   "wait": 4
+  }
+ ]
+}

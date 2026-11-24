@@ -19,14 +19,15 @@ Read this file and `DESIGN.md` before doing anything. If a request conflicts wit
 6. If something in the code disagrees with DESIGN.md, report it; don't "fix" either side on your own.
 
 ## Structure
-One Godot project at the repo root:
+One Godot project in `/collection/` (open `collection/project.godot`). Folders are grouped by feature, scene and script side by side:
 ```
-/project.godot
-/scenes/        .tscn files (mansion/, fighter/, pickups/, ui/)
-/scripts/       .gd files, mirroring scenes/ (autoload/, bots/, ...)
-/assets/        models (chars/, weapons/), textures, audio, fonts
-/shaders/
-/docs/          notes, preview screenshots for Pete
+/collection/project.godot, main.tscn, main.gd   entry point
+/collection/autoload/      singletons (settings.gd)
+/collection/fighter/       player/bot body, movement, camera
+/collection/level/         Mansion builder + mansion_layout.json
+/collection/autotest.json  scripted walk/screenshot checks ("enabled": true runs them and quits)
+/collection/<feature>/     new features get their own folder: stars/, pickups/, bots/, ui/ ...
+/docs/screenshots/         preview images for Pete
 ```
 Update DESIGN.md → "Build status" when a part moves forward.
 

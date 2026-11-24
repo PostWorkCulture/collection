@@ -158,14 +158,15 @@ Mansion rules **(Pete)**:
 ### Autoloads
 | Name | Script | Purpose |
 |---|---|---|
-| CollectionGame | `scripts/autoload/collection_game.gd` | config, match state, timer, win check (not built yet) |
+| Settings | `collection/autoload/settings.gd` | saved camera mode (third/first), FOV, mouse sensitivity |
+| CollectionGame | `collection/autoload/collection_game.gd` | config, match state, timer, win check (not built yet) |
 
 ## Build status
 | Part | Status |
 |---|---|
-| Godot project skeleton | not started |
-| The Mansion | not started |
-| Fighter / player movement | not started |
+| Godot project skeleton | done (phase 1) |
+| The Mansion | grey-box from `mansion_layout.json`, ladders, shop placeholder (phase 1) |
+| Fighter / player movement | movement, jump, crouch, ladders, third/first-person camera (phase 1) |
 | Weapons + pickups | not started |
 | Stars + cash-in | not started |
 | Bots | not started |
@@ -177,6 +178,7 @@ Mansion rules **(Pete)**:
 
 ## Decision log
 Newest first. Date — decision — why.
+- 2026-11-24 — Phase 1 committed: Godot project lives in `/collection/`, grouped by feature; `Settings` autoload added — matches the build already started.
 - 2026-11-24 — DESIGN.md replaced with the Collection build spec; repo is one Godot game, not a set of games — Pete supplied the spec.
 - 2026-11-24 — Repo set up with CLAUDE.md + DESIGN.md as the anti-drift source of truth.
 

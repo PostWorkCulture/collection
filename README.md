@@ -5,4 +5,4 @@
 - **DESIGN.md**: what's being built (the spec).
 - **CLAUDE.md**: rules for AI agents working in this repo.
 
-Open in Godot: Import → select `project.godot` in this folder.
+Open in Godot: Import → select `collection/project.godot`.
