@@ -244,8 +244,8 @@ func _pool_step(f: Node, s: Dictionary, dt: float) -> void:
 
 # ---------------------------------------------------------------- windows
 
-## jump at a window and you crash straight through the glass (as on the web); once it's open, just keep walking into
-## it and you climb over the 0.8 m sill without needing to jump (Pete, 24 Nov: windows felt too tight)
+## jump at a window and you crash straight through the glass (as on the web); once it's open you step over the 0.45 m
+## sill, or climb a higher one just by walking into it (Pete, 24 Nov: windows bigger and easier, break when you jump in)
 func _window_step(f: Node) -> void:
 	if f.downed or f.ride >= 0:
 		return
@@ -263,8 +263,8 @@ func _window_step(f: Node) -> void:
 			continue
 		var into: float = -signf(d) * (wish.z if ax else wish.x)   # pushing towards the pane
 		var v: float = -signf(d) * (f.velocity.z if ax else f.velocity.x)
-		if is_instance_valid(w.body) and not (w.body as Node).is_queued_for_deletion():
-			if not f.is_on_floor() and absf(d) < 0.62 and (into > 0.2 or v > 1.0):
+		if w.body != null and is_instance_valid(w.body) and not (w.body as Node).is_queued_for_deletion():
+			if not f.is_on_floor() and absf(d) < 0.95 and (into > 0.1 or v > 0.5):
 				game.break_glass(w.body, Vector3(p.x, p.y + 1.2, p.z))
 			continue
 		# open: step up onto the sill when walking into it from below

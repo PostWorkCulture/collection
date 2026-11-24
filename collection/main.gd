@@ -604,7 +604,7 @@ func _mansion_checks() -> void:
 	# windows: jump at one from inside and crash out; walk back in over the sill without jumping
 	var win: Dictionary = {}
 	for w in level.windows:
-		if absf(float(w.s0) - 0.8) < 0.1 and w.ax and float(w.at) < -20.0:
+		if float(w.s0) < 1.0 and w.ax and float(w.at) < -20.0 and w.body != null:
 			win = w
 			break
 	if not win.is_empty():
@@ -625,7 +625,7 @@ func _mansion_checks() -> void:
 		player.place(Vector3(u, 0.05, at - inside * 1.6), PI if inside < 0.0 else 0.0)
 		await get_tree().create_timer(0.3).timeout
 		await _hold("move_forward", 1.0)
-		_log("AUTOTEST window: walked back in without jumping=%s (at z %.1f, wall at %.1f)" % [(player.global_position.z - at) * inside > 0.0, player.global_position.z, at])
+		_log("AUTOTEST window: walked back in without jumping=%s (at %v, wall at %.1f, sill %.2f)" % [(player.global_position.z - at) * inside > 0.0, player.global_position, at, float(win.s0)])
 	# hot tub: jump in and it splashes
 	player.place(Vector3(-16, 8.5, 4), 0.0)
 	await get_tree().create_timer(1.0).timeout

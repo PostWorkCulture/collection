@@ -605,6 +605,10 @@ func break_glass(body: StaticBody3D, pos: Vector3) -> void:
 	var size: Vector3 = (cs.shape as BoxShape3D).size if cs and cs.shape is BoxShape3D else Vector3.ONE
 	_shatter(body.global_position, size)
 	Sfx.play(self, "smash", pos, 0.0, 1.0, 30.0, 0.05)
+	if level and body.has_meta("index"):   # a mirror's frame and glass go with it
+		var look: Variant = level.box_nodes.get(int(body.get_meta("index")))
+		if look:
+			(look as Node3D).visible = false
 	body.queue_free()
 
 const SHARD_POOL := 360

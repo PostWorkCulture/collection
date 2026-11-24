@@ -16,6 +16,7 @@ var dressing: Node3D = null
 var parts := {}                  # name -> Array of the GLB's named moving parts
 var props: Array = []            # smashable furniture, crates, hedges and lamps: {body, kind, hp, hp0, node (its look), back}
 var box_nodes := {}              # box index -> the dressing node that draws it
+var bodies := {}                 # box index -> its collider
 var windows: Array = []          # the 40 big windows: {body, ax (pane runs along x), at, a, b, s0 (sill), s1 (top)}
 var spawns: Array = []
 var house: Dictionary = {}
@@ -41,6 +42,10 @@ func build() -> void:
 		_add_ladder(l)
 	for st in layout.get("stairs", []):
 		_add_ramp(st)
+	# the big windows (4.4 m wide on a 0.45 m sill since 24 Nov): {body, ax (runs along x), at, a, b, s0 (sill), s1 (top)}
+	for w in layout.get("windows", []):
+		var body: Variant = bodies.get(int(w.pane))
+		windows.append({"body": body, "ax": bool(w.ax), "at": float(w.at), "a": float(w.a), "b": float(w.b), "s0": float(w.s0), "s1": float(w.s1)})
 	_add_shop()
 
 ## the Mansion's look: the imported scene when Godot has imported the .glb, otherwise read straight from the file
@@ -207,6 +212,9 @@ func _add_box(b: Dictionary, index: int = -1) -> void:
 	shape.size = size
 	cs.shape = shape
 	body.add_child(cs)
+	if index >= 0:
+		body.set_meta("index", index)
+		bodies[index] = body
 	var kind := String(b.get("p", ""))
 	var hp := float(b.get("hp", 0))
 	if kind in ["crate", "bush", "lamp"] and hp > 0.0 and hp < 1e6:
@@ -216,11 +224,6 @@ func _add_box(b: Dictionary, index: int = -1) -> void:
 		props.append(pr)
 	if glass:
 		body.set_meta("glass", true)
-		# the big windows: 3 m panes on a 0.8 m sill, downstairs and up
-		if size.y > 2.9 and size.y < 3.1 and (absf(p0.y - 0.8) < 0.05 or absf(p0.y - 6.6) < 0.05):
-			var ax := size.x > size.z
-			windows.append({"body": body, "ax": ax, "at": body.position.z if ax else body.position.x,
-				"a": p0.x if ax else p0.z, "b": p1.x if ax else p1.z, "s0": p0.y, "s1": p1.y})
 	if dressed and not glass:   # the dressing draws it
 		add_child(body)
 		return
