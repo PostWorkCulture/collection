@@ -187,7 +187,7 @@ Agreed with Pete in the rebuild plan ([`docs/collection/plan.md`](docs/collectio
 - Default camera is third person; first person is a setting.
 
 ## Known issues
-- Match pace (24 Nov, for Pete to judge): with 8 bots a match lasts about 30–90 s (Normal/Hard often under a minute, Easy 1–2 minutes). Every number involved (14 stars, 10 to win, 12.7 m/s running, 15 m sight) is the web game's, so nothing was changed; if it's too quick, the levers are fewer stars out, more to win, or shorter bot sight.
+- Match pace: see the match length note below (stars changed 24 Nov).
 - Aiming down sights needs refining (Pete, 24 Nov): details to agree with Pete.
 - Match length after the star change (24 Nov, headless 8-bot runs): Easy 3½–5 minutes, Normal 1½–3 minutes, Hard about 45 s (before it: Easy about 40 s, Normal about 25 s). For Pete to judge in play.
 - Still to come in phase 6: smashable props (trophy cups, bar bottles, crates; all solid for now), hot tub jets, hiding rooms you can't see.
