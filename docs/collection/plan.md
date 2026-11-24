@@ -42,9 +42,9 @@ The Godot version keeps every Collection rule from the web game, plus the five i
 | Win | Hold 10 stars, reach the shop on the front lawn, stand at it: first to cash in wins |
 | Going down | Lose 2 stars on the spot |
 | Dying | Lose every star you hold |
-| Leaders | 4+ stars: outlined through walls for everyone and pinned on every minimap (**open question: DESIGN.md says 8** – see its Open questions) |
+| Leaders | 8+ stars: outlined through walls for everyone and pinned on every minimap (Pete, 24 Nov; the web game used 4) |
 | Time | No limit; the clock counts up |
-| Health | 100, no armour; downed players crawl and bleed out unless finished off |
+| Health | 100, no armour; downed players crawl with 30 downed HP and get up on their own after 5 s unless finished off (Pete, 24 Nov) |
 
 **Improvements (approved by Pete, all five)**
 
@@ -58,11 +58,11 @@ The Godot version keeps every Collection rule from the web game, plus the five i
 
 Every player, you and the bots, is the same `Fighter` scene, so bots obey exactly the same physics, weapons and rules you do.
 
-- **Movement:** `CharacterBody3D` with walk, sprint (stamina), crouch, jump and double jump, step-up onto stairs and kerbs, and ladder climbing. Speeds and jump heights copied from the web game's numbers, so it feels the same before we tune it.
+- **Movement:** `CharacterBody3D` with walk, sprint (stamina), crouch, jump and double jump, step-up onto stairs and kerbs, and ladder climbing. Speeds and jump heights copied from the web game's numbers (jump 12 m/s), so it feels the same before we tune it.
 - **Camera:** third person over the shoulder by default, as on the web; first person as a setting, with the hands and weapon drawn in front. Third person returns automatically while downed, as on the web.
 - **Fists and bat:** a short sphere-cast in front on each swing; damage, swing rate and the 20% fists speed boost as now. Boxing-glove hands in first person.
 - **Guns:** hitscan with spread and recoil per gun, aim down sights, 20-bullet pickups, empty = back to fists. Muzzle flash, tracer, shell casing and impact decal per shot.
-- **Health and going down:** 100 HP, then downed (crawl, bleed out over 15 s, can be finished by a punch). Down costs 2 stars; death costs all.
+- **Health and going down:** 100 HP, then downed (crawl with 30 downed HP, get up on your own after 5 s, can be finished by a punch or shots; 15 s bleed-out only as a backstop). Down costs 2 stars; death costs all.
 - **Pickups:** one `Pickup` scene for stars, guns and bats, an `Area3D` that triggers on touch, with the spin and bob of the web version.
 - **Respawn:** 3 s later at the spawn point furthest from other players; your first spawn is on the lawns.
 
@@ -138,7 +138,7 @@ The web game's own sound files carry over (fists, guns, glass, star bing, the do
 - **Room echo:** each room gets its own reverb, set by its size and surfaces: the grand hall and pool echo, carpeted bedrooms are dead, outside is open.
 - **Footsteps:** per surface (wood, tile, carpet, grass), quieter when crouched, so sneaking matters.
 - **Mixing:** separate buses for Weapons, SFX, Music and Voice, matching the web game's Weapons and SFX volume settings.
-- **Game cues:** a distinct cue when you pick up a star, a warning sound when anyone becomes marked, and a rising cue at 8.
+- **Game cues:** a distinct cue when you pick up a star, and a warning sound with the screen-edge flash when anyone reaches 8 stars and becomes marked.
 
 ## HUD, menus and controls
 

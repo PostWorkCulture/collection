@@ -64,9 +64,9 @@ SMGs: iron sights only, aim-down-sights in 0.07 s. With fists or a bat out you r
 
 ## 5. Players
 - 100 HP; regen after 3 s without being hit, 10 HP/s.
-- Run ~12.7 m/s (11.25 × 1.125); jump 13.5 m/s; gravity 36; double jump. Players and bots share one speed. Weapon weight: SMGs +3–6%, Dual Pistols +8%.
-- Downed: at 0 HP you go down instead of dying. Crawl slowly with 30 downed HP; enemies can shoot you to death or finish you. Otherwise you get up on your own after 5 s with the downed HP you had left. 15 s bleed-out timer exists only as a backstop. Downed players give off faint dark-red smoke, never green. A downed player must never visibly pass through walls.
-- Finishers on a downed enemy: random, 25% each: Pancake, Heartbreaker, Roast, Combat. Can't be interrupted. "Eliminated" shows at the top as soon as one starts.
+- Run ~12.7 m/s (11.25 × 1.125); jump 12 m/s **(Pete)**; gravity 36; double jump. Players and bots share one speed. Weapon weight: SMGs +3–6%, Dual Pistols +8%.
+- Downed: at 0 HP you go down instead of dying. Crawl slowly with 30 downed HP; enemies can shoot you to death or finish you. Otherwise you get up on your own after 5 s **(Pete)** with the downed HP you had left. 15 s bleed-out timer exists only as a backstop. Downed players give off faint dark-red smoke, never green. A downed player must never visibly pass through walls.
+- Finishers on a downed enemy (**not in the first build (Pete)**; a downed player is finished by shooting or hitting them): random, 25% each: Pancake, Heartbreaker, Roast, Combat. Can't be interrupted. "Eliminated" shows at the top as soon as one starts.
 - Boxing gloves in each character's colours when fists are out.
 - Characters: Wednesday, Anti Hero, Lil Pink, Starscreen, Crusty, Dracz, Gorillaz, Jet, Murda Medic, Spacebot (Tripo models in the 1v1 repo `chars/`).
 
@@ -176,21 +176,17 @@ Mansion rules **(Pete)**:
 Agreed with Pete in the rebuild plan ([`docs/collection/plan.md`](docs/collection/plan.md), which also holds the visuals, sound, HUD and phase-gate plan). Not built yet.
 - Lost stars drop where you fell as pickups for 20 s (instead of vanishing).
 - 2 s spawn shield, broken by attacking.
-- Sound cue and screen-edge flash when someone reaches 8 stars.
+- Sound cue and screen-edge flash when someone reaches 8 stars. With the reveal also at 8, this is the cue for a player becoming marked.
 - Stars hum quietly in 3D, so you can find one by ear through a wall.
 - Cash-in takes 2 s standing still at the shop (interruptible), replacing the instant win in section 6.
 - Default camera is third person; first person is a setting.
 
 ## Open questions
-- **Reveal threshold 4 or 8?** This spec says 8 (from 1v1 branch `collection-v1`, commit 76738cc, never merged). The live web game on 1v1 `main` and the plan agreed in Pete's 1v1 chat use 4. The 8-star alert improvement above was designed alongside a reveal at 4. Pete to confirm.
-- **Jump 12 or 13.5 m/s?** Section 5 says 13.5, but that is the web file's unused `CFG.jumpV`; the web fighter physics uses `JUMP=12`, and so does the phase 1 Fighter (2.05 m jump, measured).
-- **Downed model:** section 5 (30 downed HP, get up after 5 s) differs from the rebuild plan (crawl and bleed out over 15 s unless finished). Pete to confirm which.
-- **Finishers:** section 5 lists them; the rebuild plan left them out of the first build.
-- Star loss: an early note said "lose 2 stars after respawning". The final build used down = −2, death = all, and this spec follows that. Confirm with Pete.
 - Target platforms (PC / Web / Android) and publishing method: not decided.
 
 ## Decision log
 Newest first. Date — decision — why.
+- 2026-11-24 — Pete settled the four open questions: reveal at 8 stars; jump 12 m/s (the web fighter's real value); downed players get up on their own after 5 s (30 downed HP, 15 s bleed-out only as a backstop); finishers left out of the first build. Star loss confirmed as down = −2, death = all (Pete's instruction in the 1v1 chat, 23 Nov).
 - 2026-11-24 — Rebuild plan from Pete's 1v1 chat added as `docs/collection/plan.md`, with its approved improvements recorded above — the plan was agreed before this repo existed.
 - 2026-11-24 — Phase 1 committed: Godot project lives in `/collection/`, grouped by feature; `Settings` autoload added — matches the build already started.
 - 2026-11-24 — DESIGN.md replaced with the Collection build spec; repo is one Godot game, not a set of games — Pete supplied the spec.
