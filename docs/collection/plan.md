@@ -152,7 +152,7 @@ The HUD and menus copy the web game's monochrome look (black and white, red high
 
 ## Build plan
 
-Six phases (the sixth added 24 Nov, when Pete settled on Godot for Collection as its own game); each ends with Pete playing it, and nothing moves on until he's happy with the last. Status (24 Nov): phases 1–5 and the first part of phase 6 (the Mansion's look and its moving parts) are built and published; the second part (stairs, windows, room lights) is built. Pete played phases 1 and 2 (notes in DESIGN.md → Known issues); phases 3–6 wait for him to play. Next: the rest of phase 6 (smashable props, hot tub jets, hiding rooms you can't see).
+Six phases (the sixth added 24 Nov, when Pete settled on Godot for Collection as its own game); each ends with Pete playing it, and nothing moves on until he's happy with the last. Status (24 Nov): phases 1–5 and the first part of phase 6 (the Mansion's look and its moving parts) are built and published; the second part (stairs, windows, room lights) is published; the third part (furniture, smashable props, fewer stars) is built. Pete played phases 1 and 2 (notes in DESIGN.md → Known issues); phases 3–6 wait for him to play. Next: the rest of phase 6 (hot tub jets, hiding rooms you can't see).
 
 | Phase | What gets built | Gate: what Pete plays and checks |
 | --- | --- | --- |
@@ -168,6 +168,12 @@ How each phase is checked before it reaches Pete:
 - **Headless checks** run on every change: the project opens without errors, a scripted match plays for 2 minutes with 8 bots, stars spawn inside the house, nobody falls through the floor, and the win triggers at the shop.
 - **Screenshots and a short clip** from fixed spots (lawn, hall, upstairs, shop) sent with each phase. Phase 1 shots are in `docs/screenshots/`.
 - **A playable build** on the PC at every gate; Pete's notes go straight into the next phase.
+
+### Phase 6 results, third part (24 Nov 2026)
+
+- Stars (Pete): 6 out instead of 14, spread across the house, each back 8–14 s after it's taken and 25 m away. 8-bot matches: Easy 3½–5 min, Normal 1½–3 min, Hard about 45 s.
+- The furniture the first export missed is in (about 900 pieces). 247 pieces smash: a 25 hp side table breaks in 3 bullets, grows back in 40 s.
+- Screenshots in `docs/screenshots/phase6_part3/`.
 
 ### Phase 6 results, second part (24 Nov 2026)
 

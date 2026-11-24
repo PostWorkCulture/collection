@@ -112,6 +112,7 @@ func start(begin := true) -> void:
 		_set_state("menu")
 
 func begin_countdown() -> void:
+	reset_props()
 	countdown = COUNTDOWN
 	_set_state("countdown")
 	center_msg.emit("COLLECTION · 8 PLAYERS · THE MANSION", "Start with fists · find 10 hidden stars · cash them in at the shop outside · first to cash in wins", COUNTDOWN)
@@ -124,6 +125,7 @@ func _set_state(s: String) -> void:
 
 func _physics_process(dt: float) -> void:
 	_t += dt
+	_tick_props(dt)
 	if _pad_mat:
 		_pad_mat.albedo_color.a = 0.35 + sin(_t * 3.0) * 0.15
 	match state:
@@ -576,7 +578,11 @@ func respawn(f: Node) -> void:
 # ---------------------------------------------------------------- the world getting hit
 
 ## a bullet or punch hitting the level: upright glass and roof skylights break in one hit; everything else gets dust
-func hit_world(col: Object, pos: Vector3, normal: Vector3, _dir: Vector3) -> void:
+func hit_world(col: Object, pos: Vector3, normal: Vector3, dir: Vector3, dmg: float = 10.0) -> void:
+	if col is StaticBody3D and col.has_meta("prop"):
+		damage_prop(int(col.get_meta("prop")), dmg, pos, dir)
+		Effects.impact(self, pos, normal)
+		return
 	if col is StaticBody3D and col.has_meta("glass"):
 		var body := col as StaticBody3D
 		var cs := body.get_child(0) as CollisionShape3D
@@ -646,6 +652,139 @@ func _shatter(center: Vector3, size: Vector3) -> void:
 		sh.rotation = Vector3(randf() * TAU, randf() * TAU, randf() * TAU)
 		sh.linear_velocity = Vector3(randf_range(-1.5, 1.5), randf_range(0.0, 2.0), randf_range(-1.5, 1.5))
 		sh.angular_velocity = Vector3(randf_range(-12, 12), randf_range(-12, 12), randf_range(-12, 12))
+
+# ---------------------------------------------------------------- smashable props
+## Furniture, crates, hedges and lamps take damage like the web's (its hit points: a side table goes in a couple of
+## shots, a sofa takes a magazine, a hedge a lot); at zero the piece breaks into chunks of its own colour, stops
+## blocking, and grows back 40 s later once nobody is standing in it.
+
+const PROP_BACK := 40.0
+const CHUNK_POOL := 160
+var _chunks: Array[RigidBody3D] = []
+var _chunk_i := 0
+var props_broken := 0
+
+func damage_prop(i: int, dmg: float, pos: Vector3, dir: Vector3) -> void:
+	if level == null or i < 0 or i >= level.props.size():
+		return
+	var pr: Dictionary = level.props[i]
+	if pr.back > 0.0:
+		return
+	pr.hp = float(pr.hp) - dmg
+	if float(pr.hp) <= 0.0:
+		_break_prop(pr, pos, dir)
+
+func _break_prop(pr: Dictionary, pos: Vector3, dir: Vector3) -> void:
+	var body: StaticBody3D = pr.body
+	body.collision_layer = 0
+	pr.back = PROP_BACK
+	props_broken += 1
+	var col := Color(0.55, 0.45, 0.35)
+	var node: Node3D = pr.node
+	if node:
+		var mi := _first_mesh(node)
+		if mi and mi.mesh and mi.mesh.get_surface_count() > 0:
+			var m := mi.get_active_material(0) as BaseMaterial3D
+			if m:
+				col = m.albedo_color
+		node.visible = false
+	var box: AABB = pr.box
+	var kind: String = pr.kind
+	Sfx.play(self, "bush" if kind == "bush" else ("bin" if kind == "lamp" else "crate"), box.get_center(), -2.0, 1.0, 18.0, 0.08)
+	var n := clampi(int(box.size.x * box.size.y * box.size.z * 10.0), 6, 16)
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(col.r, col.g, col.b)
+	mat.roughness = 0.8
+	var away := Vector3(dir.x, 0, dir.z).normalized()
+	for k in n:
+		var ch := _chunk()
+		var mi2 := ch.get_child(1) as MeshInstance3D
+		mi2.material_override = mat
+		var sz := clampf(minf(box.size.x, minf(box.size.y, box.size.z)) * randf_range(0.25, 0.45), 0.06, 0.3)
+		ch.scale = Vector3.ONE   # rigid bodies keep scale 1; the mesh carries the size
+		mi2.scale = Vector3(sz * randf_range(0.8, 1.6), sz, sz * randf_range(0.8, 1.6))
+		ch.sleeping = false
+		ch.global_position = box.position + Vector3(randf() * box.size.x, randf() * box.size.y, randf() * box.size.z)
+		ch.rotation = Vector3(randf() * TAU, randf() * TAU, randf() * TAU)
+		ch.linear_velocity = away * randf_range(1.0, 3.5) + Vector3(randf_range(-1.5, 1.5), randf_range(1.0, 3.5), randf_range(-1.5, 1.5))
+		ch.angular_velocity = Vector3(randf_range(-8, 8), randf_range(-8, 8), randf_range(-8, 8))
+
+func _chunk() -> RigidBody3D:
+	if _chunks.size() < CHUNK_POOL:
+		var ch := RigidBody3D.new()
+		ch.collision_layer = 0
+		ch.collision_mask = 1
+		ch.mass = 0.3
+		var cs := CollisionShape3D.new()
+		var sh := BoxShape3D.new()
+		sh.size = Vector3(0.12, 0.12, 0.12)
+		cs.shape = sh
+		ch.add_child(cs)
+		var mi := MeshInstance3D.new()
+		mi.mesh = BoxMesh.new()
+		(mi.mesh as BoxMesh).size = Vector3.ONE
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		ch.add_child(mi)
+		add_child(ch)
+		_chunks.append(ch)
+		return ch
+	var c := _chunks[_chunk_i % CHUNK_POOL]
+	_chunk_i += 1
+	return c
+
+func _first_mesh(n: Node) -> MeshInstance3D:
+	if n is MeshInstance3D:
+		return n
+	for c in n.get_children():
+		var m := _first_mesh(c)
+		if m:
+			return m
+	return null
+
+func _tick_props(dt: float) -> void:
+	if level == null:
+		return
+	for pr in level.props:
+		if pr.back <= 0.0:
+			if pr.has("grow") and float(pr.grow) < 1.0 and pr.node:
+				pr.grow = minf(1.0, float(pr.grow) + dt * 3.0)
+				(pr.node as Node3D).scale = pr.sc0 * maxf(0.01, ease(float(pr.grow), 0.4))
+			continue
+		pr.back = float(pr.back) - dt
+		if float(pr.back) > 0.0:
+			continue
+		var box: AABB = pr.box
+		var clear := true
+		for f in fighters:
+			if f.alive and box.grow(0.5).has_point(f.global_position + Vector3.UP * 0.5):
+				clear = false
+				break
+		if not clear:
+			pr.back = 1.0
+			continue
+		pr.back = 0.0
+		pr.hp = pr.hp0
+		(pr.body as StaticBody3D).collision_layer = 1
+		if pr.node:
+			var nd: Node3D = pr.node
+			if not pr.has("sc0"):
+				pr.sc0 = nd.scale
+			nd.visible = true
+			nd.scale = pr.sc0 * 0.01
+			pr.grow = 0.0
+
+func reset_props() -> void:
+	if level == null:
+		return
+	for pr in level.props:
+		pr.back = 0.0
+		pr.hp = pr.hp0
+		(pr.body as StaticBody3D).collision_layer = 1
+		if pr.node:
+			(pr.node as Node3D).visible = true
+			if pr.has("sc0"):
+				(pr.node as Node3D).scale = pr.sc0
+		pr.erase("grow")
 
 # ---------------------------------------------------------------- leaderboard
 

@@ -609,7 +609,7 @@ func _melee(id: String, g: Dictionary) -> void:
 		var q2 := PhysicsRayQueryParameters3D.create(o, o + forward() * reach, LAYER_WORLD, [get_rid()])
 		var hit := get_world_3d().direct_space_state.intersect_ray(q2)
 		if hit and game:
-			game.hit_world(hit.collider, hit.position, hit.normal, forward())
+			game.hit_world(hit.collider, hit.position, hit.normal, forward(), 25.0)
 			return
 
 ## where you're actually aiming: for you, the point under the crosshair (so third person shots go where the
@@ -665,7 +665,7 @@ func _shoot(id: String, g: Dictionary) -> void:
 			var fin: bool = foe.take_damage(dmg, self, head, id)
 			dealt_hit.emit(foe, roundi(dmg), head, fin)
 		elif game:
-			game.hit_world(col, end, hit.normal, dir)
+			game.hit_world(col, end, hit.normal, dir, float(g.dmg) * Weapons.falloff(id, origin.distance_to(end)) * dmg_mul)
 	var mz := muzzle_pos()
 	if shots % 2 == 1:   # a thin streak on every other bullet
 		Effects.tracer(world, mz, end)

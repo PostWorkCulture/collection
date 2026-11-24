@@ -625,6 +625,31 @@ func _mansion_checks() -> void:
 		await get_tree().create_timer(0.3).timeout
 		await _hold("move_forward", 1.0)
 		_log("AUTOTEST window: walked back in without jumping=%s (at z %.1f, wall at %.1f)" % [(player.global_position.z - at) * inside > 0.0, player.global_position.z, at])
+	# smashable props: shoot one apart, then it grows back once its 40 s are up
+	var kinds := {}
+	var with_look := 0
+	for pr in level.props:
+		kinds[pr.kind] = int(kinds.get(pr.kind, 0)) + 1
+		if pr.node:
+			with_look += 1
+	_log("AUTOTEST props: %d smashable %s, %d with their look found" % [level.props.size(), str(kinds), with_look])
+	var target: Dictionary = {}
+	for pr in level.props:
+		if pr.kind == "crate" and pr.node and float(pr.hp0) <= 40.0:
+			target = pr
+			break
+	if not target.is_empty():
+		var tb: AABB = target.box
+		var shots := 0
+		while (target.body as StaticBody3D).collision_layer != 0 and shots < 20:
+			game.hit_world(target.body, tb.get_center(), Vector3.UP, Vector3.FORWARD, 12.0)
+			shots += 1
+		await get_tree().create_timer(0.5).timeout
+		_log("AUTOTEST prop (%.0f hp): broke after %d hits of 12, look hidden=%s, solid=%s" % [target.hp0, shots, not (target.node as Node3D).visible, (target.body as StaticBody3D).collision_layer != 0])
+		target.back = 0.01
+		player.place(Vector3(0, 0.05, -40), 0.0)
+		await get_tree().create_timer(0.6).timeout
+		_log("AUTOTEST prop grew back: solid=%s visible=%s size %.2f" % [(target.body as StaticBody3D).collision_layer != 0, (target.node as Node3D).visible, float(target.get("grow", 1.0))])
 	player.invulnerable = false
 
 # ---------------- phase 2 combat checks ----------------
@@ -945,6 +970,7 @@ func _bots_match(cfg: Dictionary) -> void:
 	_log("AUTOTEST bots match: state=%s winner=%s after %.0f s, kills %d, stars held %d, times stuck (15 s checks) %s, time outside or on the roof %d%% (roof %d%%, outside after the first 10 s %d%%)" % [game.state, game.winner.display_name if game.winner else "none", game.clock - t0, total_kills, total_stars, str(stuck.values()), roundi(100.0 * outdoor[0] / maxf(1.0, outdoor[1])), roundi(100.0 * outdoor[2] / maxf(1.0, outdoor[1])), roundi(100.0 * outdoor[3] / maxf(1.0, outdoor[1]))])
 	for f in game.standings():
 		_log("AUTOTEST   %s: %d stars, %d kills, %d deaths" % [f.display_name, f.stars, f.kills, f.deaths])
+	_log("AUTOTEST props broken in the match: %d" % game.props_broken)
 	_log("AUTOTEST Mansion features used: %s" % str(features.uses) + ", lift and pole rides " + str(game.fighters.reduce(func(a, f): return a + f.rides, 0)))
 	if game.state == "won" and cfg.has("end_shot"):
 		await _wait(3.2)

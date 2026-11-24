@@ -14,6 +14,8 @@ var lifts: Array = []            # the 2 lifts and the fireman's pole: {box, nx,
 var dressed := false             # mansion.glb loaded
 var dressing: Node3D = null
 var parts := {}                  # name -> Array of the GLB's named moving parts
+var props: Array = []            # smashable furniture, crates, hedges and lamps: {body, kind, hp, hp0, node (its look), back}
+var box_nodes := {}              # box index -> the dressing node that draws it
 var windows: Array = []          # the 40 big windows: {body, ax (pane runs along x), at, a, b, s0 (sill), s1 (top)}
 var spawns: Array = []
 var house: Dictionary = {}
@@ -33,8 +35,8 @@ func build() -> void:
 	_grid_tex = _make_grid()
 	_load_dressing()
 	_build_ground()
-	for b in layout.boxes:
-		_add_box(b)
+	for i in layout.boxes.size():
+		_add_box(layout.boxes[i], i)
 	for l in layout.ladders:
 		_add_ladder(l)
 	for st in layout.get("stairs", []):
@@ -85,6 +87,10 @@ func _fix_materials(n: Node, seen: Dictionary) -> void:
 func _collect_parts(n: Node) -> void:
 	for c in n.get_children():
 		var nm := String(c.name)
+		if nm.begins_with("box_"):
+			var bits := nm.split("_")
+			if bits.size() > 1 and bits[1].is_valid_int():
+				box_nodes[int(bits[1])] = c
 		for key in ["lift_car", "tramp_mat", "tramp_arrow", "disco_ball", "disco_floor", "disco_beam", "pool_water", "portal_swirl"]:
 			if nm.begins_with(key):
 				if not parts.has(key):
@@ -135,7 +141,7 @@ func _mat(col: String, glass: bool) -> Material:
 	_mats[key] = m
 	return m
 
-func _add_box(b: Dictionary) -> void:
+func _add_box(b: Dictionary, index: int = -1) -> void:
 	var a: Array = b.b
 	var p0 := Vector3(a[0], a[1], a[2])
 	var p1 := Vector3(a[3], a[4], a[5])
@@ -150,6 +156,13 @@ func _add_box(b: Dictionary) -> void:
 	shape.size = size
 	cs.shape = shape
 	body.add_child(cs)
+	var kind := String(b.get("p", ""))
+	var hp := float(b.get("hp", 0))
+	if kind in ["crate", "bush", "lamp"] and hp > 0.0 and hp < 1e6:
+		var pr := {"body": body, "kind": kind, "hp": hp, "hp0": hp, "node": box_nodes.get(index), "back": 0.0,
+			"box": AABB(p0, size)}
+		body.set_meta("prop", props.size())
+		props.append(pr)
 	if glass:
 		body.set_meta("glass", true)
 		# the big windows: 3 m panes on a 0.8 m sill, downstairs and up
