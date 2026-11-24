@@ -23,16 +23,22 @@ One Godot project in `/collection/` (open `collection/project.godot`). Folders a
 ```
 /collection/project.godot, main.tscn, main.gd   entry point
 /collection/autoload/      singletons (settings.gd)
-/collection/fighter/       player/bot body, movement, camera
+/collection/game/          the match node: fighters, pickups, respawns, glass, kill feed (stars and win in phase 3)
+/collection/fighter/       player/bot body, movement, camera, health, weapons in hand; dummy_brain.gd for tests
+/collection/weapons/       weapon stats (from the web game), block models, hit/gun effects
+/collection/pickups/       weapon pickups
+/collection/ui/            HUD
+/collection/audio/         sfx.gd + sfx/ (the web game's own sound files)
 /collection/level/         Mansion builder + mansion_layout.json
-/collection/autotest.json  scripted walk/screenshot checks ("enabled": true runs them and quits)
-/collection/<feature>/     new features get their own folder: stars/, pickups/, bots/, ui/ ...
-/docs/screenshots/         preview images for Pete
+/collection/autotest.json  scripted checks ("enabled": true runs them and quits; "combat": true adds the fight checks)
+/collection/<feature>/     new features get their own folder: stars/, bots/ ...
+/docs/screenshots/         preview images for Pete, one folder per phase
 ```
 Update DESIGN.md → "Build status" when a part moves forward.
 
 ## Godot conventions
-- Files and folders: `snake_case` (`player_controller.gd`, `main_menu.tscn`). Classes: `class_name PascalCase`.
+- Files and folders: `snake_case` (`player_controller.gd`, `main_menu.tscn`).
+- Scripts load each other with `const Name := preload("res://...")`, not `class_name`: runs from the command line (Godot MCP, headless checks) don't have the editor's class list. Don't add autoloads either; the open editor rewrites `project.godot`.
 - Static typing everywhere (`var speed: float = 5.0`, typed function args and returns).
 - One script per scene root; signals over direct node paths across scenes.
 - Autoloads listed in DESIGN.md; don't add one without recording it.
@@ -40,7 +46,7 @@ Update DESIGN.md → "Build status" when a part moves forward.
 - Large binaries (models, audio, textures over ~50 MB): ask before adding; use Git LFS if needed.
 
 ## Before committing
-- Run the affected game (Godot MCP `run_project`) and check `get_debug_output`: zero errors, no new warnings.
+- Run the checks: set `collection/autotest.json` to `"enabled": true` (plus `"combat": true`), run it (Godot MCP `run_project`, or headless: `godot --headless --path collection`), read the results in `collection/shots/autotest.txt` and any script errors in the console (`get_debug_output`), then set it back to `false`. Headless runs skip the screenshots.
 - Commit message: `<area>: <what changed>` e.g. `stars: add spawn spacing`, `bots: add room exploring`, `docs: update DESIGN.md`.
 - Studio rules (DESIGN.md §10) apply to every change: no confetti/coloured particles, red spray + mist for hits, realistic premium look, white ladders.
 

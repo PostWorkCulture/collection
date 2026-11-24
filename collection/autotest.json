@@ -94,5 +94,7 @@
    "cam": "first",
    "wait": 4
   }
- ]
+ ],
+ "combat": true,
+ "movement": true
 }

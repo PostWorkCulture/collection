@@ -159,7 +159,8 @@ Mansion rules **(Pete)**:
 | Name | Script | Purpose |
 |---|---|---|
 | Settings | `collection/autoload/settings.gd` | saved camera mode (third/first), FOV, mouse sensitivity |
-| CollectionGame | `collection/autoload/collection_game.gd` | config, match state, timer, win check (not built yet) |
+
+CollectionGame is **not** an autoload: it is a node (`collection/game/collection_game.gd`) that `main.gd` creates as "Game" and hands to every fighter. Phase 2: fighters, pickups, respawns, glass, kill feed. Phase 3 adds stars, the shop and the win.
 
 ## Build status
 | Part | Status |
@@ -167,13 +168,15 @@ Mansion rules **(Pete)**:
 | Godot project skeleton | done (phase 1) |
 | The Mansion | grey-box from `mansion_layout.json`, ladders, shop placeholder (phase 1) |
 | Fighter / player movement | movement, jump, crouch, ladders, third/first-person camera (phase 1) |
-| Weapons + pickups | not started |
+| Weapons + pickups | fists, bat, 6 SMGs + Dual Pistols with the web stats; 20-bullet pickups (6 guns + 2 bats); first-person hands and iron-sight aiming (phase 2) |
+| Health, down, death, respawn | 100 HP + regen, downed (30 HP, crawl, up after 5 s), finished = dead, respawn 3 s furthest from others, 2 s spawn shield (phase 2) |
+| Effects + sound | red spray + mist on hits, muzzle flash, thin tracers, dust, glass shards, dark-red downed wisps; the web game's sound files, 3D positioned (phase 2) |
 | Stars + cash-in | not started |
 | Bots | not started |
-| HUD / minimap / menus | not started |
+| HUD / minimap / menus | combat HUD: health, weapon/bullets, crosshair, hit marker, damage numbers, kill feed, down/eliminated messages (phase 2); minimap, leaderboard, star counter and menus not started |
 
 ## Approved improvements (Pete, 23 Nov 2026)
-Agreed with Pete in the rebuild plan ([`docs/collection/plan.md`](docs/collection/plan.md), which also holds the visuals, sound, HUD and phase-gate plan). Not built yet.
+Agreed with Pete in the rebuild plan ([`docs/collection/plan.md`](docs/collection/plan.md), which also holds the visuals, sound, HUD and phase-gate plan). Built so far: the spawn shield (phase 2) and third person as default.
 - Lost stars drop where you fell as pickups for 20 s (instead of vanishing).
 - 2 s spawn shield, broken by attacking.
 - Sound cue and screen-edge flash when someone reaches 8 stars. With the reveal also at 8, this is the cue for a player becoming marked.
@@ -181,11 +184,19 @@ Agreed with Pete in the rebuild plan ([`docs/collection/plan.md`](docs/collectio
 - Cash-in takes 2 s standing still at the shop (interruptible), replacing the instant win in section 6.
 - Default camera is third person; first person is a setting.
 
+## Known issues
+- Walking up stairs feels rough (Pete, 24 Nov, after playing phases 1–2). Cause is movement, not looks: the capsule pops up each step with the 0.55 m step-up. Likely fix: invisible smooth ramps over every staircase in the level builder (steps stay visible), plus smoothing the camera height on steps. Not scheduled yet.
+- The bat doesn't visibly swing yet (Pete, 24 Nov): hits land, but there's no swing animation in first or third person.
+- Aiming down sights needs refining (Pete, 24 Nov): details to agree with Pete.
+- Windows feel too tight to jump in and out of (Pete, 24 Nov): openings or the jump-through rule need widening.
+
 ## Open questions
 - Target platforms (PC / Web / Android) and publishing method: not decided.
 
 ## Decision log
 Newest first. Date — decision — why.
+- 2026-11-24 — Phase 2 (combat) built, waiting for Pete's play-through. Choices made while building, all easy to change: a bat dropped by a downed player lies where they fell for 20 s (the plan says "dropped" but not for how long; 20 s matches dropped stars); all upright glass and roof skylights break in one hit, upstairs glass floor panels don't (studio rule + Mansion "bulletproof floor panels"); shards fall and vanish rather than settle (settling comes with the phase 5 glass pass); fighters are solid to each other, downed ones aren't (so you can walk over them); first-person hands push out as the view zooms so the gun keeps its size on screen; 6 test dummies stand on the lawn and in the house (2 strafe) and go back to their spot when they respawn; **G** cycles through every gun and the bat (test aid, removed in phase 3); sounds play from where they happen, but muffling through walls and room echo wait for phase 5.
+- 2026-11-24 — CollectionGame is a node made by `main.gd`, not an autoload; scripts load each other with `preload` instead of `class_name` — the open editor rewrites project.godot, and command-line runs (Godot MCP, headless checks) don't have the editor's class list, so both keep the game runnable either way.
 - 2026-11-24 — Pete settled the four open questions: reveal at 8 stars; jump 12 m/s (the web fighter's real value); downed players get up on their own after 5 s (30 downed HP, 15 s bleed-out only as a backstop); finishers left out of the first build. Star loss confirmed as down = −2, death = all (Pete's instruction in the 1v1 chat, 23 Nov).
 - 2026-11-24 — Rebuild plan from Pete's 1v1 chat added as `docs/collection/plan.md`, with its approved improvements recorded above — the plan was agreed before this repo existed.
 - 2026-11-24 — Phase 1 committed: Godot project lives in `/collection/`, grouped by feature; `Settings` autoload added — matches the build already started.

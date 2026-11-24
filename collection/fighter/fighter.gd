@@ -1,7 +1,24 @@
 extends CharacterBody3D
-## One player. Phase 1: the local player's movement and cameras, using the web game's numbers so it feels the same:
-## run 12.7 m/s (x1.2 with fists out), ground acceleration 70, air 28, gravity 36 (x1.2 falling), jump 12,
-## a double jump for 15 stamina, crouch, 0.55 m step-up onto stairs and kerbs, ladders. Bots reuse this script later.
+## One player: you, a test dummy, and later every bot. All of them obey the same physics, weapons and rules.
+## Movement (phase 1) uses the web game's numbers: run 12.7 m/s (x1.2 with fists or bat out), ground acceleration 70,
+## air 28, gravity 36 (x1.2 falling), jump 12, a double jump for 15 stamina, crouch, 0.55 m step-up, ladders.
+## Combat (phase 2): 100 HP, regen 10 HP/s after 3 s unhurt; at 0 HP you go down (30 downed HP, crawl, back up on
+## your own after 5 s, 15 s bleed-out backstop); finished off = dead; respawn after 3 s with a 2 s spawn shield.
+## Weapons: fists or a bat in the melee slot, one picked-up gun (20 bullets, no reload) in the gun slot.
+## Whoever drives the fighter (keyboard and mouse, or a brain) fills in in_move / in_jump / in_fire / in_aim.
+
+signal hurt(amount: int, src: Node, head: bool)
+signal went_down(src: Node)
+signal died(src: Node)
+signal got_up
+signal respawned
+signal dealt_hit(target: Node, amount: int, head: bool, finished: bool)
+signal weapon_changed
+
+const Weapons := preload("res://weapons/weapons.gd")
+const WeaponModel := preload("res://weapons/weapon_model.gd")
+const Effects := preload("res://weapons/effects.gd")
+const Sfx := preload("res://audio/sfx.gd")
 
 const RADIUS := 0.45
 const HEIGHT := 2.25
@@ -21,7 +38,40 @@ const STAM_REGEN := 40.0
 const STAM_DELAY := 0.5
 const EYE := 2.0
 const EYE_CROUCH := 1.3
+const EYE_DOWN := 0.75
 
+const HP_MAX := 100.0
+const DOWN_HP := 30.0
+const GET_UP := 5.0
+const BLEED := 15.0
+const REGEN_DELAY := 3.0
+const REGEN_RATE := 10.0
+const CRAWL := 3.0
+const RESPAWN := 3.0
+const SHIELD := 2.0
+const SWAP := 0.3
+const HEAD_TOP := 0.55          # the top 0.55 m of a standing body counts as the head
+
+const LAYER_WORLD := 1
+const LAYER_BODY := 2           # standing players: solid to each other and to bullets
+const LAYER_DOWNED := 4         # downed players: bullets hit them, people walk over them
+const SHOT_MASK := LAYER_WORLD | LAYER_BODY | LAYER_DOWNED
+
+# who this is
+var is_player := true
+var display_name := "You"
+var band_color := Color(0.18, 0.5, 0.88)
+var game: Node = null            # the match (main.gd's CollectionGame node), set before add_child
+var home: Variant = null         # test dummies respawn at their own spot: [Vector3, yaw]
+
+# input (filled by the keyboard/mouse for you, by a brain for dummies and bots)
+var in_move := Vector2.ZERO
+var in_jump := false
+var in_fire := false
+var in_aim := false
+var force_input := false         # the autotest presses fire without the mouse captured
+
+# movement
 var yaw := 0.0     # web convention: facing (sin yaw, 0, cos yaw)
 var pitch := 0.0
 var crouching := false
@@ -30,26 +80,68 @@ var stam_rest := 0.0
 var air_jumps := 1
 var ladders: Array[AABB] = []
 var on_ladder := false
-var is_player := true
+
+# health
+var alive := true
+var hp := HP_MAX
+var downed := false
+var dhp := 0.0
+var bleed := 0.0
+var revive := 0.0
+var last_hurt := -99.0
+var last_by: Node = null
+var respawn_t := 0.0
+var shield_t := 0.0
+var stars := 0
+var kills := 0
+var deaths := 0
+
+# weapons
+var gun_id := ""                 # "" = no gun
+var ammo := 0
+var has_bat := false
+var slot := "melee"              # "melee" (fists or bat) or "gun"
+var fire_t := 0.0
+var swap_t := 0.0
+var bloom := 0.0
+var ads := false
+var ads_k := 0.0                 # 0 = hip, 1 = fully aimed
+var dual_left := false
+var punch_left := false
+var swing_t := 0.0
+var kick_t := 0.0
+var shots := 0
 
 var _shape: CapsuleShape3D
+var _cs: CollisionShape3D
 var _body_mesh: MeshInstance3D
+var _shell: MeshInstance3D
+var _shell_mat: StandardMaterial3D
 var _pivot: Node3D
 var _arm: SpringArm3D
 var cam: Camera3D
+var _held: Node3D                # weapon in the hand, seen in third person and by everyone else
+var _view: Node3D                # first person hands and weapon, on the camera
+var _view_model: Node3D
+var _held_model: Node3D
+var _gloves: Array[MeshInstance3D] = []
 var _eye := EYE
 var _jump_held := false
+var _shown_weapon := "?"
+var _look_pad := Vector2.ZERO
 
 func _ready() -> void:
+	collision_layer = LAYER_BODY
+	collision_mask = LAYER_WORLD | LAYER_BODY
 	_shape = CapsuleShape3D.new()
 	_shape.radius = RADIUS
 	_shape.height = HEIGHT
-	var cs := CollisionShape3D.new()
-	cs.shape = _shape
-	cs.position.y = HEIGHT * 0.5
-	cs.name = "Shape"
-	add_child(cs)
-	# grey capsule figure with a coloured band (you = blue)
+	_cs = CollisionShape3D.new()
+	_cs.shape = _shape
+	_cs.position.y = HEIGHT * 0.5
+	_cs.name = "Shape"
+	add_child(_cs)
+	# grey capsule figure with a coloured band (you = blue, everyone else red)
 	_body_mesh = MeshInstance3D.new()
 	var cm := CapsuleMesh.new()
 	cm.radius = RADIUS
@@ -67,11 +159,10 @@ func _ready() -> void:
 	bandm.height = 0.16
 	band.mesh = bandm
 	var bandmat := StandardMaterial3D.new()
-	bandmat.albedo_color = Color(0.18, 0.5, 0.88) if is_player else Color(0.91, 0.27, 0.23)
+	bandmat.albedo_color = band_color
 	band.material_override = bandmat
-	band.position.y = HEIGHT * 0.62
-	_body_mesh.add_child(band)
 	band.position = Vector3(0, HEIGHT * 0.12, 0)
+	_body_mesh.add_child(band)
 	var visor := MeshInstance3D.new()   # a dark visor so you can see which way a figure faces
 	var vm := BoxMesh.new()
 	vm.size = Vector3(0.5, 0.16, 0.2)
@@ -81,12 +172,32 @@ func _ready() -> void:
 	visor.material_override = vmat
 	visor.position = Vector3(0, HEIGHT * 0.33, RADIUS - 0.04)
 	_body_mesh.add_child(visor)
+	# spawn shield: a faint white shell that fades over 2 s
+	_shell = MeshInstance3D.new()
+	var sm := CapsuleMesh.new()
+	sm.radius = RADIUS + 0.12
+	sm.height = HEIGHT + 0.2
+	_shell.mesh = sm
+	_shell_mat = StandardMaterial3D.new()
+	_shell_mat.albedo_color = Color(1, 1, 1, 0.0)
+	_shell_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_shell_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_shell_mat.cull_mode = BaseMaterial3D.CULL_BACK
+	_shell.material_override = _shell_mat
+	_shell.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_shell.visible = false
+	_body_mesh.add_child(_shell)
+	# held weapon in the right hand (body faces +Z, so the right hand is at -X)
+	_held = Node3D.new()
+	_held.position = Vector3(-0.42, 0.15, 0.32)
+	_held.rotation.y = PI    # models point down -Z
+	_body_mesh.add_child(_held)
 	# camera rig: pivot at the eyes, spring arm for the third person view (pulls in when a wall is behind you)
 	_pivot = Node3D.new()
 	_pivot.position.y = EYE
 	add_child(_pivot)
 	_arm = SpringArm3D.new()
-	_arm.collision_mask = 1
+	_arm.collision_mask = LAYER_WORLD
 	var probe := SphereShape3D.new()
 	probe.radius = 0.25
 	_arm.shape = probe
@@ -96,16 +207,85 @@ func _ready() -> void:
 	cam.current = is_player
 	cam.near = 0.05
 	_arm.add_child(cam)
+	# first person hands: boxing gloves in your colour, and the gun
+	_view = Node3D.new()
+	cam.add_child(_view)
+	for side in [-1.0, 1.0]:
+		var gl := MeshInstance3D.new()
+		var gs := SphereMesh.new()
+		gs.radius = 0.05
+		gs.height = 0.1
+		gl.mesh = gs
+		var gmat := StandardMaterial3D.new()
+		gmat.albedo_color = band_color
+		gmat.roughness = 0.45
+		gl.material_override = gmat
+		gl.scale = Vector3(1.0, 0.95, 1.25)
+		gl.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		gl.position = Vector3(0.17 * side, -0.19, -0.48)
+		_view.add_child(gl)
+		_gloves.append(gl)
 	floor_snap_length = STEP + 0.1
 	floor_max_angle = deg_to_rad(50)
 	apply_camera_mode()
+	_refresh_weapon_models()
+
+# ---------------------------------------------------------------- views and models
 
 func apply_camera_mode() -> void:
-	var fp := Settings.camera_mode == "first"
+	var fp := Settings.camera_mode == "first" and not downed and is_player
 	_arm.spring_length = 0.0 if fp else 4.2
 	_arm.position = Vector3.ZERO if fp else Vector3(0.9, 0.55, 0)   # over the right shoulder
-	_body_mesh.visible = not fp
+	_body_mesh.visible = (not fp) and alive
+	_view.visible = fp and alive and is_player
 	cam.fov = Settings.fov
+
+func first_person() -> bool:
+	return is_player and Settings.camera_mode == "first" and not downed
+
+func current_weapon() -> String:
+	if slot == "gun" and gun_id != "":
+		return gun_id
+	return "bat" if has_bat else "fists"
+
+func _refresh_weapon_models() -> void:
+	var id := current_weapon()
+	if id == _shown_weapon:
+		return
+	_shown_weapon = id
+	if _held_model:
+		_held_model.queue_free()
+	if _view_model:
+		_view_model.queue_free()
+	_held_model = WeaponModel.make(id)
+	_held.add_child(_held_model)
+	_view_model = WeaponModel.make(id)
+	_view.add_child(_view_model)
+	for i in _gloves.size():   # gloves show with fists; the right glove also holds a bat; guns hide them
+		_gloves[i].visible = id == "fists" or (id == "bat" and i == 1)
+	weapon_changed.emit()
+
+## where shots come from: the barrel tip of the visible weapon
+func muzzle_pos() -> Vector3:
+	var model := _view_model if first_person() else _held_model
+	if model:
+		var nm := "Muzzle2" if current_weapon() == "duals" and dual_left else "Muzzle"
+		var m := model.get_node_or_null(nm)
+		if m:
+			return (m as Node3D).global_position
+	return eye_pos() + aim_forward() * 0.9
+
+func eye_pos() -> Vector3:
+	return _pivot.global_position
+
+func aim_forward() -> Vector3:
+	return Vector3(sin(yaw) * cos(pitch), sin(pitch), cos(yaw) * cos(pitch))
+
+func forward() -> Vector3:
+	return Vector3(sin(yaw), 0, cos(yaw))
+
+func right() -> Vector3:
+	return Vector3(-cos(yaw), 0, sin(yaw))
 
 func place(p: Vector3, y: float) -> void:
 	global_position = p
@@ -113,19 +293,329 @@ func place(p: Vector3, y: float) -> void:
 	pitch = 0.0
 	velocity = Vector3.ZERO
 
+func _now() -> float:
+	return Time.get_ticks_msec() * 0.001
+
+# ---------------------------------------------------------------- input (you)
+
 func _unhandled_input(e: InputEvent) -> void:
 	if not is_player:
 		return
 	if e is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
-		var s := 0.0006 * (0.5 + Settings.sensitivity * 0.25)
+		var s := 0.0006 * (0.5 + Settings.sensitivity * 0.25) * (lerpf(1.0, 0.65, ads_k))
 		yaw -= e.relative.x * s
 		pitch = clamp(pitch - e.relative.y * s, -1.45, 1.45)
 	if e.is_action_pressed("camera_toggle"):
 		Settings.camera_mode = "first" if Settings.camera_mode == "third" else "third"
 		Settings.save()
 		apply_camera_mode()
-	if e.is_action_pressed("crouch"):
+	if e.is_action_pressed("crouch") and not downed:
 		_set_crouch(not crouching)
+	if e.is_action_pressed("weapon_melee"):
+		select_slot("melee")
+	elif e.is_action_pressed("weapon_gun"):
+		select_slot("gun")
+	elif e.is_action_pressed("weapon_next"):
+		select_slot("gun" if slot == "melee" else "melee")
+	elif e.is_action_pressed("weapon_fists"):
+		select_slot("melee")
+
+func _read_player_input(dt: float) -> void:
+	in_move = Input.get_vector("move_left", "move_right", "move_back", "move_forward")
+	in_jump = Input.is_action_pressed("jump")
+	in_fire = Input.is_action_pressed("fire") and (Input.mouse_mode == Input.MOUSE_MODE_CAPTURED or force_input)
+	in_aim = Input.is_action_pressed("aim")
+	# controller right stick looks around
+	var look := Input.get_vector("look_left", "look_right", "look_up", "look_down")
+	if look.length() > 0.12:
+		var r := 2.6 * (0.5 + Settings.sensitivity * 0.15) * lerpf(1.0, 0.6, ads_k)
+		yaw -= look.x * r * dt
+		pitch = clamp(pitch - look.y * r * 0.7 * dt, -1.45, 1.45)
+
+func select_slot(s: String) -> void:
+	if s == "gun" and gun_id == "":
+		return
+	if s == slot:
+		return
+	slot = s
+	var w := Weapons.stat(current_weapon())
+	swap_t = float(w.get("swap", SWAP))
+	ads = false
+	if is_player:
+		Sfx.play(get_parent(), "swap", global_position, -8.0, 1.0, 8.0)
+	_refresh_weapon_models()
+
+# ---------------------------------------------------------------- pickups
+
+func can_take_gun() -> bool:
+	return alive and not downed and not (gun_id != "" and ammo >= Weapons.KEEP_AT)
+
+func can_take_bat() -> bool:
+	return alive and not downed and not has_bat
+
+func give_gun(id: String) -> void:
+	gun_id = id
+	ammo = Weapons.AMMO
+	slot = "gun"
+	swap_t = float(Weapons.stat(id).get("swap", SWAP))
+	_refresh_weapon_models()
+
+func give_bat() -> void:
+	has_bat = true
+	_refresh_weapon_models()
+
+# ---------------------------------------------------------------- damage
+
+## returns true when this hit put them down or finished them
+func take_damage(amount: float, src: Node, head := false, _gun := "") -> bool:
+	if not alive or shield_t > 0.0:
+		return false
+	var dmg := maxi(1, roundi(amount))
+	last_hurt = _now()
+	last_by = src
+	hurt.emit(dmg, src, head)
+	if downed:
+		dhp -= dmg
+		if dhp <= 0.0:
+			_die(src)
+			return true
+		return false
+	stamina = maxf(0.0, stamina - dmg * 1.2)
+	stam_rest = 0.0
+	hp = maxf(0.0, hp - dmg)
+	if hp <= 0.0:
+		_go_down(src)
+		return true
+	return false
+
+func _go_down(src: Node) -> void:
+	downed = true
+	dhp = DOWN_HP
+	bleed = BLEED
+	revive = 0.0
+	ads = false
+	in_aim = false
+	on_ladder = false
+	crouching = false
+	velocity.x = 0.0
+	velocity.z = 0.0
+	collision_layer = LAYER_DOWNED
+	collision_mask = LAYER_WORLD
+	if has_bat:   # the bat drops where you fell
+		has_bat = false
+		if game:
+			game.drop_bat(global_position)
+	slot = "gun" if slot == "gun" and gun_id != "" else "melee"
+	_refresh_weapon_models()
+	Effects.hit_spray(get_parent(), global_position + Vector3.UP * 1.0, Vector3.ZERO, true)
+	Sfx.play(get_parent(), "down", global_position, 0.0, 1.0, 30.0)
+	apply_camera_mode()
+	went_down.emit(src)
+
+func _get_up() -> void:
+	downed = false
+	hp = maxf(1.0, roundf(dhp))   # back up with whatever downed health was left; regen waits the usual 3 s
+	last_hurt = _now()
+	revive = 0.0
+	collision_layer = LAYER_BODY
+	collision_mask = LAYER_WORLD | LAYER_BODY
+	_set_pose_standing()
+	apply_camera_mode()
+	got_up.emit()
+
+func _die(src: Node) -> void:
+	alive = false
+	downed = false
+	deaths += 1
+	if src and src != self and "kills" in src:
+		src.kills += 1
+	collision_layer = 0
+	collision_mask = LAYER_WORLD
+	velocity = Vector3.ZERO
+	respawn_t = RESPAWN
+	gun_id = ""
+	ammo = 0
+	has_bat = false
+	slot = "melee"
+	ads = false
+	_set_pose_standing()
+	_refresh_weapon_models()
+	Effects.hit_spray(get_parent(), global_position + Vector3.UP * 0.5, Vector3.ZERO, true)
+	Sfx.play(get_parent(), "kill", global_position, -2.0, 1.0, 40.0)
+	apply_camera_mode()
+	died.emit(src)
+
+## back in the game at a new spot, fists only, with a 2 s spawn shield
+func respawn_at(p: Vector3, y: float) -> void:
+	alive = true
+	downed = false
+	hp = HP_MAX
+	stamina = STAM_MAX
+	shield_t = SHIELD
+	bloom = 0.0
+	collision_layer = LAYER_BODY
+	collision_mask = LAYER_WORLD | LAYER_BODY
+	place(p, y)
+	_set_pose_standing()
+	apply_camera_mode()
+	Sfx.play(get_parent(), "respawn", global_position, -4.0, 1.0, 20.0)
+	respawned.emit()
+
+func _set_pose_standing() -> void:
+	_shape.radius = RADIUS
+	_shape.height = CROUCH_HEIGHT if crouching else HEIGHT
+	_cs.basis = Basis()
+	_cs.position = Vector3(0, _shape.height * 0.5, 0)
+	_body_mesh.basis = Basis(Vector3.UP, yaw)
+	_body_mesh.position = Vector3(0, HEIGHT * 0.5, 0)
+
+## lying flat: body and collider both turn horizontal along the facing, so a downed player never pokes through walls
+func _set_pose_downed() -> void:
+	_shape.radius = 0.4
+	_shape.height = 1.5
+	var b := Basis(Vector3.UP, yaw) * Basis(Vector3.RIGHT, PI * 0.5)
+	_cs.basis = b
+	_cs.position = Vector3(0, 0.4, 0)
+	_body_mesh.basis = b * Basis.from_scale(Vector3(0.88, 0.66, 0.88))
+	_body_mesh.position = Vector3(0, 0.4, 0)
+
+# ---------------------------------------------------------------- attacking
+
+func can_attack() -> bool:
+	return alive and not downed and not on_ladder and swap_t <= 0.0
+
+func _attack() -> void:
+	var id := current_weapon()
+	var g := Weapons.stat(id)
+	shield_t = 0.0    # attacking ends your spawn shield
+	fire_t = float(g.rate)
+	if Weapons.is_melee(id):
+		_melee(id, g)
+	else:
+		_shoot(id, g)
+
+func _melee(id: String, g: Dictionary) -> void:
+	swing_t = 0.26
+	punch_left = not punch_left
+	var lunge: float = g.lunge
+	velocity.x += sin(yaw) * lunge
+	velocity.z += cos(yaw) * lunge
+	var world := get_parent()
+	Sfx.play(world, "fistwhoosh" if id == "fists" else "batswing", global_position, -4.0, 1.0, 14.0, 0.08)
+	var reach: float = g.reach
+	var arc: float = g.arc
+	var eye := eye_pos()
+	var foes: Array = game.fighters.duplicate() if game else []
+	foes.sort_custom(func(a, b): return a.global_position.distance_squared_to(global_position) < b.global_position.distance_squared_to(global_position))
+	for foe in foes:
+		if foe == self or not foe.alive:
+			continue
+		var d: Vector3 = foe.global_position - global_position
+		var dist := Vector2(d.x, d.z).length()
+		if dist > reach or absf(d.y) > 1.9:
+			continue
+		var ang := absf(wrapf(atan2(d.x, d.z) - yaw, -PI, PI))
+		if ang > arc:
+			continue
+		var chest: Vector3 = foe.global_position + Vector3.UP * (0.4 if foe.downed else 1.2)
+		var q := PhysicsRayQueryParameters3D.create(eye, chest, LAYER_WORLD, [get_rid()])
+		if get_world_3d().direct_space_state.intersect_ray(q):
+			continue   # a wall in the way
+		var dmg: float = g.dmg
+		var hd := Vector3(d.x, 0, d.z).normalized()
+		var knock: float = g.knock
+		foe.velocity.x += hd.x * knock
+		foe.velocity.z += hd.z * knock
+		Effects.hit_spray(world, foe.global_position + Vector3.UP * (0.5 if foe.downed else 1.4), hd)
+		Sfx.play(world, "fisthit" if id == "fists" else "swordhit", foe.global_position, 0.0, 1.0, 20.0, 0.07)
+		var fin: bool = foe.take_damage(dmg, self, false, id)
+		dealt_hit.emit(foe, roundi(dmg), false, fin)
+		return
+	# nobody in reach: a punch or swing still breaks glass in front of you
+	for hy in [0.0, -0.9]:
+		var o: Vector3 = eye + Vector3.UP * hy
+		var q2 := PhysicsRayQueryParameters3D.create(o, o + forward() * reach, LAYER_WORLD, [get_rid()])
+		var hit := get_world_3d().direct_space_state.intersect_ray(q2)
+		if hit and game:
+			game.hit_world(hit.collider, hit.position, hit.normal, forward())
+			return
+
+## where you're actually aiming: for you, the point under the crosshair (so third person shots go where the
+## camera looks, fired from your eyes); for brains, straight down yaw/pitch
+func aim_direction() -> Vector3:
+	if not is_player:
+		return aim_forward()
+	var co := cam.global_position
+	var cd := -cam.global_basis.z
+	var eye := eye_pos()
+	var t0 := maxf(0.0, (eye - co).dot(cd))
+	var q := PhysicsRayQueryParameters3D.create(co + cd * t0, co + cd * 300.0, SHOT_MASK, [get_rid()])
+	var hit := get_world_3d().direct_space_state.intersect_ray(q)
+	var p: Vector3 = hit.position if hit else co + cd * 300.0
+	var d := p - eye
+	return d.normalized() if d.length() > 0.5 else cd
+
+func current_spread() -> float:
+	var g := Weapons.stat(current_weapon())
+	if Weapons.is_melee(current_weapon()):
+		return 0.0
+	var s := lerpf(float(g.spread), float(g.ads_spread), ads_k)
+	if Vector2(velocity.x, velocity.z).length() > 2.0:
+		s *= 1.45
+	if not is_on_floor() and not on_ladder:
+		s *= 2.2
+	if crouching:
+		s *= 0.65
+	return s + bloom * (0.3 if ads_k > 0.9 else 1.0)
+
+func _shoot(id: String, g: Dictionary) -> void:
+	ammo -= 1
+	shots += 1
+	if id == "duals":
+		dual_left = not dual_left
+	kick_t = 1.0
+	var world := get_parent()
+	var origin := eye_pos()
+	var dir := Weapons.spread_dir(aim_direction(), current_spread())
+	var q := PhysicsRayQueryParameters3D.create(origin, origin + dir * 250.0, SHOT_MASK, [get_rid()])
+	var hit := get_world_3d().direct_space_state.intersect_ray(q)
+	var end := origin + dir * 180.0
+	if hit:
+		end = hit.position
+		var col: Object = hit.collider
+		if col and col.has_method("take_damage") and col != self:
+			var foe = col
+			var dist := origin.distance_to(end)
+			var foe_y: float = foe.global_position.y
+			var head: bool = (not foe.downed) and end.y - foe_y > HEIGHT - HEAD_TOP
+			var dmg: float = float(g.dmg) * (float(g.head) if head else 1.0) * Weapons.falloff(id, dist)
+			Effects.hit_spray(world, end, dir)
+			var fin: bool = foe.take_damage(dmg, self, head, id)
+			dealt_hit.emit(foe, roundi(dmg), head, fin)
+		elif game:
+			game.hit_world(col, end, hit.normal, dir)
+	var mz := muzzle_pos()
+	if shots % 2 == 1:   # a thin streak on every other bullet
+		Effects.tracer(world, mz, end)
+	Effects.muzzle_flash(world, mz)
+	var snd: Array = g.sound
+	Sfx.play(world, snd[0], mz, -3.0, float(snd[1]), 45.0, 0.03)
+	bloom = minf(bloom + float(g.bloom), 3.0)
+	if is_player:
+		var k: float = g.kick
+		pitch = clamp(pitch + k * (0.6 if ads else 1.0), -1.45, 1.45)
+		yaw += (randf() - 0.5) * k * 0.4
+	if ammo <= 0:
+		gun_id = ""
+		slot = "melee"
+		ads = false
+		swap_t = SWAP
+		Sfx.play(world, "dry", global_position, -6.0, 1.0, 8.0)
+		if game:
+			game.feed_out_of_ammo(self)
+		_refresh_weapon_models()
+
+# ---------------------------------------------------------------- crouch
 
 func _set_crouch(on: bool) -> void:
 	if not on and crouching:   # only stand up if there's room above
@@ -134,37 +624,59 @@ func _set_crouch(on: bool) -> void:
 			return
 	crouching = on
 	_shape.height = CROUCH_HEIGHT if on else HEIGHT
-	get_node("Shape").position.y = _shape.height * 0.5
+	_cs.position.y = _shape.height * 0.5
 
-func forward() -> Vector3:
-	return Vector3(sin(yaw), 0, cos(yaw))
-
-func right() -> Vector3:
-	return Vector3(-cos(yaw), 0, sin(yaw))
+# ---------------------------------------------------------------- every physics tick
 
 func _physics_process(dt: float) -> void:
-	var mv := Vector2.ZERO
-	var jump := false
-	var jump_press := false
 	if is_player:
-		mv = Input.get_vector("move_left", "move_right", "move_back", "move_forward")
-		jump = Input.is_action_pressed("jump")
-		jump_press = jump and not _jump_held
-		_jump_held = jump
+		_read_player_input(dt)
+	if not alive:
+		respawn_t -= dt
+		if respawn_t <= 0.0 and game:
+			game.respawn(self)
+		return
+	_tick_health(dt)
+	if not alive:
+		return
+	# weapons: cooldowns, bloom, aiming, firing
+	fire_t -= dt
+	swap_t -= dt
+	shield_t = maxf(0.0, shield_t - dt)
+	bloom = maxf(0.0, bloom - dt * (1.0 if in_fire else 3.0))
+	var id := current_weapon()
+	var melee := Weapons.is_melee(id)
+	ads = in_aim and not melee and not downed
+	ads_k = move_toward(ads_k, 1.0 if ads else 0.0, dt / Weapons.ADS_TIME)
+	if in_fire and fire_t <= 0.0 and can_attack():
+		_attack()
+		id = current_weapon()
+		melee = Weapons.is_melee(id)
+	# movement
+	var mv := in_move
+	var jump := in_jump and not downed
+	var jump_press := jump and not _jump_held
+	_jump_held = jump
 	var wish := (forward() * mv.y + right() * mv.x)
 	if wish.length() > 1.0:
 		wish = wish.normalized()
 	var grounded := is_on_floor()
 	if grounded:
 		air_jumps = 1
-	# ladders: inside a ladder zone and pushing forward = climb
 	on_ladder = false
-	var feet := global_position
-	for l in ladders:
-		if l.grow(0.55).has_point(feet + Vector3.UP * 0.6) or l.grow(0.55).has_point(feet + Vector3.UP * 1.6):
-			on_ladder = true
-			break
-	var speed := RUN * FISTS_MUL * (CROUCH_MUL if crouching else 1.0)
+	if not downed:   # ladders: inside a ladder zone and pushing forward = climb
+		var feet := global_position
+		for l in ladders:
+			if l.grow(0.55).has_point(feet + Vector3.UP * 0.6) or l.grow(0.55).has_point(feet + Vector3.UP * 1.6):
+				on_ladder = true
+				break
+	var speed := RUN * (FISTS_MUL if melee else float(Weapons.stat(id).get("weight", 1.0)))
+	if ads:
+		speed = Weapons.ADS_SPEED * float(Weapons.stat(id).get("weight", 1.0))
+	if crouching:
+		speed *= CROUCH_MUL
+	if downed:
+		speed = CRAWL
 	var target := wish * speed
 	var acc := ACC_GROUND if grounded else ACC_AIR
 	var hv := Vector3(velocity.x, 0, velocity.z)
@@ -189,18 +701,69 @@ func _physics_process(dt: float) -> void:
 			stam_rest = 0.0
 		if not grounded:
 			velocity.y -= GRAV * dt * (1.2 if velocity.y < 0 else 1.0)
-	# stamina comes back after a short rest
 	stam_rest += dt
 	if stam_rest > STAM_DELAY:
 		stamina = min(STAM_MAX, stamina + STAM_REGEN * dt)
 	var before := global_position
 	move_and_slide()
-	_step_up(before, hv * dt, grounded)
-	# camera
-	_eye = lerp(_eye, EYE_CROUCH if crouching else EYE, min(1.0, dt * 12.0))
+	if not downed:
+		_step_up(before, hv * dt, grounded)
+	if downed:
+		_set_pose_downed()
+	_update_view(dt)
+
+func _tick_health(dt: float) -> void:
+	if downed:
+		bleed -= dt
+		revive += dt / GET_UP
+		if randf() < dt * 11.0:
+			Effects.downed_wisp(get_parent(), global_position + Vector3(randf_range(-0.25, 0.25), 0.4, randf_range(-0.25, 0.25)))
+		if revive >= 1.0:
+			_get_up()
+		elif bleed <= 0.0:
+			_die(last_by)
+	elif hp < HP_MAX and _now() - last_hurt > REGEN_DELAY:
+		hp = minf(HP_MAX, hp + REGEN_RATE * dt)
+
+## camera, aim zoom, first person hands, shield shell
+func _update_view(dt: float) -> void:
+	var g := Weapons.stat(current_weapon())
+	_eye = lerp(_eye, EYE_DOWN if downed else (EYE_CROUCH if crouching else EYE), min(1.0, dt * 12.0))
 	_pivot.position.y = _eye
 	_pivot.rotation = Vector3(pitch, yaw + PI, 0)
-	_body_mesh.rotation.y = yaw
+	if not downed:
+		_body_mesh.rotation.y = yaw
+	var fp := first_person()
+	if is_player:
+		cam.fov = lerpf(Settings.fov, float(g.get("zoom", Settings.fov)), ads_k) if not Weapons.is_melee(current_weapon()) else Settings.fov
+		if not fp:
+			_arm.spring_length = lerpf(4.2, 2.4, ads_k) if not downed else 3.4
+	# first person hands: punches jab forward, guns kick back and come to the centre when aiming
+	swing_t = maxf(0.0, swing_t - dt)
+	kick_t = maxf(0.0, kick_t - dt * 14.0)
+	if _view.visible:
+		var jab := sin((1.0 - swing_t / 0.26) * PI) if swing_t > 0.0 else 0.0
+		for i in _gloves.size():
+			var side := -1.0 if i == 0 else 1.0
+			var active := (i == 0) == punch_left
+			_gloves[i].position = Vector3(0.17 * side, -0.19 + (0.06 * jab if active else 0.0), -0.48 - (0.3 * jab if active else 0.0))
+		if _view_model:
+			# aimed: the sights sit just under the centre of the screen so you look over the front post, not
+			# through the gun; the whole hand is pushed out as the view zooms so the gun keeps its size on screen
+			var hip := Vector3(0.2, -0.2, -0.5)
+			var aimed := Vector3(0.0, -0.097, -0.5)
+			if current_weapon() == "duals":
+				hip = Vector3(0.0, -0.2, -0.5)
+				aimed = Vector3(0.0, -0.15, -0.5)
+			elif current_weapon() == "bat":
+				hip = Vector3(0.24, -0.3, -0.38)
+				aimed = hip
+				_view_model.rotation.x = -0.9 * jab
+			var zoom_k := tan(deg_to_rad(Settings.fov) * 0.5) / tan(deg_to_rad(cam.fov) * 0.5)
+			_view_model.position = (hip.lerp(aimed, ads_k) + Vector3(0, 0, 0.045 * kick_t)) * zoom_k
+	_shell.visible = shield_t > 0.0 and _body_mesh.visible
+	if _shell.visible:
+		_shell_mat.albedo_color.a = 0.22 * (shield_t / SHIELD)
 
 ## stairs and kerbs up to 0.55 m: if we ran into something low while walking, try the same move from 0.55 m higher
 func _step_up(before: Vector3, motion: Vector3, was_grounded: bool) -> void:

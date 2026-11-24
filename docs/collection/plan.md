@@ -152,12 +152,12 @@ The HUD and menus copy the web game's monochrome look (black and white, red high
 
 ## Build plan
 
-Five phases; each ends with Pete playing it, and nothing moves on until he's happy with the last. Status (24 Nov): phase 1 is built and waiting for his walk-through.
+Five phases; each ends with Pete playing it, and nothing moves on until he's happy with the last. Status (24 Nov): phases 1 and 2 are built; Pete moved on to phase 2 before his phase 1 walk-through, so both wait for him to play.
 
 | Phase | What gets built | Gate: what Pete plays and checks |
 | --- | --- | --- |
 | 1 · Foundations | Godot project, repo, grey-box Mansion built from the web layout; one Fighter: walk, sprint, crouch, jump, ladders, both cameras | Walk the Mansion: rooms, stairs, scale feel right. **Built; waiting for Pete's walk-through.** |
-| 2 · Combat | Fists, the SMG family, Dual Pistols, bat; 20-bullet pickups; health, downed, death, respawn; test dummies to hit | Fight a few dummies: punches and guns feel right |
+| 2 · Combat | Fists, the SMG family, Dual Pistols, bat; 20-bullet pickups; health, downed, death, respawn; test dummies to hit | Fight a few dummies: punches and guns feel right. **Built; waiting for Pete.** |
 | 3 · Collection rules | Stars, shop cash-in, 2 lost when downed, all lost on death; leader outline and minimap marker; HUD and leaderboard | Play a full solo match: find 10 stars and cash in |
 | 4 · Bots | Nav mesh, searching by sight, hearing, fighting, targeting; 7 bots at Easy, Normal, Hard; a debug view of what they see | Play full 8-player matches: bots feel fair at every level |
 | 5 · Look and sound | Lighting, reflections, fog, post effects, particles, glass; 3D sound through walls, room echo, menus, settings, controller | Compare with the web game, then decide: carry on or stop |
@@ -167,6 +167,15 @@ How each phase is checked before it reaches Pete:
 - **Headless checks** run on every change: the project opens without errors, a scripted match plays for 2 minutes with 8 bots, stars spawn inside the house, nobody falls through the floor, and the win triggers at the shop.
 - **Screenshots and a short clip** from fixed spots (lawn, hall, upstairs, shop) sent with each phase. Phase 1 shots are in `docs/screenshots/`.
 - **A playable build** on the PC at every gate; Pete's notes go straight into the next phase.
+
+### Phase 2 results (24 Nov 2026)
+
+- Fists: 3 punches down a dummy (34 each); left alone it gets up after 5 s with 30 HP; one punch downs it again and one more finishes it; it respawns 3 s later with a 2 s shield.
+- MP5 aimed at 10 m: 20 of 20 bullets hit, down then eliminated. Dual Pistols hip-fired at a strafing dummy 7 m away: about half hit.
+- Every gun empties its 20 and drops back to fists: Sting 1.0 s, Vector 1.3, MP5 1.4, P90 1.6, Uzi 1.7, UMP 2.2, Dual Pistols 3.5 (including the 0.3 s swap).
+- Pickups: 1,594 floor spots inside the house and 878 on the lawns; walking onto a gun gives it with 20 bullets; it comes back elsewhere 15 s later.
+- You: going down and being finished shows the down and eliminated screens; respawn lands at the spot furthest from everyone (33 m away in the test), fists only, with the shield.
+- 140–165 fps on the RTX 5060 laptop with 7 fighters. Screenshots in `docs/screenshots/phase2/`.
 
 ### Phase 1 results (23 Nov 2026)
 
