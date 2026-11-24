@@ -23,11 +23,11 @@ const Sfx := preload("res://audio/sfx.gd")
 const RADIUS := 0.45
 const HEIGHT := 2.25
 const CROUCH_HEIGHT := 1.45
-const RUN := 11.25 * 1.125
+const RUN := 8.5               # Pete, 24 Nov: players and bots were far too fast (was 11.25 x 1.125 = 12.7 m/s)
 const FISTS_MUL := 1.2
 const CROUCH_MUL := 0.5
-const ACC_GROUND := 70.0
-const ACC_AIR := 28.0
+const ACC_GROUND := 55.0        # was 70, eased with the slower run
+const ACC_AIR := 22.0           # was 28
 const GRAV := 36.0
 const JUMP := 12.0
 const STEP := 0.55
