@@ -11,19 +11,23 @@ const LevelBuilder := preload("res://level/level_builder.gd")
 const CollectionGame := preload("res://game/collection_game.gd")
 const DummyBrain := preload("res://fighter/dummy_brain.gd")
 const BotBrain := preload("res://fighter/bot_brain.gd")
-const NAMES := ["Wednesday", "Anti Hero", "Lil Pink", "Starscreen", "Crusty", "Dracz", "Gorillaz"]
+## the cast: imok 1v1's ten playable characters and their colours (DESIGN §5); 7 are drawn at random as bots each match
+const CAST := [
+	["Wednesday", "#d0202a"], ["Lil Pink", "#ff6fae"], ["North West", "#2e8bff"], ["Johnny Rotten", "#e0202a"],
+	["Emo Bunny", "#b79cff"], ["Glitch", "#1fd6ff"], ["Kitty", "#a77bff"], ["Puffa", "#ffd21a"], ["Raven", "#d0202a"], ["Toxic", "#5dff3a"],
+]
 const Hud := preload("res://ui/hud.gd")
 const Weapons := preload("res://weapons/weapons.gd")
 
 ## standing test dummies for the scripted combat and star checks (they never attack or collect): name, spot, facing, strafes?
 const DUMMIES := [
 	["Wednesday", Vector3(-9, 0.05, -31), PI, false],
-	["Anti Hero", Vector3(-13, 0.05, -33), PI, true],
-	["Lil Pink", Vector3(3, 0.05, -40), -PI * 0.5, false],
-	["Starscreen", Vector3(0, 0.05, -18), PI, true],
-	["Crusty", Vector3(-30, 0.05, -15), 1.2, false],
-	["Dracz", Vector3(13, 5.85, 1), -2.4, false],
-	["Gorillaz", Vector3(6, 0.05, 34), PI, true],
+	["Lil Pink", Vector3(-13, 0.05, -33), PI, true],
+	["North West", Vector3(3, 0.05, -40), -PI * 0.5, false],
+	["Johnny Rotten", Vector3(0, 0.05, -18), PI, true],
+	["Emo Bunny", Vector3(-30, 0.05, -15), 1.2, false],
+	["Glitch", Vector3(13, 5.85, 1), -2.4, false],
+	["Kitty", Vector3(6, 0.05, 34), PI, true],
 ]
 
 var level: Node3D
@@ -90,18 +94,20 @@ func _add_dummies() -> void:
 func _add_bots() -> void:
 	var styles: Array = BotBrain.STYLES.keys()
 	styles.shuffle()
-	for i in NAMES.size():
-		var f := _new_fighter(NAMES[i])
+	var cast: Array = CAST.duplicate()
+	cast.shuffle()
+	for i in 7:
+		var f := _new_fighter(cast[i][0], Color(cast[i][1]))
 		f.place(Vector3(-24.0 + i * 8.0, 0.05, -42.0), 0.0)   # spread out on the front lawn until the real spawns are picked
 		_add_brain(f, styles[i % styles.size()])
 		bots.append(f)
 
-func _new_fighter(nm: String) -> CharacterBody3D:
+func _new_fighter(nm: String, col := Color(0.91, 0.27, 0.23)) -> CharacterBody3D:
 	var f := Fighter.new()
 	f.name = "Fighter_" + nm.replace(" ", "")
 	f.is_player = false
 	f.display_name = nm
-	f.band_color = Color(0.91, 0.27, 0.23)
+	f.band_color = col
 	f.ladders = level.ladders
 	f.game = game
 	add_child(f)
@@ -550,11 +556,11 @@ func _star_checks() -> void:
 	await _snap("p3_02_ten_stars_third.png")
 	_log("AUTOTEST at 10: still %d, star still there=%s, marked=%s" % [player.stars, s1.active and s1.global_position == at1, player.marked])
 	# a marked leader shows through walls and on the minimap
-	var crusty: Node = dummies[4]
-	game.add_stars(crusty, 8)
-	_log("AUTOTEST Crusty at 8: marked=%s stencil=%d" % [crusty.marked, crusty._body_mat.stencil_mode])
+	var lead: Node = dummies[4]
+	game.add_stars(lead, 8)
+	_log("AUTOTEST %s at 8: marked=%s stencil=%d" % [lead.display_name, lead.marked, lead._body_mat.stencil_mode])
 	player.place(Vector3(-27, 0.05, -31), 0.0)
-	_face(player, crusty.global_position + Vector3.UP * 1.2)
+	_face(player, lead.global_position + Vector3.UP * 1.2)
 	await _wait(1.0)
 	await _snap("p3_03_marked_xray_third.png")
 	# down costs 2 (dropped where you fell), death costs the rest
@@ -567,7 +573,7 @@ func _star_checks() -> void:
 	await _snap("p3_04_dropped_stars_third.png")
 	player.take_damage(40, dummies[1])
 	await _wait(0.3)
-	_log("AUTOTEST dead: you have %d, dropped stars %d, Anti Hero kills %d" % [player.stars, game.drops.size(), dummies[1].kills])
+	_log("AUTOTEST dead: you have %d, dropped stars %d, %s kills %d" % [player.stars, game.drops.size(), dummies[1].display_name, dummies[1].kills])
 	while not player.alive:
 		await get_tree().physics_frame
 	await _wait(0.3)
