@@ -143,6 +143,7 @@ func _physics_process(dt: float) -> void:
 		_tramp_step(f, s, dt)
 		_portal_step(f, s)
 		_pool_step(f, s, dt)
+		_window_step(f)
 	_ball_pit(dt)
 
 func _process(dt: float) -> void:
@@ -231,6 +232,41 @@ func _pool_step(f: Node, s: Dictionary, dt: float) -> void:
 	elif f.clock - float(s.dv) < 0.9 and not f.is_on_floor() and p.x < 17.0:
 		p.x += 5.0 * dt
 		f.global_position = p
+
+# ---------------------------------------------------------------- windows
+
+## jump at a window and you crash straight through the glass (as on the web); once it's open, just keep walking into
+## it and you climb over the 0.8 m sill without needing to jump (Pete, 24 Nov: windows felt too tight)
+func _window_step(f: Node) -> void:
+	if f.downed or f.ride >= 0:
+		return
+	var p: Vector3 = f.global_position
+	var wish: Vector3 = f.forward() * f.in_move.y + f.right() * f.in_move.x
+	for w in level.windows:
+		var ax: bool = w.ax
+		var d: float = (p.z if ax else p.x) - float(w.at)
+		var u: float = p.x if ax else p.z
+		if absf(d) > 1.0 or u < float(w.a) + 0.15 or u > float(w.b) - 0.15:
+			continue
+		var s0: float = w.s0
+		var s1: float = w.s1
+		if p.y + 1.6 < s0 or p.y > s1 - 0.3:
+			continue
+		var into: float = -signf(d) * (wish.z if ax else wish.x)   # pushing towards the pane
+		var v: float = -signf(d) * (f.velocity.z if ax else f.velocity.x)
+		if is_instance_valid(w.body) and not (w.body as Node).is_queued_for_deletion():
+			if not f.is_on_floor() and absf(d) < 0.62 and (into > 0.2 or v > 1.0):
+				game.break_glass(w.body, Vector3(p.x, p.y + 1.2, p.z))
+			continue
+		# open: step up onto the sill when walking into it from below
+		if into > 0.3 and absf(d) < 0.8 and p.y < s0 - 0.05 and p.y > s0 - 1.2:
+			var lift := s0 + 0.03 - p.y
+			f.global_position = p + Vector3(0, lift, 0) + Vector3(0, 0, -signf(d) * 0.08) * (1.0 if ax else 0.0) \
+					+ Vector3(-signf(d) * 0.08, 0, 0) * (0.0 if ax else 1.0)
+			f._step_dy = clampf(f._step_dy - lift, -1.2, 0.0)
+			if f.velocity.y < 0.0:
+				f.velocity.y = 0.0
+		return
 
 # ---------------------------------------------------------------- ball pit
 

@@ -90,6 +90,7 @@ var ride_dir := 1
 var ride_cd := 0.0               # no getting straight back on for 0.6 s
 var clock := 0.0                 # this fighter's own running time (lift, trampoline and portal cooldowns)
 var wading := false
+var _step_dy := 0.0              # camera lag after a step-up (smooths kerbs, sills and odd steps)
 var lift_arm := true             # leave a lift before it takes you again              # in the indoor pool: 20% slower (set by the Mansion features)
 
 # health
@@ -921,7 +922,8 @@ func _tick_health(dt: float) -> void:
 func _update_view(dt: float) -> void:
 	var g := Weapons.stat(current_weapon())
 	_eye = lerp(_eye, EYE_DOWN if downed else (EYE_CROUCH if crouching else EYE), min(1.0, dt * 12.0))
-	_pivot.position.y = _eye
+	_step_dy = move_toward(_step_dy, 0.0, dt * 2.0) * maxf(0.0, 1.0 - dt * 9.0)
+	_pivot.position.y = _eye + _step_dy
 	_pivot.rotation = Vector3(pitch, yaw + PI, 0)
 	if not downed:
 		_body_mesh.rotation.y = yaw
@@ -983,5 +985,7 @@ func _step_up(before: Vector3, motion: Vector3, was_grounded: bool) -> void:
 	t.origin += Vector3.UP * STEP
 	if test_move(t, motion):
 		return
+	var y0 := global_position.y
 	global_position = before + Vector3.UP * STEP + motion
 	apply_floor_snap()
+	_step_dy = clampf(_step_dy - (global_position.y - y0), -1.2, 0.0)   # the view eases up the step instead of popping

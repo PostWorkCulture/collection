@@ -10,6 +10,7 @@ extends Node3D
 const Fighter := preload("res://fighter/fighter.gd")
 const LevelBuilder := preload("res://level/level_builder.gd")
 const MansionFeatures := preload("res://level/mansion_features.gd")
+const MansionLights := preload("res://level/mansion_lights.gd")
 const CollectionGame := preload("res://game/collection_game.gd")
 const DummyBrain := preload("res://fighter/dummy_brain.gd")
 const BotBrain := preload("res://fighter/bot_brain.gd")
@@ -36,6 +37,7 @@ const DUMMIES := [
 
 var level: Node3D
 var features: Node3D
+var lights: Node3D
 var game: Node3D
 var player: CharacterBody3D
 var dummies: Array = []
@@ -56,7 +58,13 @@ func _ready() -> void:
 	level.name = "Level"
 	add_child(level)
 	level.build()
-	_house_lights()
+	if level.dressed and level.layout.has("rooms"):
+		lights = MansionLights.new()
+		lights.name = "MansionLights"
+		add_child(lights)
+		lights.setup(level.layout, String(Settings.quality))
+	else:
+		_house_lights()
 	game = CollectionGame.new()
 	game.name = "Game"
 	game.level = level
@@ -137,6 +145,8 @@ func _on_settings_changed(what: String) -> void:
 	match what:
 		"quality":
 			_apply_quality()
+			if lights:
+				lights.set_quality(String(Settings.quality))
 		"view":
 			player.apply_camera_mode()
 		"audio":
@@ -509,9 +519,16 @@ func _movement_checks(cfg: Dictionary) -> void:
 		player.place(Vector3(s.from[0], s.from[1], s.from[2]), s.yaw)
 		await get_tree().create_timer(0.4).timeout
 		Input.action_press("move_forward")
-		await get_tree().create_timer(s.get("secs", 2.0)).timeout
+		var pop := 0.0   # the biggest single-frame climb: a smooth staircase stays small
+		var py: float = player.global_position.y
+		var tw := 0.0
+		while tw < float(s.get("secs", 2.0)):
+			await get_tree().physics_frame
+			tw += get_physics_process_delta_time()
+			pop = maxf(pop, player.global_position.y - py)
+			py = player.global_position.y
 		Input.action_release("move_forward")
-		_log("AUTOTEST walk %s: ended at %v" % [s.name, player.global_position])
+		_log("AUTOTEST walk %s: ended at %v, biggest step in one frame %.2f m" % [s.name, player.global_position, pop])
 
 # ---------------- phase 6 Mansion feature checks ----------------
 func _hold(action: String, secs: float) -> void:
@@ -583,6 +600,31 @@ func _mansion_checks() -> void:
 		if features._pos[i].distance_to(features._home[i]) > 0.5:
 			moved += 1
 	_log("AUTOTEST ball pit: landed at %v, %d of %d balls thrown" % [r[1], moved, features._pos.size()])
+	# windows: jump at one from inside and crash out; walk back in over the sill without jumping
+	var win: Dictionary = {}
+	for w in level.windows:
+		if absf(float(w.s0) - 0.8) < 0.1 and w.ax and float(w.at) < -20.0:
+			win = w
+			break
+	if not win.is_empty():
+		var u := (float(win.a) + float(win.b)) * 0.5
+		var at: float = win.at
+		var inside := 1.0 if at < 0.0 else -1.0   # the house is towards z = 0
+		player.place(Vector3(u, 0.05, at + inside * 2.2), 0.0 if inside < 0.0 else PI)
+		await get_tree().create_timer(0.3).timeout
+		Input.action_press("move_forward")
+		await get_tree().create_timer(0.12).timeout
+		Input.action_press("jump")
+		await get_tree().create_timer(0.7).timeout
+		Input.action_release("jump")
+		Input.action_release("move_forward")
+		await get_tree().create_timer(0.4).timeout
+		var out_side: bool = (player.global_position.z - at) * inside < 0.0
+		_log("AUTOTEST window: jumped through=%s glass broken=%s, now %.1f m outside" % [out_side, not is_instance_valid(win.body) or (win.body as Node).is_queued_for_deletion(), absf(player.global_position.z - at)])
+		player.place(Vector3(u, 0.05, at - inside * 1.6), PI if inside < 0.0 else 0.0)
+		await get_tree().create_timer(0.3).timeout
+		await _hold("move_forward", 1.0)
+		_log("AUTOTEST window: walked back in without jumping=%s (at z %.1f, wall at %.1f)" % [(player.global_position.z - at) * inside > 0.0, player.global_position.z, at])
 	player.invulnerable = false
 
 # ---------------- phase 2 combat checks ----------------

@@ -564,15 +564,22 @@ func hit_world(col: Object, pos: Vector3, normal: Vector3, _dir: Vector3) -> voi
 		var upright := minf(size.x, size.z) < size.y or size.y > 0.5
 		var skylight := body.global_position.y > 10.0
 		if upright or skylight:
-			_shatter(body.global_position, size)
-			Sfx.play(self, "smash", pos, 0.0, 1.0, 30.0, 0.05)
-			body.queue_free()
+			break_glass(body, pos)
 			return
 	Effects.impact(self, pos, normal)
 	if randf() < 0.35:
 		Sfx.play(self, "impact", pos, -10.0, 1.0, 9.0, 0.1)
 
 # ---------------------------------------------------------------- glass
+
+func break_glass(body: StaticBody3D, pos: Vector3) -> void:
+	if not is_instance_valid(body) or body.is_queued_for_deletion():
+		return
+	var cs := body.get_child(0) as CollisionShape3D
+	var size: Vector3 = (cs.shape as BoxShape3D).size if cs and cs.shape is BoxShape3D else Vector3.ONE
+	_shatter(body.global_position, size)
+	Sfx.play(self, "smash", pos, 0.0, 1.0, 30.0, 0.05)
+	body.queue_free()
 
 const SHARD_POOL := 360
 var _shards: Array[RigidBody3D] = []

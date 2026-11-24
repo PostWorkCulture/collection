@@ -14,6 +14,7 @@ var lifts: Array = []            # the 2 lifts and the fireman's pole: {box, nx,
 var dressed := false             # mansion.glb loaded
 var dressing: Node3D = null
 var parts := {}                  # name -> Array of the GLB's named moving parts
+var windows: Array = []          # the 40 big windows: {body, ax (pane runs along x), at, a, b, s0 (sill), s1 (top)}
 var spawns: Array = []
 var house: Dictionary = {}
 var shop_pos := Vector3.ZERO
@@ -36,6 +37,8 @@ func build() -> void:
 		_add_box(b)
 	for l in layout.ladders:
 		_add_ladder(l)
+	for st in layout.get("stairs", []):
+		_add_ramp(st)
 	_add_shop()
 
 ## the Mansion's look: the imported scene when Godot has imported the .glb, otherwise read straight from the file
@@ -149,6 +152,11 @@ func _add_box(b: Dictionary) -> void:
 	body.add_child(cs)
 	if glass:
 		body.set_meta("glass", true)
+		# the big windows: 3 m panes on a 0.8 m sill, downstairs and up
+		if size.y > 2.9 and size.y < 3.1 and (absf(p0.y - 0.8) < 0.05 or absf(p0.y - 6.6) < 0.05):
+			var ax := size.x > size.z
+			windows.append({"body": body, "ax": ax, "at": body.position.z if ax else body.position.x,
+				"a": p0.x if ax else p0.z, "b": p1.x if ax else p1.z, "s0": p0.y, "s1": p1.y})
 	if dressed and not glass:   # the dressing draws it
 		add_child(body)
 		return
@@ -206,6 +214,36 @@ func _build_ground() -> void:
 		fl.material_override = _mat("#c8c4bc", false)
 		add_child(fl)
 	_edge_walls(bd, w, d)
+
+## an invisible ramp over a staircase, its top surface touching the front edge of every step, so you glide up and down
+## instead of popping up each step (the steps still show; Pete, 24 Nov: stairs felt rough)
+func _add_ramp(st: Dictionary) -> void:
+	var dir: float = st.dir
+	var run: float = st.run
+	var rise: float = st.rise
+	var n: float = st.n
+	var y0: float = st.y0
+	var u0: float = float(st.u0) - dir * run
+	var u1: float = u0 + dir * run * n
+	var h := rise * n
+	var length := sqrt(pow(run * n, 2) + h * h)
+	var t := 0.4
+	var along := Vector3(0, h, dir * run * n) / length
+	var up := Vector3(0, run * n, -dir * h) / length
+	var mid := Vector3((float(st.v0) + float(st.v1)) * 0.5, y0 + h * 0.5, (u0 + u1) * 0.5)
+	if not st.get("along_z", true):
+		along = Vector3(along.z, along.y, 0)
+		up = Vector3(up.z, up.y, 0)
+		mid = Vector3(mid.z, mid.y, mid.x)
+	var body := StaticBody3D.new()
+	body.transform = Transform3D(Basis(up.cross(along), up, along), mid - up * t * 0.5)
+	var cs := CollisionShape3D.new()
+	var sh := BoxShape3D.new()
+	sh.size = Vector3(float(st.v1) - float(st.v0), t, length)
+	cs.shape = sh
+	body.add_child(cs)
+	body.set_meta("ramp", true)
+	add_child(body)
 
 func _ground_box(r: Rect2, y0: float, y1: float) -> void:
 	var body := StaticBody3D.new()
