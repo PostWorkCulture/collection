@@ -1,0 +1,25 @@
+# Godot 4
+.godot/
+**/.godot/
+*.translation
+export_credentials.cfg
+**/export_credentials.cfg
+
+# Build output
+build/
+**/build/
+*.apk
+*.aab
+*.exe
+*.pck
+
+# Blender autosaves
+*.blend1
+*.blend2
+
+# OS / editor
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+mono_crash.*
