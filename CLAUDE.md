@@ -3,8 +3,10 @@
 Read this file and `DESIGN.md` before doing anything. If a request conflicts with either, stop and ask Pete before changing code.
 
 ## What this repo is
-- **Godot Collection** (`PostWorkCulture/collection`): Pete's collection of Godot games.
+- **Collection** (`PostWorkCulture/collection`): one Godot game — the Collection mode from imok 1v1 (8 players, The Mansion, find 10 stars, cash in at the shop) rebuilt as a standalone game. Spec: DESIGN.md.
 - Engine: **Godot 4.7.x stable**, GDScript only (no C#) unless DESIGN.md says otherwise.
+- Reference for porting: `PostWorkCulture/1v1`, branch `collection-v1`, commit `76738cc`, `index.html` (port the logic, don't copy three.js code). The 1v1 README has the full Mansion layout.
+- Values in DESIGN.md marked **(Pete)** are locked. Other numbers are the browser build's and may be tuned, but record any change in the Decision log.
 - Local working copy: `Documents\AI\Claude\Projects\Games\Collection Godot` on the "bakes" PC.
 - `main` on GitHub is the source of truth. Local copies, chat history and memory are not.
 
@@ -17,13 +19,16 @@ Read this file and `DESIGN.md` before doing anything. If a request conflicts wit
 6. If something in the code disagrees with DESIGN.md, report it; don't "fix" either side on your own.
 
 ## Structure
+One Godot project at the repo root:
 ```
-/                    repo root (this file, DESIGN.md, README.md)
-/<game-name>/        one folder per game, each its own Godot project (project.godot inside)
-/shared/             reusable scripts, shaders, UI, audio shared between games
-/docs/               extra notes, screenshots
+/project.godot
+/scenes/        .tscn files (mansion/, fighter/, pickups/, ui/)
+/scripts/       .gd files, mirroring scenes/ (autoload/, bots/, ...)
+/assets/        models (chars/, weapons/), textures, audio, fonts
+/shaders/
+/docs/          notes, preview screenshots for Pete
 ```
-New game = new folder + a row in DESIGN.md → "Games".
+Update DESIGN.md → "Build status" when a part moves forward.
 
 ## Godot conventions
 - Files and folders: `snake_case` (`player_controller.gd`, `main_menu.tscn`). Classes: `class_name PascalCase`.
@@ -35,8 +40,11 @@ New game = new folder + a row in DESIGN.md → "Games".
 
 ## Before committing
 - Run the affected game (Godot MCP `run_project`) and check `get_debug_output`: zero errors, no new warnings.
-- Commit message: `<game>: <what changed>` e.g. `bman: add bomb chain reaction`, `repo: update DESIGN.md`.
+- Commit message: `<area>: <what changed>` e.g. `stars: add spawn spacing`, `bots: add room exploring`, `docs: update DESIGN.md`.
+- Studio rules (DESIGN.md §10) apply to every change: no confetti/coloured particles, red spray + mist for hits, realistic premium look, white ladders.
 
 ## Publishing
+- Anything new that Pete will see (models, rooms, effects, UI): show him preview images first, then push.
 - Push to `main` unless Pete says otherwise. Say what was pushed and the commit hash.
-- Web builds (if a game is published to GitHub Pages) are exported from the game's "Web" preset; see DESIGN.md → "Publishing".
+- End every reply with "Published" or "Unpublished".
+- Platforms and build publishing aren't decided yet (DESIGN.md → "Open questions"); don't set up exports until Pete picks.
