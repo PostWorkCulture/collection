@@ -64,6 +64,57 @@ func _load_dressing() -> void:
 	dressed = true
 	_collect_parts(dressing)
 	_fix_materials(dressing, {})
+	_set_ranges(dressing)
+
+## small things stop being drawn (fading out) once they're too far away to matter, and the smallest cast no shadows:
+## a cup 25 m off, a chair 45 m off. Walls, floors and big furniture always draw.
+var ranged := 0
+var floor_things := [[], []]     # furniture-sized meshes on the ground floor and the first floor
+var _floors_shown := [true, true]
+
+## hide the furniture of a floor you can't see into (the house's own walls and floors always draw)
+func show_floors(ground: bool, upper: bool) -> void:
+	for i in 2:
+		var on := ground if i == 0 else upper
+		if _floors_shown[i] == on:
+			continue
+		_floors_shown[i] = on
+		for mi in floor_things[i]:
+			(mi as MeshInstance3D).visible = on
+
+## which floors can be seen from here: outside, in the hall, on a staircase or by a hole between floors, both;
+## otherwise just your own
+static func floors_seen(p: Vector3) -> Array:
+	if absf(p.x) > 40.0 or absf(p.z) > 27.0 or p.y > 11.5:
+		return [true, true]
+	if absf(p.x) < 9.5 and absf(p.z) < 10.5:
+		return [true, true]   # the hall and the atrium round its void
+	for hole in [Vector2(-32, 0), Vector2(32, 0), Vector2(-22.35, 25.5), Vector2(22.35, -7.5), Vector2(-38.2, -13.8), Vector2(38.2, 13.8)]:
+		if Vector2(p.x, p.z).distance_to(hole) < 6.5:
+			return [true, true]   # pole, launch hole, lifts, back stairs
+	if p.y > 1.2 and p.y < 5.6:
+		return [true, true]
+	return [p.y < 5.6, p.y >= 5.6]
+
+func _set_ranges(n: Node) -> void:
+	for c in n.get_children():
+		var mi := c as MeshInstance3D
+		if mi and mi.mesh:
+			var sz := mi.mesh.get_aabb().size * mi.global_transform.basis.get_scale()
+			var big := maxf(sz.x, maxf(sz.y, sz.z))
+			if big < 1.4:
+				mi.visibility_range_end = 25.0 if big < 0.4 else 45.0
+				mi.visibility_range_end_margin = 4.0
+				mi.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
+				ranged += 1
+			if big < 0.6:
+				mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			# furniture-sized things inside the house, away from the hall void, belong to one floor
+			if big < 3.0:
+				var cp := mi.global_transform * mi.mesh.get_aabb().get_center()
+				if absf(cp.x) < 40.0 and absf(cp.z) < 27.0 and not (absf(cp.x) < 8.0 and absf(cp.z) < 9.0) and cp.y < 11.0:
+					floor_things[1 if cp.y > 5.75 else 0].append(mi)
+		_set_ranges(c)
 
 ## the web drew its light beams and glows additively (faint, never solid); glTF has no additive blend, so the faint unlit
 ## see-through materials go back to additive here

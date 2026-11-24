@@ -63,6 +63,7 @@ func _ready() -> void:
 		lights.name = "MansionLights"
 		add_child(lights)
 		lights.setup(level.layout, String(Settings.quality))
+		lights.level_ref = level
 	else:
 		_house_lights()
 	game = CollectionGame.new()
@@ -439,7 +440,7 @@ func _run_autotest(cfg: Dictionary) -> void:
 	await get_tree().create_timer(1.0).timeout
 	if cfg.get("menu", false):
 		await _menu_checks()
-	_log("AUTOTEST boxes=%d ladders=%d lifts=%d spawns=%d dressed=%s" % [level.get_child_count(), level.ladders.size(), level.lifts.size(), level.spawns.size(), level.dressed])
+	_log("AUTOTEST boxes=%d ladders=%d lifts=%d spawns=%d dressed=%s, %d small things with a draw distance, floor furniture %d + %d" % [level.get_child_count(), level.ladders.size(), level.lifts.size(), level.spawns.size(), level.dressed, level.ranged, level.floor_things[0].size(), level.floor_things[1].size()])
 	while game.state != "fight":   # the 3 s countdown
 		await get_tree().physics_frame
 	if cfg.get("movement", true):
@@ -625,6 +626,15 @@ func _mansion_checks() -> void:
 		await get_tree().create_timer(0.3).timeout
 		await _hold("move_forward", 1.0)
 		_log("AUTOTEST window: walked back in without jumping=%s (at z %.1f, wall at %.1f)" % [(player.global_position.z - at) * inside > 0.0, player.global_position.z, at])
+	# hot tub: jump in and it splashes
+	player.place(Vector3(-16, 8.5, 4), 0.0)
+	await get_tree().create_timer(1.0).timeout
+	var tub: Dictionary = features._tubs[0]
+	var rings_on := 0
+	for rg in tub.rings:
+		if float(rg[1]) < 1.2:
+			rings_on += 1
+	_log("AUTOTEST hot tub: in it=%s at y %.2f, splash rings %d, water found=%s, jets %d" % [tub.inside.get(player.get_instance_id(), false), player.global_position.y, rings_on, tub.water != null, features.get_children().filter(func(c): return c is GPUParticles3D).size()])
 	# smashable props: shoot one apart, then it grows back once its 40 s are up
 	var kinds := {}
 	var with_look := 0

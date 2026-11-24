@@ -152,7 +152,7 @@ The HUD and menus copy the web game's monochrome look (black and white, red high
 
 ## Build plan
 
-Six phases (the sixth added 24 Nov, when Pete settled on Godot for Collection as its own game); each ends with Pete playing it, and nothing moves on until he's happy with the last. Status (24 Nov): phases 1–5 and the first part of phase 6 (the Mansion's look and its moving parts) are built and published; the second part (stairs, windows, room lights) is published; the third part (furniture, smashable props, fewer stars) is built. Pete played phases 1 and 2 (notes in DESIGN.md → Known issues); phases 3–6 wait for him to play. Next: the rest of phase 6 (hot tub jets, hiding rooms you can't see).
+Six phases (the sixth added 24 Nov, when Pete settled on Godot for Collection as its own game); each ends with Pete playing it, and nothing moves on until he's happy with the last. Status (24 Nov): phases 1–5 and the first part of phase 6 (the Mansion's look and its moving parts) are built and published; the second part (stairs, windows, room lights) is published; the third part (furniture, smashable props, fewer stars) is published; the last part (hot tubs, speed) is built, which finishes phase 6. Pete played phases 1 and 2 (notes in DESIGN.md → Known issues); phases 3–6 wait for him to play. Next: Pete plays phase 6; the plan's six phases are then done.
 
 | Phase | What gets built | Gate: what Pete plays and checks |
 | --- | --- | --- |
@@ -168,6 +168,11 @@ How each phase is checked before it reaches Pete:
 - **Headless checks** run on every change: the project opens without errors, a scripted match plays for 2 minutes with 8 bots, stars spawn inside the house, nobody falls through the floor, and the win triggers at the shop.
 - **Screenshots and a short clip** from fixed spots (lawn, hall, upstairs, shop) sent with each phase. Phase 1 shots are in `docs/screenshots/`.
 - **A playable build** on the PC at every gate; Pete's notes go straight into the next phase.
+
+### Phase 6 results, last part (24 Nov 2026)
+
+- Hot tubs: jumping into the spa tub lands you in the water (y 6.1) with a splash ring; jets run in both tubs.
+- Speed on High (RTX 5060 laptop): lawn 119 fps (was 88), foyer 139 (124), library 125 (108), kitchen 134 (100), landing 156 (108), master bedroom 148 (106); the rest 150–165.
 
 ### Phase 6 results, third part (24 Nov 2026)
 

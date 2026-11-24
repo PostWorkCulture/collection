@@ -12,6 +12,7 @@ const DIM_NO_FITTINGS := ["cinema", "observ", "ballroom", "panic"]   # moody roo
 const H1 := 5.5
 
 var rooms: Array = []
+var level_ref: Node = null   # the level builder: hides the furniture of a floor you can't see
 var _room_lights := {}      # name -> Array of [OmniLight3D, base energy]
 var _accent := {}           # name -> OmniLight3D
 var _tubes: Array = []      # garage: [light, bad, on, timer]
@@ -77,6 +78,9 @@ func _process(dt: float) -> void:
 	_t += dt
 	var cam := get_viewport().get_camera_3d()
 	if cam:
+		if level_ref:
+			var fs: Array = level_ref.floors_seen(cam.global_position)
+			level_ref.show_floors(fs[0], fs[1])
 		var c := _cell_of(cam.global_position)
 		if c != _cell:
 			_cell = c
