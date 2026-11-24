@@ -97,5 +97,9 @@
  ],
  "combat": true,
  "movement": true,
- "stars": true
+ "stars": true,
+ "bots_match": false,
+ "difficulty": "normal",
+ "match_secs": 300,
+ "speed": 1
 }

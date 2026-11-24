@@ -152,14 +152,14 @@ The HUD and menus copy the web game's monochrome look (black and white, red high
 
 ## Build plan
 
-Six phases (the sixth added 24 Nov, when Pete settled on Godot for Collection as its own game); each ends with Pete playing it, and nothing moves on until he's happy with the last. Status (24 Nov): phases 1–3 are built. Pete played phases 1 and 2 (notes in DESIGN.md → Known issues) and phase 2 is published; phase 3 waits for his solo match.
+Six phases (the sixth added 24 Nov, when Pete settled on Godot for Collection as its own game); each ends with Pete playing it, and nothing moves on until he's happy with the last. Status (24 Nov): phases 1–4 are built; phases 2 and 3 are published. Pete played phases 1 and 2 (notes in DESIGN.md → Known issues); phases 3 and 4 wait for him to play.
 
 | Phase | What gets built | Gate: what Pete plays and checks |
 | --- | --- | --- |
 | 1 · Foundations | Godot project, repo, grey-box Mansion built from the web layout; one Fighter: walk, sprint, crouch, jump, ladders, both cameras | Walk the Mansion: rooms, stairs, scale feel right. **Built; waiting for Pete's walk-through.** |
 | 2 · Combat | Fists, the SMG family, Dual Pistols, bat; 20-bullet pickups; health, downed, death, respawn; test dummies to hit | Fight a few dummies: punches and guns feel right. **Built; waiting for Pete.** |
 | 3 · Collection rules | Stars, shop cash-in, 2 lost when downed, all lost on death; leader outline and minimap marker; HUD and leaderboard | Play a full solo match: find 10 stars and cash in. **Built; waiting for Pete.** |
-| 4 · Bots | Nav mesh, searching by sight, hearing, fighting, targeting; 7 bots at Easy, Normal, Hard; a debug view of what they see | Play full 8-player matches: bots feel fair at every level |
+| 4 · Bots | Nav mesh, searching by sight, hearing, fighting, targeting; 7 bots at Easy, Normal, Hard; a debug view of what they see | Play full 8-player matches: bots feel fair at every level. **Built; waiting for Pete.** |
 | 5 · Look and sound | Lighting, reflections, fog, post effects, particles, glass; 3D sound through walls, room echo, menus, settings, controller | Play it with everything switched on (Pete decided on 24 Nov to carry on in Godot regardless) |
 | 6 · The Mansion in full | The grey box built out into the real Mansion: every room's look, props, glass, lifts, pole, portals, trampolines, ball pit, pool, lighting per room (DESIGN §9) | Walk every room and play full matches |
 
@@ -168,6 +168,14 @@ How each phase is checked before it reaches Pete:
 - **Headless checks** run on every change: the project opens without errors, a scripted match plays for 2 minutes with 8 bots, stars spawn inside the house, nobody falls through the floor, and the win triggers at the shop.
 - **Screenshots and a short clip** from fixed spots (lawn, hall, upstairs, shop) sent with each phase. Phase 1 shots are in `docs/screenshots/`.
 - **A playable build** on the PC at every gate; Pete's notes go straight into the next phase.
+
+### Phase 4 results (24 Nov 2026)
+
+- The navigation mesh bakes at match start (2,011 polygons) with all 7 ladders linked; paths run lawn → front door → hall, room to room, and up the stairs to the first floor.
+- 8-bot matches (you on autopilot as an eighth bot), run headless at 3× speed: Easy 71–126 s, Normal 27–49 s, Hard 26–40 s; at normal speed on the PC, Normal took 65 s with 26 eliminations.
+- No bot stood still at any 15 s check in the last 11 matches; after the opening run in from the lawns, bots spend 1–4% of their time outside and none on the roof.
+- The leader runs for the shop with 10 stars and cashes in; stars change hands constantly as players go down.
+- Screenshots in `docs/screenshots/phase4/`.
 
 ### Phase 3 results (24 Nov 2026)
 

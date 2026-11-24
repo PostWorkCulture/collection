@@ -64,6 +64,7 @@ var _msg_t := 0.0
 var _msg_title := ""
 var _msg_sub := ""
 var _load_card: PanelContainer
+var _load_bots: Label
 var _win: Control
 var _win_title: Label
 var _win_sub: Label
@@ -267,6 +268,9 @@ func _build_phase3() -> void:
 	l2.text = "Start with fists · find 10 hidden stars · cash them in at the shop outside · first to cash in wins"
 	l2.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lv.add_child(l2)
+	_load_bots = _label(13, GREY)
+	_load_bots.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lv.add_child(_load_bots)
 	# win screen and results
 	_win = Control.new()
 	_win.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -450,7 +454,7 @@ func _process(dt: float) -> void:
 		_center.text = ""
 		_center_sub.text = ""
 	_shield.visible = player.alive and player.shield_t > 0.0
-	_help.text = "imok Collection · Godot grey box (phase 3: Collection rules) · WASD move · Space jump · C crouch · V camera · LMB attack · RMB aim · 1 fists/bat · 2 gun · Esc mouse · %d fps" % Engine.get_frames_per_second()
+	_help.text = "imok Collection · Godot grey box (phase 4: bots) · WASD move · Space jump · C crouch · V camera · LMB attack · RMB aim · 1 fists/bat · 2 gun · F3 bot view · Esc mouse · %d fps" % Engine.get_frames_per_second()
 	_process_phase3(dt)
 	_cross.queue_redraw()
 
@@ -476,6 +480,7 @@ func _process_phase3(dt: float) -> void:
 	_edge_t = maxf(0.0, _edge_t - dt)
 	_edge_mat.set_shader_parameter("amount", clampf(_edge_t / 1.4, 0.0, 1.0) * 0.9)
 	_load_card.visible = game.state == "countdown"
+	_load_bots.text = "Bots: %s · B to change" % String(Settings.bots).capitalize()
 	_msg_t -= dt
 	# centre message: down / eliminated win over timed messages; the countdown shows its number
 	if player.alive and not player.downed and game.state != "won":

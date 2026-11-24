@@ -69,7 +69,10 @@ var in_move := Vector2.ZERO
 var in_jump := false
 var in_fire := false
 var in_aim := false
+var dmg_mul := 1.0               # bots on Easy deal 30% less damage
+var can_headshot := true         # and never land headshots
 var force_input := false         # the autotest presses fire without the mouse captured
+var autopilot := false           # the autotest's bot match: your fighter is driven by a bot brain too
 
 # movement
 var yaw := 0.0     # web convention: facing (sin yaw, 0, cos yaw)
@@ -227,6 +230,10 @@ func _ready() -> void:
 		gl.position = Vector3(0.17 * side, -0.19, -0.48)
 		_view.add_child(gl)
 		_gloves.append(gl)
+	# other players are never a moving floor: standing on someone who respawns or gets moved must not launch you
+	platform_floor_layers = LAYER_WORLD
+	platform_wall_layers = 0
+	platform_on_leave = CharacterBody3D.PLATFORM_ON_LEAVE_DO_NOTHING
 	floor_snap_length = STEP + 0.1
 	floor_max_angle = deg_to_rad(50)
 	apply_camera_mode()
@@ -512,6 +519,8 @@ func _melee(id: String, g: Dictionary) -> void:
 	velocity.z += cos(yaw) * lunge
 	var world := get_parent()
 	Sfx.play(world, "fistwhoosh" if id == "fists" else "batswing", global_position, -4.0, 1.0, 14.0, 0.08)
+	if game:
+		game.make_noise(global_position, 12.0, self)
 	var reach: float = g.reach
 	var arc: float = g.arc
 	var eye := eye_pos()
@@ -531,7 +540,7 @@ func _melee(id: String, g: Dictionary) -> void:
 		var q := PhysicsRayQueryParameters3D.create(eye, chest, LAYER_WORLD, [get_rid()])
 		if get_world_3d().direct_space_state.intersect_ray(q):
 			continue   # a wall in the way
-		var dmg: float = g.dmg
+		var dmg: float = float(g.dmg) * dmg_mul
 		var hd := Vector3(d.x, 0, d.z).normalized()
 		var knock: float = g.knock
 		foe.velocity.x += hd.x * knock
@@ -597,8 +606,8 @@ func _shoot(id: String, g: Dictionary) -> void:
 			var foe = col
 			var dist := origin.distance_to(end)
 			var foe_y: float = foe.global_position.y
-			var head: bool = (not foe.downed) and end.y - foe_y > HEIGHT - HEAD_TOP
-			var dmg: float = float(g.dmg) * (float(g.head) if head else 1.0) * Weapons.falloff(id, dist)
+			var head: bool = can_headshot and (not foe.downed) and end.y - foe_y > HEIGHT - HEAD_TOP
+			var dmg: float = float(g.dmg) * (float(g.head) if head else 1.0) * Weapons.falloff(id, dist) * dmg_mul
 			Effects.hit_spray(world, end, dir)
 			var fin: bool = foe.take_damage(dmg, self, head, id)
 			dealt_hit.emit(foe, roundi(dmg), head, fin)
@@ -611,6 +620,8 @@ func _shoot(id: String, g: Dictionary) -> void:
 	var snd: Array = g.sound
 	Sfx.play(world, snd[0], mz, -3.0, float(snd[1]), 45.0, 0.03)
 	bloom = minf(bloom + float(g.bloom), 3.0)
+	if game and shots % 3 == 1:
+		game.make_noise(global_position, 40.0, self)
 	if is_player:
 		var k: float = g.kick
 		pitch = clamp(pitch + k * (0.6 if ads else 1.0), -1.45, 1.45)
@@ -639,7 +650,7 @@ func _set_crouch(on: bool) -> void:
 # ---------------------------------------------------------------- every physics tick
 
 func _physics_process(dt: float) -> void:
-	if is_player:
+	if is_player and not autopilot:
 		_read_player_input(dt)
 	if game and not game.fighting():   # countdown and after the win: nobody moves or attacks
 		in_move = Vector2.ZERO

@@ -24,15 +24,15 @@ One Godot project in `/collection/` (open `collection/project.godot`). Folders a
 /collection/project.godot, main.tscn, main.gd   entry point
 /collection/autoload/      singletons (settings.gd)
 /collection/game/          the match node: state and clock, fighters, stars, pickups, shop cash-in, win, respawns, glass, kill feed
-/collection/fighter/       player/bot body, movement, camera, health, weapons in hand; dummy_brain.gd for tests
+/collection/fighter/       player/bot body, movement, camera, health, weapons in hand; bot_brain.gd (the bots); dummy_brain.gd for tests
 /collection/weapons/       weapon stats (from the web game), block models, hit/gun effects
 /collection/pickups/       weapon pickups
 /collection/stars/         the gold star (mesh, hum, dropped stars)
 /collection/ui/            HUD and minimap
 /collection/audio/         sfx.gd + sfx/ (the web game's own sound files)
 /collection/level/         Mansion builder + mansion_layout.json
-/collection/autotest.json  scripted checks ("enabled": true runs them and quits; "combat": true adds the fight checks, "stars": true the Collection rules)
-/collection/<feature>/     new features get their own folder: bots/ ...
+/collection/autotest.json  scripted checks ("enabled": true runs them and quits; "combat" and "stars" check fights and Collection rules on standing dummies; "bots_match" plays a whole 8-bot match, with "difficulty", "match_secs" and "speed")
+/collection/<feature>/     new features get their own folder
 /docs/screenshots/         preview images for Pete, one folder per phase
 ```
 Update DESIGN.md → "Build status" when a part moves forward.

@@ -10,13 +10,15 @@ extends Node3D
 ## 8+ stars and you're marked: outlined through walls and pinned on every minimap. Cashing in takes 2 s standing
 ## still at the shop (approved improvement; getting hurt or moving away starts it again). First to cash in wins.
 ## Weapons (phase 2): 6 gun + 2 bat pickups, 80% indoors, 6 m apart, back somewhere new 15 s after being taken.
-## Respawn 3 s after dying at the spawn point furthest from everyone (test dummies go back to their own spot).
+## Respawn 3 s after dying at the spawn point furthest from everyone, leaving out the 3 roof spawns (test dummies go
+## back to their own spot).
 
 signal feed_msg(text: String, mine: bool)
 signal center_msg(title: String, sub: String, secs: float)
 signal leader_marked(f: Node)         # someone just reached 8 stars: cue + screen-edge flash
 signal state_changed(state: String)
 signal won(f: Node)
+signal noise(pos: Vector3, radius: float, src: Node)   # gunshots and punches; bots within earshot may go and look
 
 const Weapons := preload("res://weapons/weapons.gd")
 const Effects := preload("res://weapons/effects.gd")
@@ -56,6 +58,9 @@ var countdown := COUNTDOWN
 var winner: Node = null
 var cash_point := Vector3.ZERO       # where you stand to cash in: just in front of the shop
 var cash_t := {}                     # fighter → seconds stood at the shop
+var nav_region: NavigationRegion3D
+var ladder_links := 0
+var debug := false                   # F3: show what every bot is doing, seeing and where it's going
 var _star_back := 0.0
 var _pad_mat: StandardMaterial3D
 var _t := 0.0
@@ -75,6 +80,7 @@ func start() -> void:
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 	_find_spots()
+	await _bake_nav()
 	cash_point = level.shop_pos + Vector3(0, 0, 1.7)   # the shop faces the house (+z); you stand in front of it
 	_make_pad()
 	for i in ON_MAP:
@@ -265,6 +271,68 @@ func _win(f: Node) -> void:
 	feed_msg.emit("%s cashed in %d stars" % ["You" if f.is_player else f.display_name, STARS], f.is_player)
 	won.emit(f)
 
+# ---------------------------------------------------------------- navigation
+
+## bake a navigation mesh from the Mansion's own collision boxes (both floors, the stairs, the lawns and the roof),
+## with a link up every ladder (bots climb up; coming down they drop off the edge, as there's no fall damage)
+func _bake_nav() -> void:
+	var bd: Dictionary = level.layout.get("bounds", {"x0": -60, "x1": 60, "z0": -45, "z1": 45})
+	var nm := NavigationMesh.new()
+	nm.agent_radius = 0.5
+	nm.agent_height = 1.6
+	nm.agent_max_climb = 0.5
+	nm.agent_max_slope = 50.0
+	nm.cell_size = 0.25
+	nm.cell_height = 0.1
+	nm.geometry_parsed_geometry_type = NavigationMesh.PARSED_GEOMETRY_STATIC_COLLIDERS
+	nm.geometry_collision_mask = 1
+	nm.filter_baking_aabb = AABB(Vector3(float(bd.x0), -1.0, float(bd.z0)), Vector3(float(bd.x1) - float(bd.x0), 14.0, float(bd.z1) - float(bd.z0)))
+	var src := NavigationMeshSourceGeometryData3D.new()
+	NavigationServer3D.parse_source_geometry_data(nm, src, level)
+	NavigationServer3D.bake_from_source_geometry_data(nm, src)
+	var map := get_world_3d().navigation_map
+	NavigationServer3D.map_set_cell_size(map, nm.cell_size)
+	NavigationServer3D.map_set_cell_height(map, nm.cell_height)
+	nav_region = NavigationRegion3D.new()
+	nav_region.navigation_mesh = nm
+	add_child(nav_region)
+	# Godot loads the baked mesh into the map in the background: wait until it answers (a few frames)
+	var probe := Vector3(0, 0, -40)
+	for i in 240:
+		await get_tree().physics_frame
+		if NavigationServer3D.map_get_iteration_id(map) > 0 and NavigationServer3D.map_get_closest_point(map, probe) != Vector3.ZERO:
+			break
+	# ladder links: the foot on the floor in front of the ladder, the top on the floor past its top edge
+	# (stepping further out until there's walkable floor to land on)
+	for l in level.layout.get("ladders", []):
+		var a: Array = l.b
+		var n := Vector3(float(l.get("nx", 0)), 0, float(l.get("nz", 0)))
+		var c := Vector3((float(a[0]) + float(a[3])) * 0.5, 0, (float(a[2]) + float(a[5])) * 0.5)
+		var foot := _nav_floor(map, c - n * 0.9 + Vector3(0, float(a[1]), 0), -n)
+		var top := _nav_floor(map, c + n * 0.9 + Vector3(0, float(a[4]), 0), n)
+		if foot == Vector3.INF or top == Vector3.INF:
+			continue
+		var link := NavigationLink3D.new()
+		link.bidirectional = true
+		add_child(link)
+		link.start_position = foot
+		link.end_position = top
+		ladder_links += 1
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+
+## the nearest walkable point at about this height, stepping out along `out` up to 3 m to find one
+func _nav_floor(map: RID, p: Vector3, out: Vector3) -> Vector3:
+	for k in 7:
+		var q := p + out * (k * 0.5)
+		var c := NavigationServer3D.map_get_closest_point(map, q)
+		if c.distance_to(q) < 0.6:
+			return c
+	return Vector3.INF
+
+func make_noise(pos: Vector3, radius: float, src: Node) -> void:
+	noise.emit(pos, radius, src)
+
 # ---------------------------------------------------------------- floor spots
 
 ## a grid of downward rays over the grounds: every floor a standing body fits on becomes a spot
@@ -409,6 +477,8 @@ func respawn(f: Node) -> void:
 	var best: Variant = null
 	var best_d := -1.0
 	for s in level.spawns:
+		if float(s.y) > 10.0:
+			continue   # not the 3 roof spawns: they always measure furthest, and the game happens indoors
 		var p := Vector3(float(s.x), float(s.y) + 0.05, float(s.z))
 		var d := 1e9
 		for o in fighters:

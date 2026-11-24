@@ -1,17 +1,21 @@
 extends Node3D
-## Entry point: builds the lighting, the grey-box Mansion, the match ("Game"), you, seven test dummies (8 players)
-## and the HUD, and sets up the controls. After a win, Enter plays again. If autotest.json says "enabled": true, it
-## runs the scripted checks and screenshots instead ("combat": true adds the fight checks, "stars": true the
-## Collection rules checks).
+## Entry point: builds the lighting, the grey-box Mansion, the match ("Game"), you, seven bots (8 players) and the
+## HUD, and sets up the controls. Everyone's first spawn is out on the front and back lawns, facing the house.
+## During the countdown B changes the bots' difficulty (Easy / Normal / Hard, saved); F3 shows what each bot is
+## doing; after a win, Enter plays again. If autotest.json says "enabled": true, it runs the scripted checks and
+## screenshots instead: "combat" and "stars" use seven standing test dummies; "bots_match" plays a full 8-bot match
+## (you on autopilot too) and reports how it went.
 
 const Fighter := preload("res://fighter/fighter.gd")
 const LevelBuilder := preload("res://level/level_builder.gd")
 const CollectionGame := preload("res://game/collection_game.gd")
 const DummyBrain := preload("res://fighter/dummy_brain.gd")
+const BotBrain := preload("res://fighter/bot_brain.gd")
+const NAMES := ["Wednesday", "Anti Hero", "Lil Pink", "Starscreen", "Crusty", "Dracz", "Gorillaz"]
 const Hud := preload("res://ui/hud.gd")
 const Weapons := preload("res://weapons/weapons.gd")
 
-## test dummies until the bots arrive in phase 4 (they never attack or collect): name, spot, facing, strafes?
+## standing test dummies for the scripted combat and star checks (they never attack or collect): name, spot, facing, strafes?
 const DUMMIES := [
 	["Wednesday", Vector3(-9, 0.05, -31), PI, false],
 	["Anti Hero", Vector3(-13, 0.05, -33), PI, true],
@@ -26,6 +30,7 @@ var level: Node3D
 var game: Node3D
 var player: CharacterBody3D
 var dummies: Array = []
+var bots: Array = []
 var hud: CanvasLayer
 
 func _ready() -> void:
@@ -48,32 +53,86 @@ func _ready() -> void:
 	game.add_fighter(player)
 	# first spawn of the game: out on the front lawn, facing the house (as in Collection)
 	player.place(Vector3(-6, 0.05, -36), 0.0)
-	for d in DUMMIES:
-		var f := Fighter.new()
-		f.name = "Dummy_" + String(d[0]).replace(" ", "")
-		f.is_player = false
-		f.display_name = d[0]
-		f.band_color = Color(0.91, 0.27, 0.23)
-		f.ladders = level.ladders
-		f.game = game
-		f.home = [d[1], d[2]]
-		add_child(f)
-		f.place(d[1], d[2])
-		var brain := DummyBrain.new()
-		brain.strafe = d[3]
-		f.add_child(brain)
-		game.add_fighter(f)
-		dummies.append(f)
+	var auto := _autotest()
+	var testing: bool = auto.get("enabled", false)
+	if testing and auto.has("difficulty"):
+		Settings.bots = auto.difficulty   # for this run only (not saved)
+	var use_dummies: bool = testing and (auto.get("combat", false) or auto.get("stars", false)) and not auto.get("bots_match", false)
+	if use_dummies:
+		_add_dummies()
+	else:
+		_add_bots()
+	if testing and auto.get("bots_match", false):
+		player.autopilot = true   # you play as a bot too, so the whole match runs by itself
+		_add_brain(player, "duelist")
 	hud = Hud.new()
 	hud.player = player
 	hud.game = game
 	add_child(hud)
 	await game.start()
-	var auto := _autotest()
-	if auto.get("enabled", false):
+	_lawn_spawns()
+	if testing:
 		_run_autotest(auto)
 	else:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+func _add_dummies() -> void:
+	for d in DUMMIES:
+		var f := _new_fighter(d[0])
+		f.home = [d[1], d[2]]
+		f.place(d[1], d[2])
+		var brain := DummyBrain.new()
+		brain.strafe = d[3]
+		f.add_child(brain)
+		dummies.append(f)
+
+## seven bots, each with a style from the web game's Rumble pool (picked at random, no repeats until all are used)
+func _add_bots() -> void:
+	var styles: Array = BotBrain.STYLES.keys()
+	styles.shuffle()
+	for i in NAMES.size():
+		var f := _new_fighter(NAMES[i])
+		f.place(Vector3(-24.0 + i * 8.0, 0.05, -42.0), 0.0)   # spread out on the front lawn until the real spawns are picked
+		_add_brain(f, styles[i % styles.size()])
+		bots.append(f)
+
+func _new_fighter(nm: String) -> CharacterBody3D:
+	var f := Fighter.new()
+	f.name = "Fighter_" + nm.replace(" ", "")
+	f.is_player = false
+	f.display_name = nm
+	f.band_color = Color(0.91, 0.27, 0.23)
+	f.ladders = level.ladders
+	f.game = game
+	add_child(f)
+	game.add_fighter(f)
+	return f
+
+func _add_brain(f: Node, style: String) -> void:
+	var b := BotBrain.new()
+	b.game = game
+	b.style = style
+	b.difficulty = Settings.bots
+	f.add_child(b)
+
+## first spawn of the match: everyone out on the front and back lawns, spread out, facing the house
+func _lawn_spawns() -> void:
+	var taken: Array[Vector3] = [player.global_position]
+	for f in bots:
+		var spot: Variant = game.pick_spot(game.cand_out, taken, 8.0)
+		if spot == null:
+			continue
+		var p: Vector3 = spot
+		taken.append(p)
+		f.place(p + Vector3(0, 0.05, 0), 0.0 if p.z < 0.0 else PI)
+
+func set_bot_difficulty(d: String) -> void:
+	Settings.bots = d
+	Settings.save()
+	for f in game.fighters:
+		for c in f.get_children():
+			if c.has_method("set_difficulty"):
+				c.set_difficulty(d)
 
 func _inputs() -> void:
 	var keys := {
@@ -176,6 +235,11 @@ func _unhandled_input(e: InputEvent) -> void:
 		get_viewport().set_input_as_handled()   # the click that grabs the mouse doesn't also punch
 	elif e.is_action_pressed("ui_accept") and game.state == "won":
 		get_tree().reload_current_scene()   # play again
+	elif e is InputEventKey and e.pressed and not e.echo and e.physical_keycode == KEY_B and game.state in ["countdown", "won"]:
+		var order := ["easy", "normal", "hard"]
+		set_bot_difficulty(order[(order.find(Settings.bots) + 1) % 3])
+	elif e is InputEventKey and e.pressed and not e.echo and e.physical_keycode == KEY_F3:
+		game.debug = not game.debug
 
 # ---------------- scripted checks (autotest.json) ----------------
 func _autotest() -> Dictionary:
@@ -205,6 +269,8 @@ func _run_autotest(cfg: Dictionary) -> void:
 		await _combat_checks()
 	if cfg.get("stars", false):
 		await _star_checks()
+	if cfg.get("bots_match", false):
+		await _bots_match(cfg)
 	# screenshots
 	for sh in cfg.get("shots", []):
 		Settings.camera_mode = sh.get("cam", "third")
@@ -522,3 +588,67 @@ func _star_checks() -> void:
 	await _wait(3.0)
 	await _snap("p3_06_victory_results.png")
 	player.force_input = false
+
+# ---------------- phase 4: a full 8-bot match ----------------
+func _bots_match(cfg: Dictionary) -> void:
+	var limit: float = cfg.get("match_secs", 300.0)
+	Engine.time_scale = float(cfg.get("speed", 1.0))
+	_log("AUTOTEST nav: %d ladder links of %d" % [game.ladder_links, level.ladders.size()])
+	_log("AUTOTEST bots: difficulty %s, styles %s" % [Settings.bots, ", ".join(game.fighters.map(func(f): return "%s=%s" % [f.display_name, _brain(f).style]))])
+	var t0: float = game.clock
+	var next_report := 15.0
+	var stuck := {}
+	var last_pos := {}
+	var shot_i := 0
+	var shots: Array = cfg.get("match_shots", [])
+	var outdoor := [0, 0, 0, 0]   # outside, all, on the roof, after the first 10 s outside
+	while game.state == "fight" and game.clock - t0 < limit:
+		await get_tree().physics_frame
+		for f in game.fighters:
+			if f.alive:
+				outdoor[1] += 1
+				var p: Vector3 = f.global_position
+				if absf(p.x) > 40.0 or absf(p.z) > 27.0 or p.y > 10.5:
+					outdoor[0] += 1
+					if p.y > 10.5:
+						outdoor[2] += 1
+					if game.clock - t0 > 10.0:
+						outdoor[3] += 1
+		var t: float = game.clock - t0
+		if t >= next_report:
+			next_report += 15.0
+			var parts: Array[String] = []
+			for f in game.fighters:
+				var b := _brain(f)
+				var moved: float = f.global_position.distance_to(last_pos.get(f, f.global_position)) if last_pos.has(f) else 99.0
+				if f.alive and not f.downed and moved < 1.0:
+					stuck[f] = int(stuck.get(f, 0)) + 1
+					_log("AUTOTEST   still: %s %s at %v goal %v ladder=%s floor=%s target=%s" % [f.display_name, b.state if b else "-", f.global_position, b.goal if b else Vector3.ZERO, f.on_ladder, f.is_on_floor(), b.target.display_name if b and b.target else "-"])
+				last_pos[f] = f.global_position
+				parts.append("%s %d★ %dk/%dd %s y%.0f" % [f.display_name, f.stars, f.kills, f.deaths, b.state if b else "-", f.global_position.y])
+			_log("AUTOTEST t=%ds stars out %d | %s" % [int(t), _active_stars().size(), " | ".join(parts)])
+		if shot_i < shots.size() and t >= float(shots[shot_i].get("at", 0.0)):
+			var sh: Dictionary = shots[shot_i]
+			shot_i += 1
+			Settings.camera_mode = sh.get("cam", "third")
+			player.apply_camera_mode()
+			game.debug = sh.get("debug", false)
+			await _snap(sh.file)
+	Engine.time_scale = 1.0
+	var total_stars := 0
+	var total_kills := 0
+	for f in game.fighters:
+		total_stars += f.stars
+		total_kills += f.kills
+	_log("AUTOTEST bots match: state=%s winner=%s after %.0f s, kills %d, stars held %d, times stuck (15 s checks) %s, time outside or on the roof %d%% (roof %d%%, outside after the first 10 s %d%%)" % [game.state, game.winner.display_name if game.winner else "none", game.clock - t0, total_kills, total_stars, str(stuck.values()), roundi(100.0 * outdoor[0] / maxf(1.0, outdoor[1])), roundi(100.0 * outdoor[2] / maxf(1.0, outdoor[1])), roundi(100.0 * outdoor[3] / maxf(1.0, outdoor[1]))])
+	for f in game.standings():
+		_log("AUTOTEST   %s: %d stars, %d kills, %d deaths" % [f.display_name, f.stars, f.kills, f.deaths])
+	if game.state == "won" and cfg.has("end_shot"):
+		await _wait(3.2)
+		await _snap(cfg.end_shot)
+
+func _brain(f: Node) -> Node:
+	for c in f.get_children():
+		if c.has_method("set_difficulty"):
+			return c
+	return null
