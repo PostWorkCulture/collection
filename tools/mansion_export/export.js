@@ -1,8 +1,16 @@
-(async()=>{const X=__X,T=X.THREE; const {GLTFExporter}=await import('/__export/gltf_exporter.js'); X.S.collect=true; X.S.players="ffa"; X.buildMap("mansion"); const M=X.M;
-const rm=[], hid=[]; let inv=0;
+(async()=>{const X=__X,T=X.THREE; const {GLTFExporter}=await import('/__export/gltf_exporter.js'); window.__NOBATCHPROPS=true; X.S.collect=true; X.S.players="ffa"; X.buildMap("mansion"); const M=X.M;
+const rm=[], hid=[]; let inv=0, swapped=0;
+const isInv=o=>{const ms=Array.isArray(o.material)?o.material:[o.material]; return ms.every(m=>m.visible===false||(m.transparent&&m.opacity<=0.01));};
+// many props are an invisible collider box carrying the visible pieces as children: keep the pieces under a plain node
+const swap=o=>{const g=new T.Group(); g.name=o.name; g.position.copy(o.position); g.quaternion.copy(o.quaternion); g.scale.copy(o.scale); g.userData=o.userData; g.visible=o.visible; const p=o.parent, ix=p.children.indexOf(o); while(o.children.length) g.add(o.children[0]); p.children[ix]=g; g.parent=p; o.parent=null; swapped++; return g;};
+const glassSet=new Set(M.boxes.filter(b=>b.prop==='glass'&&b.mesh).map(b=>b.mesh));
+const toSwap=[]; M.group.traverse(o=>{ if(o.isMesh&&o.children.length&&(isInv(o)||glassSet.has(o))) toSwap.push(o); });
+const swapMap=new Map(); for(const o of toSwap) swapMap.set(o, swap(o));
+for(const b of M.boxes) if(b.mesh&&swapMap.has(b.mesh)) b.mesh=swapMap.get(b.mesh);
+
 M.group.traverse(o=>{ if(o.isSprite||o.isLineSegments||o.isLight||o.isLine||o.isPoints||o.isInstancedMesh) rm.push(o); else if(o.isMesh){ if(!o.visible){const p=new T.Vector3();o.getWorldPosition(p);hid.push([o.geometry.type,p.x.toFixed(1),p.y.toFixed(1),p.z.toFixed(1)]);} const ms=Array.isArray(o.material)?o.material:[o.material]; if(ms.every(m=>m.visible===false||(m.transparent&&m.opacity<=0.01))){o.visible=false;inv++;} }});
 for(const o of rm) o.parent&&o.parent.remove(o);
-const boxes=M.boxes.map((b,i)=>{ if(b.mesh){ b.mesh.name='box_'+i+(b.prop?'_'+b.prop:''); if(b.prop==='glass') b.mesh.visible=false;} return {b:[b.x0,b.y0,b.z0,b.x1,b.y1,b.z1].map(v=>+v.toFixed(3)),p:b.prop||'',hp:b.hp||0,m:b.mesh?1:0,see:b.see?1:0}; });
+const boxes=M.boxes.map((b,i)=>{ if(b.mesh){ b.mesh.name='box_'+i+(b.prop?'_'+b.prop:''); if(b.prop==='glass'&&b.mesh.isMesh) b.mesh.visible=false;} return {b:[b.x0,b.y0,b.z0,b.x1,b.y1,b.z1].map(v=>+v.toFixed(3)),p:b.prop||'',hp:b.hp||0,m:b.mesh?1:0,see:b.see?1:0}; });
 // name the moving parts so Godot can animate them
 const lifts=M.ladders.filter(l=>l.lift); const named={};
 const tag=(o,n)=>{o.name=n; named[n]=(named[n]||0)+1;};
@@ -20,4 +28,4 @@ M.group.traverse(o=>{ if(o.isMesh&&o.material&&o.material.map&&o.parent&&o.paren
 M.group.updateMatrixWorld(true);
 const glb=await new GLTFExporter().parseAsync(M.group,{binary:true,onlyVisible:true,maxTextureSize:1024});
 const u8=new Uint8Array(glb); let s=''; for(let i=0;i<u8.length;i+=32768) s+=String.fromCharCode.apply(null,u8.subarray(i,i+32768));
-return {glb:btoa(s), size:u8.length, removed:rm.length, hid, inv, named, boxes, lifts};})()
+return {swapped, glb:btoa(s), size:u8.length, removed:rm.length, hid, inv, named, boxes, lifts};})()
