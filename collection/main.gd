@@ -147,6 +147,7 @@ var _logf: FileAccess
 func _log(t: String) -> void:
 	print(t)
 	if _logf == null:
+		DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://shots"))
 		_logf = FileAccess.open("res://shots/autotest.txt", FileAccess.WRITE)
 	_logf.store_line(t)
 	_logf.flush()
