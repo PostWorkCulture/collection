@@ -7,7 +7,7 @@
    Leaves a report in window.__TIDY_REPORT. */
 window.__TIDY = function (M) {
   const T = window.__X.THREE, R = M.dbg.R, D = M.dbg.DOORS, WN = M.dbg.WINS;
-  const rep = { underWindow: [], turned: 0, removed: [], glassMeshes: 0, clusters: 0, moved: 0, stayed: [], against: 0, big: 0, special: 0 };
+  const rep = { floorSpot: [], underWindow: [], turned: 0, removed: [], glassMeshes: 0, clusters: 0, moved: 0, stayed: [], against: 0, big: 0, special: 0 };
   M.group.updateMatrixWorld(true);
   /* ---- glass */
   for (const b of M.boxes) {
@@ -113,7 +113,7 @@ window.__TIDY = function (M) {
       // try each wall, nearest first, sliding along it; as it stands, then turned a quarter; strict clearances, then looser
       const cx0 = (f.x0 + f.x1) / 2, cz0 = (f.z0 + f.z1) / 2;
       let best = null;
-      for (const zs of (fl ? [strict, loose, doorsOnly] : [strict, loose])) {   // ground-floor windows are kept clear
+      for (const zs of [strict, loose]) {   // windows are never covered (Pete's Mansion rule)
         clear = zs;
         for (const rot of [0, 1]) {
           const hw = (rot ? d : w) / 2, hd = (rot ? w : d) / 2;
@@ -139,6 +139,28 @@ window.__TIDY = function (M) {
         }
         if (best) break;
       }
+      // no wall spot: the nearest open floor spot that blocks nothing, as it stands or turned (low things only: a tall
+      // block in the middle of a room is just an obstruction, so that goes instead)
+      const tall = w * d > 6 && f.top - fy > 2;
+      if (!best && tall) c.blocks = true;
+      if (!best && !tall) {
+        for (const zs of [strict, loose]) {
+          clear = zs;
+          let bd = 1e9;
+          for (const rot of [0, 1]) {
+            const hw = (rot ? d : w) / 2, hd = (rot ? w : d) / 2;
+            for (let x = ix0 + hw + 0.06; x <= ix1 - hw - 0.06; x += 0.5) for (let z = iz0 + hd + 0.06; z <= iz1 - hd - 0.06; z += 0.5) {
+              const dist = Math.hypot(x - cx0, z - cz0);
+              if (dist >= bd) continue;
+              if (blocked(x - hw - 0.2, x + hw + 0.2, z - hd - 0.2, z + hd + 0.2, fy)) continue;
+              if (inSpecial(x - hw, x + hw, z - hd, z + hd, fl)) continue;
+              if (others(c, x - hw, x + hw, z - hd, z + hd)) continue;
+              bd = dist; best = [x - cx0, z - cz0, rot];
+            }
+          }
+          if (best) { rep.floorSpot.push(name); break; }
+        }
+      }
       clear = strict;
       const pieces = () => {
       const set = new Set();
@@ -156,7 +178,7 @@ window.__TIDY = function (M) {
       clear = doorsOnly;
       const blocksDoor = blocked(f.x0, f.x1, f.z0, f.z1, fy);
       clear = strict;
-      if (!best && c.blocks && (blocksDoor || fl === 0)) {   // in a doorway or under a ground-floor window with nowhere else to go: it goes
+      if (!best && c.blocks) {   // in a doorway or under a window with nowhere else to go: it goes
         for (const o of pieces()) o.parent.remove(o);
         for (const b of c.list) { const i = M.boxes.indexOf(b); if (i >= 0) M.boxes.splice(i, 1); }
         rep.removed.push(where); continue;
