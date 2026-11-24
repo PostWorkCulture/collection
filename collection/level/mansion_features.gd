@@ -7,6 +7,8 @@ extends Node3D
 ## - indoor pool: wade through it 20% slower; the springboard bounces you out into the water
 ## - playroom ball pit: balls scatter when you walk through and burst out all over the room when you land in it
 ## - ballroom: dance floor patterns, turning disco ball, moving-head beams kept inside the room, its own music
+## - hot tubs (spa and roof terrace): jets streaming in from the rim, the water moving, a splash and a ring on the water
+##   when you get in, wading sounds as you move about (DESIGN §9: jets only, no ducks)
 ## Every fighter (you and the bots) gets the same treatment.
 
 const Sfx := preload("res://audio/sfx.gd")
@@ -81,6 +83,11 @@ var _disco_light: OmniLight3D
 
 var _cars: Array = []                # [node, lift index]
 
+# ---- hot tubs: x, z (both on the upstairs floor, deck 0.3 m, water 0.42 m above it)
+const TUBS := [Vector2(-16, 4), Vector2(30, 23)]
+const TUB_R := 1.5
+var _tubs: Array = []                # {c, wy, water, base, burst, rings: [[mesh, t, s]], ri, inside: {}}
+
 func setup(g: Node, lv: Node) -> void:
 	game = g
 	level = lv
@@ -120,6 +127,7 @@ func setup(g: Node, lv: Node) -> void:
 		_swirl(s as MeshInstance3D)
 	_setup_disco(parts)
 	_setup_ball_pit()
+	_setup_tubs()
 	if game.has_signal("state_changed"):
 		game.state_changed.connect(func(s: String) -> void:
 			if s == "countdown":
@@ -144,6 +152,7 @@ func _physics_process(dt: float) -> void:
 		_portal_step(f, s)
 		_pool_step(f, s, dt)
 		_window_step(f)
+		_tub_step(f, s)
 	_ball_pit(dt)
 
 func _process(dt: float) -> void:
@@ -512,6 +521,21 @@ func _animate(dt: float) -> void:
 		var m := w.material_override as StandardMaterial3D
 		m.uv1_offset = _water_base[i] + Vector3(sin(t * 0.13) * 0.4, t * 0.05, 0)
 		w.position.y = WATER_Y + sin(t * 1.3) * 0.012
+	for tb in _tubs:
+		if tb.water:
+			var wm: StandardMaterial3D = (tb.water as MeshInstance3D).material_override
+			wm.uv1_offset = tb.base + Vector3(sin(t * 0.4) * 0.3, t * 0.12, 0)
+			(tb.water as Node3D).position.y = float(tb.wy) + sin(t * 2.3) * 0.012
+		for r in tb.rings:
+			if r[1] > 1.2:
+				continue
+			r[1] += dt
+			var rm: MeshInstance3D = r[0]
+			rm.visible = r[1] < 1.2
+			var kk: float = r[1] / 1.2
+			var sc: float = 0.15 + float(r[2]) * 1.3 * sqrt(kk)
+			rm.scale = Vector3(sc, 0.02, sc)
+			(rm.material_override as StandardMaterial3D).albedo_color.a = 0.6 * (1.0 - kk) * (1.0 - kk)
 	_paint_floor(t)
 	if _beams_ball:
 		_beams_ball.rotation.y = t * 0.8
@@ -523,6 +547,134 @@ func _animate(dt: float) -> void:
 		for m in _beams[bi][1]:
 			var sm := m as StandardMaterial3D
 			sm.albedo_color = Color(c.r, c.g, c.b, sm.albedo_color.a)
+
+# ---------------------------------------------------------------- hot tubs
+
+func _setup_tubs() -> void:
+	var drop := SphereMesh.new()
+	drop.radius = 0.035
+	drop.height = 0.07
+	drop.radial_segments = 6
+	drop.rings = 3
+	var dm := StandardMaterial3D.new()
+	dm.albedo_color = Color(0.92, 0.98, 1.0, 0.75)
+	dm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	dm.roughness = 0.05
+	dm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	drop.material = dm
+	var ring := TorusMesh.new()
+	ring.inner_radius = 0.86
+	ring.outer_radius = 1.0
+	ring.rings = 28
+	ring.ring_segments = 4
+	for c in TUBS:
+		var wy := UF + 0.3 + 0.42
+		var t := {"c": c, "wy": wy, "rings": [], "ri": 0, "inside": {}, "water": null}
+		# the jets: six, streaming in from the rim just under the surface
+		for i in 6:
+			var a := float(i) / 6.0 * TAU + 0.3
+			var jet := GPUParticles3D.new()
+			var pm := ParticleProcessMaterial.new()
+			pm.direction = Vector3(-cos(a), 0.12, -sin(a))
+			pm.spread = 9.0
+			pm.initial_velocity_min = 2.0
+			pm.initial_velocity_max = 3.0
+			pm.gravity = Vector3(0, -3, 0)
+			pm.scale_min = 0.6
+			pm.scale_max = 1.2
+			jet.process_material = pm
+			jet.draw_pass_1 = drop
+			jet.amount = 14
+			jet.lifetime = 0.35
+			jet.local_coords = false
+			jet.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			jet.position = Vector3(c.x + cos(a) * (TUB_R - 0.1), wy - 0.06, c.y + sin(a) * (TUB_R - 0.1))
+			jet.visibility_aabb = AABB(Vector3(-2, -1, -2), Vector3(4, 2, 4))
+			add_child(jet)
+		# a burst of spray for getting in
+		var b := GPUParticles3D.new()
+		var bp := ParticleProcessMaterial.new()
+		bp.direction = Vector3.UP
+		bp.spread = 55.0
+		bp.initial_velocity_min = 2.0
+		bp.initial_velocity_max = 4.5
+		bp.gravity = Vector3(0, -15, 0)
+		bp.scale_min = 0.9
+		bp.scale_max = 1.8
+		b.process_material = bp
+		b.draw_pass_1 = drop
+		b.amount = 24
+		b.lifetime = 0.7
+		b.one_shot = true
+		b.explosiveness = 0.95
+		b.emitting = false
+		b.local_coords = false
+		b.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		b.visibility_aabb = AABB(Vector3(-3, -1, -3), Vector3(6, 4, 6))
+		add_child(b)
+		t.burst = b
+		for i in 4:
+			var rm := MeshInstance3D.new()
+			rm.mesh = ring
+			var m := StandardMaterial3D.new()
+			m.albedo_color = Color(1, 1, 1, 0)
+			m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			rm.material_override = m
+			rm.scale = Vector3(1, 0.02, 1)
+			rm.visible = false
+			rm.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			add_child(rm)
+			t.rings.append([rm, 9.0, 1.0])
+		_tubs.append(t)
+	if level.dressing:
+		_find_tub_water(level.dressing)
+
+func _find_tub_water(n: Node) -> void:
+	for c in n.get_children():
+		var mi := c as MeshInstance3D
+		if mi:
+			for t in _tubs:
+				var p := mi.global_position
+				if t.water == null and absf(p.y - float(t.wy)) < 0.05 and Vector2(p.x, p.z).distance_to(t.c) < 0.1:
+					var m := mi.get_active_material(0)
+					if m is StandardMaterial3D:
+						m = m.duplicate()
+						mi.material_override = m
+						t.water = mi
+						t.base = (m as StandardMaterial3D).uv1_offset
+		_find_tub_water(c)
+
+func _tub_splash(t: Dictionary, at: Vector3, size: float) -> void:
+	var r: Array = t.rings[int(t.ri)]
+	t.ri = (int(t.ri) + 1) % (t.rings as Array).size()
+	r[1] = 0.0
+	r[2] = size
+	(r[0] as Node3D).position = Vector3(at.x, float(t.wy) + 0.02, at.z)
+	if size > 0.5:
+		var b: GPUParticles3D = t.burst
+		b.global_position = Vector3(at.x, float(t.wy) + 0.05, at.z)
+		b.amount_ratio = clampf(size / 1.6, 0.3, 1.0)
+		b.restart()
+
+func _tub_step(f: Node, s: Dictionary) -> void:
+	var p: Vector3 = f.global_position
+	var k := f.get_instance_id()
+	for t in _tubs:
+		var c: Vector2 = t.c
+		var wy: float = t.wy
+		var inn: bool = Vector2(p.x - c.x, p.z - c.y).length() < TUB_R + 0.05 and p.y < wy + 0.6 and p.y > wy - 0.75
+		var was: bool = t.inside.get(k, false)
+		if inn and not was:
+			var size := minf(1.6, 0.6 + maxf(0.0, -float(s.vy if s.has("vy") else 0.0)) / 9.0)
+			size = minf(1.6, 0.6 + maxf(0.0, -f.velocity.y) / 9.0) if f.velocity.y < 0.0 else size
+			_tub_splash(t, p, size)
+			Sfx.play(self, "splash", p, linear_to_db(minf(1.0, 0.45 + size * 0.35)), 1.0, 18.0)
+		elif inn and Vector2(f.velocity.x, f.velocity.z).length() > 1.5 and f.clock > float(s.get("tw", 0.0)):
+			s.tw = f.clock + 0.32
+			_tub_splash(t, p + f.velocity * 0.06, 0.4)
+			Sfx.play(self, "wade1" if randf() < 0.5 else "wade2", p, linear_to_db(0.3), 1.0, 12.0, 0.1)
+		t.inside[k] = inn
 
 func _swirl(mi: MeshInstance3D) -> void:
 	if mi == null:
