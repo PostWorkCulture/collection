@@ -812,7 +812,7 @@ func _active_stars() -> Array:
 func _star_checks() -> void:
 	player.force_input = true
 	await _wait(1.0)
-	# 14 stars, all inside the house (ground or first floor, never the roof), at least 7 m apart
+	# 6 stars, all inside the house (ground or first floor, never the roof), spread out
 	var act := _active_stars()
 	var inside := true
 	var gap := 1e9
@@ -824,7 +824,7 @@ func _star_checks() -> void:
 			if a != b and absf(p.y - b.global_position.y) < 3.0:
 				gap = minf(gap, Vector2(p.x - b.global_position.x, p.z - b.global_position.z).length())
 	_log("AUTOTEST stars: %d out, all inside=%s, closest pair on a floor %.1f m" % [act.size(), inside, gap])
-	# take one: it's replaced straight away, at least 12 m from where it was
+	# take one: it's gone for 8-14 s, then comes back at least 25 m from where it was
 	var s0: Node = act[0]
 	var at: Vector3 = s0.global_position
 	Settings.camera_mode = "first"
@@ -836,7 +836,11 @@ func _star_checks() -> void:
 	await _snap("p3_01_star_first.png")
 	player.place(at + Vector3(0, 0.05, 0), 0.0)
 	await _wait(0.2)
-	_log("AUTOTEST take star: you have %d, stars out %d, that star moved %.1f m" % [player.stars, _active_stars().size(), s0.global_position.distance_to(at)])
+	var wait_s: float = game._star_wait.get(s0, -1.0)
+	var out_now := _active_stars().size()
+	game._star_wait[s0] = 0.01   # skip the wait
+	await _wait(0.2)
+	_log("AUTOTEST take star: you have %d, stars out %d, back in %.1f s, then %d out and that star moved %.1f m" % [player.stars, out_now, wait_s, _active_stars().size(), s0.global_position.distance_to(at)])
 	# hold 10 and you can't take an 11th
 	game.add_stars(player, game.STARS - player.stars)
 	var s1: Node = _active_stars()[1]

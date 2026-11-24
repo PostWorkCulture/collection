@@ -3,9 +3,9 @@ extends Node3D
 ## main.gd creates it (as "Game") and hands it to every fighter. It isn't an autoload: the open editor rewrites
 ## project.godot, so keeping the match out of it means nothing an agent adds there can be lost.
 ##
-## Rules (DESIGN §2–6): 14 stars hidden inside the house (both floors, never the roof), each at least 7 m from other
-## stars, pickups and players; a taken star is replaced at once at least 12 m away, and if fewer than 14 are out one
-## more appears every 4 s. Hold 10 and you can't pick up more: get to the shop on the front lawn and stand at it.
+## Rules (DESIGN §2–6): 6 stars hidden inside the house (both floors, never the roof), each at least 7 m from other
+## stars, pickups and players and as far from the other stars as it can be; a taken star comes back 8-14 s later at
+## least 25 m away. Hold 10 and you can't pick up more: get to the shop on the front lawn and stand at it.
 ## Going down costs 2 stars, dying costs the rest; lost stars lie where you fell for 20 s (approved improvement).
 ## 8+ stars and you're marked: outlined through walls and pinned on every minimap. Cashing in takes 2 s standing
 ## still at the shop (approved improvement; getting hurt or moving away starts it again). First to cash in wins.
@@ -29,10 +29,13 @@ const Star := preload("res://stars/star.gd")
 const STARS := 10             # to win
 const LOSE := 2               # lost when you go down
 const MARK := 8               # marked from here
-const ON_MAP := 14
-const STAR_GAP := 7.0
-const STAR_FAR := 12.0        # a replacement appears at least this far from the star just taken
-const STAR_BACK := 4.0        # backup: one more every 4 s while fewer than 14 are out
+const ON_MAP := 6             # Pete, 24 Nov: fewer stars out (was 14)
+const STAR_GAP := 7.0         # never this close to a player, pickup or another star
+const STAR_FAR := 25.0        # a replacement appears at least this far from the star just taken (was 12)
+const STAR_WAIT := Vector2(8.0, 14.0)   # and only after this many seconds (was at once); spread out in place and time
+const STAR_TRIES := 40        # candidate spots weighed for each star: the one furthest from the other stars wins
+var _star_wait := {}          # hidden star -> seconds until it comes back
+var _star_from := {}          # hidden star -> where it was taken
 const STAR_R := 1.2           # pick-up reach, across
 const STAR_H := 1.6           # and up/down
 const DROP_LIFE := 20.0       # lost stars and dropped bats lie there this long
@@ -47,7 +50,7 @@ const INDOOR_SHARE := 0.8
 var level: Node3D
 var fighters: Array = []
 var pickups: Array = []
-var stars: Array = []                # map stars (always 14 nodes, some may be waiting to come back)
+var stars: Array = []                # map stars (always 6 nodes, some waiting to come back)
 var drops: Array = []                # stars dropped by players
 var cand_in: Array[Vector3] = []     # walkable floor spots inside the house (both floors, never the roof)
 var cand_out: Array[Vector3] = []    # walkable spots on the front and back lawns
@@ -62,7 +65,6 @@ var nav_region: NavigationRegion3D
 var ladder_links := 0
 var warp_links := 0
 var debug := false                   # F3: show what every bot is doing, seeing and where it's going
-var _star_back := 0.0
 var _pad_mat: StandardMaterial3D
 var _t := 0.0
 
@@ -89,9 +91,10 @@ func start(begin := true) -> void:
 		var s := Star.new()
 		add_child(s)
 		stars.append(s)
-		var spot: Variant = pick_spot(cand_in, _avoid_for_star(s), STAR_GAP)
+		var spot: Variant = _star_spot(s)
 		if spot == null:
 			s.hide_star()
+			_star_wait[s] = 1.0
 		else:
 			s.move_to(spot)
 	for i in GUN_PICKS + BAT_PICKS:
@@ -155,23 +158,41 @@ func _tick_stars(dt: float) -> void:
 		if s.life <= 0.0:
 			drops.erase(s)
 			s.queue_free()
-	# backup: one more star every 4 s while fewer than 14 are out
-	var out := 0
+	# a taken star comes back somewhere else after a wait (8-14 s), far from where it went and from the others
 	for s in stars:
-		if s.active:
-			out += 1
-	if out < ON_MAP:
-		_star_back -= dt
-		if _star_back <= 0.0:
-			_star_back = STAR_BACK
-			for s in stars:
-				if not s.active:
-					var spot: Variant = pick_spot(cand_in, _avoid_for_star(s), STAR_GAP)
-					if spot != null:
-						s.move_to(spot)
-					break
-	else:
-		_star_back = STAR_BACK
+		if s.active or not _star_wait.has(s):
+			continue
+		_star_wait[s] = float(_star_wait[s]) - dt
+		if float(_star_wait[s]) <= 0.0:
+			var spot: Variant = _star_spot(s, _star_from.get(s, Vector3.INF), STAR_FAR)
+			if spot == null:
+				spot = _star_spot(s)
+			if spot != null:
+				s.move_to(spot)
+				_star_wait.erase(s)
+			else:
+				_star_wait[s] = 1.0
+
+## spreads the stars round the house: of STAR_TRIES good spots, the one furthest from every other star
+## (another floor counts as 12 m apart)
+func _star_spot(s: Node, far_from := Vector3.INF, far_d := 0.0) -> Variant:
+	var avoid := _avoid_for_star(s)
+	var best: Variant = null
+	var best_d := -1.0
+	for i in STAR_TRIES:
+		var p: Variant = pick_spot(cand_in, avoid, STAR_GAP, far_from, far_d)
+		if p == null:
+			break
+		var d := 999.0
+		for o in stars:
+			if o == s or not o.active:
+				continue
+			var q: Vector3 = o.global_position
+			d = minf(d, Vector2(q.x - p.x, q.z - p.z).length() + (12.0 if absf(q.y - p.y) > 3.0 else 0.0))
+		if d > best_d:
+			best_d = d
+			best = p
+	return best
 
 func _take_star(f: Node, s: Node) -> void:
 	var at: Vector3 = s.global_position
@@ -180,9 +201,8 @@ func _take_star(f: Node, s: Node) -> void:
 		s.queue_free()
 	else:
 		s.hide_star()
-		var spot: Variant = pick_spot(cand_in, _avoid_for_star(s), STAR_GAP, at, STAR_FAR)
-		if spot != null:   # a new one straight away, well away from this one (or the 4 s backup brings it)
-			s.move_to(spot)
+		_star_from[s] = at
+		_star_wait[s] = randf_range(STAR_WAIT.x, STAR_WAIT.y)
 	add_stars(f, 1)
 	Sfx.play(self, "bing", at, 0.0, 1.25, 14.0)
 	if f.is_player:
