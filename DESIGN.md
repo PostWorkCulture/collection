@@ -31,7 +31,7 @@ Units: metres, seconds. Y is up.
 - Spawn spot: random walkable floor spot in the main connected nav area that a body fits in (no deep water), at least 7 m from every other star, visible pickup and living player. Vertical separation over 3 m also counts as clear.
 - Pick-up: within 1.2 m horizontally and 1.6 m vertically. Not while downed, dead, doing a finisher, or already holding 10.
 - Replacement: when a star is taken, a new one appears at least 12 m from where it was taken. Backup: if fewer than 14 are on the map, one more appears every 4 s.
-- Look: chunky gold 5-point star, extruded ~0.07 m with bevelled edges, ~0.85 m across. Metal: colour `#ffc83a`, metalness 0.85, roughness 0.22, emissive `#a8700a` at 0.55. Floats 1.05 m up, spins ~1.6 rad/s, bobs ±0.08 m, faint gold glow disc on the floor (r 0.5 m, 16% opacity).
+- Look: chunky gold 5-point star, extruded ~0.07 m with bevelled edges, ~0.85 m across. Metal: colour `#ffc83a`, metalness 0.85, roughness 0.22, emissive `#a8700a` at 0.55. Floats 1.05 m up, spins ~1.6 rad/s, bobs ±0.08 m. Nothing on the floor under it **(Pete, 24 Nov: no circles under stars)**.
 - Sound: "bing" pitched ×1.25, audible ~14 m.
 
 ## 4. Weapon pickups
@@ -121,6 +121,7 @@ Mansion rules **(Pete)**:
 - Must run smoothly with 8 players: only light the room you're in, cull rooms you can't see, batch static meshes.
 
 ## 10. Studio rules (apply to everything) (Pete)
+- Keep the design as minimal and clean as possible (24 Nov): no decoration a rule doesn't need.
 - No confetti, coloured particle squares or over-the-top sparks; hits use a red spray with a mist puff.
 - No black zig-zag cracks or smoke on damaged buildings.
 - All upright glass breaks with one hit and shatters into tiny shards that settle on surfaces; floor/roof glass is tougher.
@@ -195,6 +196,7 @@ Agreed with Pete in the rebuild plan ([`docs/collection/plan.md`](docs/collectio
 
 ## Decision log
 Newest first. Date — decision — why.
+- 2026-11-24 — **Collection is a standalone Godot game** (Pete): the Godot rebuild carries on past phase 5 rather than being judged against the web game, and the Mansion gets built out in full after the grey box (phase 6). Stars lose their floor glow disc and the design stays minimal and clean (Pete).
 - 2026-11-24 — Phase 3 (Collection rules) built, waiting for Pete. Choices made while building, all easy to change: 7 test dummies so there are 8 players on the leaderboard (they don't collect stars until the bots in phase 4); the shop's cash-in spot is 1.7 m in front of it with a pulsing white pad, within 2.2 m counts; cash-in restarts if you move faster than 2 m/s, get hurt or go down; lost stars drop in a ring about 1 m round where you fell, so whoever gets there can scoop several at once; the minimap is 60 m across, turns with you, and shows only you and marked players (nothing else is in the spec); the X-ray is red (the plan's "red outline, as on the web") using Godot 4.7's built-in X-ray material, and you can see your own glow when you're marked; the star hum is a soft two-note tone made in code (the web game has no hum file); marked and 10-star feed lines also show for you ("You have 8 stars: you're marked"); the gong plays when anyone becomes marked; the G test-gun key is gone. Star spots come from the floor grid, not a nav mesh yet, so a star could land somewhere hard to reach until phase 4 bakes one.
 - 2026-11-24 — Phase 2 (combat) built, waiting for Pete's play-through. Choices made while building, all easy to change: a bat dropped by a downed player lies where they fell for 20 s (the plan says "dropped" but not for how long; 20 s matches dropped stars); all upright glass and roof skylights break in one hit, upstairs glass floor panels don't (studio rule + Mansion "bulletproof floor panels"); shards fall and vanish rather than settle (settling comes with the phase 5 glass pass); fighters are solid to each other, downed ones aren't (so you can walk over them); first-person hands push out as the view zooms so the gun keeps its size on screen; 6 test dummies stand on the lawn and in the house (2 strafe) and go back to their spot when they respawn; **G** cycles through every gun and the bat (test aid, removed in phase 3); sounds play from where they happen, but muffling through walls and room echo wait for phase 5.
 - 2026-11-24 — CollectionGame is a node made by `main.gd`, not an autoload; scripts load each other with `preload` instead of `class_name` — the open editor rewrites project.godot, and command-line runs (Godot MCP, headless checks) don't have the editor's class list, so both keep the game runnable either way.

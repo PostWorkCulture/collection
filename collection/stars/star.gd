@@ -1,8 +1,8 @@
 extends Node3D
 ## A gold star (DESIGN §3): a chunky 5-point star about 0.85 m across, 0.07 m deep with bevelled edges, gold metal
 ## (#ffc83a, metalness 0.85, roughness 0.22, emissive #a8700a at 0.55). Floats 1.05 m up, spins 1.6 rad/s, bobs
-## ±0.08 m, with a faint gold glow disc (r 0.5 m, 16% opacity) on the floor under it. It hums quietly in 3D so you
-## can find one by ear (approved improvement). No particle bursts when taken (studio rule).
+## ±0.08 m. Nothing under it: no glow disc (Pete, 24 Nov: minimal and clean). It hums quietly in 3D so you can find
+## one by ear (approved improvement). No particle bursts when taken (studio rule).
 ## A `dropped` star is one a player lost: it lies where they fell for 20 s and is never replaced.
 
 const OUTER := 0.425
@@ -12,7 +12,6 @@ const BEVEL := 0.025
 
 static var _mesh: ArrayMesh
 static var _mat: StandardMaterial3D
-static var _disc_mesh: Mesh
 static var _hum: AudioStreamWAV
 
 var dropped := false
@@ -28,11 +27,6 @@ func _ready() -> void:
 	_spin.material_override = star_material()
 	_spin.position.y = 1.05
 	add_child(_spin)
-	var disc := MeshInstance3D.new()
-	disc.mesh = _disc()
-	disc.position.y = 0.02
-	disc.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(disc)
 	_player = AudioStreamPlayer3D.new()
 	_player.stream = hum_stream()
 	_player.volume_db = -16.0
@@ -115,22 +109,6 @@ static func star_mesh() -> ArrayMesh:
 	st.generate_normals()
 	_mesh = st.commit()
 	return _mesh
-
-static func _disc() -> Mesh:
-	if _disc_mesh:
-		return _disc_mesh
-	var cm := CylinderMesh.new()
-	cm.top_radius = 0.5
-	cm.bottom_radius = 0.5
-	cm.height = 0.01
-	cm.radial_segments = 32
-	var m := StandardMaterial3D.new()
-	m.albedo_color = Color(1.0, 0.78, 0.23, 0.16)
-	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	cm.material = m
-	_disc_mesh = cm
-	return cm
 
 ## a soft two-note hum (G3 + D4) with a slow swell, made in code: 2 s, looping
 static func hum_stream() -> AudioStreamWAV:
