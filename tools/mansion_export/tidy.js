@@ -209,5 +209,12 @@ window.__TIDY = function (M) {
       rep.moved++;
     }
   }
+  /* ---- the shop: no lightbox on top (Pete, 25 Nov) */
+  for (const g of M.group.children) {
+    if (!g.isGroup || !g.userData.dyn || !M.coShop) continue;
+    const s = M.coShop[0];
+    if (Math.abs(g.position.x - s.x) > 0.05 || Math.abs(g.position.z - s.z) > 0.05) continue;
+    for (const c of g.children.slice()) if (c.position.y > 3.6) { g.remove(c); rep.shopTop = (rep.shopTop || 0) + 1; }
+  }
   window.__TIDY_REPORT = rep;
 };
