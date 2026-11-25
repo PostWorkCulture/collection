@@ -21,6 +21,11 @@ window.__TIDY = function (M) {
       rep.glassMeshes++;
     }
   }
+  /* ---- the rubber ducks in the pool (Pete, 25 Nov: it's not a bath) */
+  for (const g of M.group.children.slice()) {
+    if (g.isGroup && g.userData.dyn && g.children.length === 5 && g.children[0].material && g.children[0].material.color &&
+        g.children[0].material.color.getHexString() === 'ffd23f') { M.group.remove(g); rep.ducks = (rep.ducks || 0) + 1; }
+  }
   /* ---- furniture */
   const UF = 5.8;
   const special = [
