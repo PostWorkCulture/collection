@@ -336,13 +336,14 @@ func _apply_quality() -> void:
 	_env.ssr_max_steps = 48
 	_env.ssr_fade_out = 2.5
 	_env.volumetric_fog_enabled = high
-	_env.volumetric_fog_density = 0.005
+	_env.volumetric_fog_density = 0.0012   # a touch of haze for the light shafts, not a mist over the house (Pete, 25 Nov)
 	_env.volumetric_fog_albedo = Color(1.0, 0.96, 0.9)
 	_env.volumetric_fog_ambient_inject = 0.05
 	_env.glow_enabled = not low
 	_env.glow_intensity = 0.4
-	_env.glow_bloom = 0.05
-	_sun.light_volumetric_fog_energy = 1.4
+	_env.glow_bloom = 0.0                   # bloom lifted the whole picture: only bright lamps and signs glow now
+	_env.glow_hdr_threshold = 1.1
+	_sun.light_volumetric_fog_energy = 0.8
 	_sun.directional_shadow_max_distance = 60.0 if low else 120.0
 	_sun.shadow_blur = 1.0 if low else 1.5
 	get_viewport().msaa_3d = Viewport.MSAA_DISABLED if low else Viewport.MSAA_2X
