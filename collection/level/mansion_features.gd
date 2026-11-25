@@ -38,18 +38,51 @@ var _arrow: Node3D
 # ---- portals: [A, A.nx, B, B.nx]
 const PORTALS := [[Vector3(-39.75, 0, 18), 1.0, Vector3(39.75, 0, -18), -1.0],
 		[Vector3(-39.75, UF, 18), 1.0, Vector3(39.75, UF, -18), -1.0]]
-const SWIRL_SHADER := """
+const PORTAL_SHADER := """
 shader_type spatial;
-render_mode unshaded, blend_mix, depth_draw_never, cull_disabled;
-uniform sampler2D tex : source_color, filter_linear_mipmap;
-uniform float speed = 2.2;
+render_mode unshaded, cull_back, depth_draw_opaque;
+// A tunnel behind the wall: the view ray is followed into a box-shaped passage the size of the doorway, so the
+// portal has real depth from every angle. Soft bands drift slowly inward and fade into a dim glow at the far end.
+uniform vec3 rim : source_color = vec3(0.85, 0.62, 0.4);
+uniform vec3 deep : source_color = vec3(0.05, 0.04, 0.035);
+uniform float hx = 0.95;
+uniform float hy = 1.45;
+varying vec3 o_pos;
+varying vec3 o_cam;
+float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float noise(vec2 p) {
+	vec2 i = floor(p), f = fract(p);
+	f = f * f * (3.0 - 2.0 * f);
+	return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), f.x), f.y);
+}
+void vertex() {
+	o_pos = VERTEX;
+	o_cam = (inverse(MODEL_MATRIX) * vec4(CAMERA_POSITION_WORLD, 1.0)).xyz;
+}
 void fragment() {
-	float a = TIME * speed;
-	vec2 uv = mat2(vec2(cos(a), sin(a)), vec2(-sin(a), cos(a))) * (UV - 0.5) + 0.5;
-	uv = abs(mod(uv + 1.0, 2.0) - 1.0);
-	vec4 c = texture(tex, uv);
-	ALBEDO = c.rgb;
-	ALPHA = 0.95;
+	vec3 rd = normalize(o_pos - o_cam);
+	vec3 ro = o_pos;
+	float t = 1e4;
+	if (abs(rd.x) > 1e-4) t = min(t, ((rd.x > 0.0 ? hx : -hx) - ro.x) / rd.x);
+	if (abs(rd.y) > 1e-4) t = min(t, ((rd.y > 0.0 ? hy : -hy) - ro.y) / rd.y);
+	t = max(t, 0.0);
+	vec3 h = ro + rd * t;
+	float depth = min(-h.z, 40.0);
+	// where on the tunnel wall: round the outline (0..1) and along the depth
+	float around = atan(h.y / hy, h.x / hx) / 6.2831853 + 0.5;
+	float flow = depth * 0.55 - TIME * 0.28;
+	float bands = smoothstep(0.35, 0.5, abs(fract(flow) - 0.5)) * 0.55 + 0.15;
+	float mist = noise(vec2(around * 9.0, flow * 1.6)) * 0.5 + noise(vec2(around * 23.0 + 3.0, flow * 3.1)) * 0.25;
+	float fade = exp(-depth * 0.32);
+	vec3 col = mix(deep, rim, (bands * 0.65 + mist * 0.45) * fade);
+	// the far end: a soft glow, brighter at the centre, breathing slowly
+	float endg = (1.0 - fade) * 0.35 * (0.85 + 0.15 * sin(TIME * 1.3));
+	col += rim * endg * smoothstep(1.2, 0.0, length(vec2(h.x / hx, h.y / hy)));
+	// a faint sheen right at the opening
+	vec2 uv2 = UV * 2.0 - 1.0;
+	float edge = pow(max(abs(uv2.x), abs(uv2.y)), 10.0);
+	col += rim * edge * 0.25;
+	ALBEDO = col;
 }
 """
 
@@ -123,8 +156,7 @@ func setup(g: Node, lv: Node) -> void:
 			mi.material_override = mat
 			_water.append(mi)
 			_water_base.append((mat as StandardMaterial3D).uv1_offset)
-	for s in parts.get("portal_swirl", []):
-		_swirl(s as MeshInstance3D)
+	_build_portals()
 	_setup_disco(parts)
 	_setup_ball_pit()
 	_setup_tubs()
@@ -676,18 +708,78 @@ func _tub_step(f: Node, s: Dictionary) -> void:
 			Sfx.play(self, "wade1" if randf() < 0.5 else "wade2", p, linear_to_db(0.3), 1.0, 12.0, 0.1)
 		t.inside[k] = inn
 
-func _swirl(mi: MeshInstance3D) -> void:
-	if mi == null:
-		return
-	var old := mi.get_active_material(0) as StandardMaterial3D
-	if old == null or old.albedo_texture == null:
-		return
+# ---------------------------------------------------------------- portals (look)
+
+## The web's portals (bright swirl posters in neon frames) are replaced with a doorway that has depth: a tunnel that
+## drifts away into the wall, a thin gunmetal frame and a soft spill of light on the floor. Each pair shares one muted
+## colour so you can tell which corners are linked: warm copper downstairs, sea-glass teal upstairs (Pete, 25 Nov).
+const PORTAL_COLS := [[Color("#c9925f"), Color("#120d0a")], [Color("#79b4ab"), Color("#081211")]]
+const PW := 1.9
+const PH := 2.9
+const FT := 0.09
+
+func _build_portals() -> void:
+	if level.dressing:
+		_hide_old_portals(level.dressing)
 	var sh := Shader.new()
-	sh.code = SWIRL_SHADER
-	var m := ShaderMaterial.new()
-	m.shader = sh
-	m.set_shader_parameter("tex", old.albedo_texture)
-	# the web turns each swirl the way its portal faces
-	var nx := 1.0 if mi.global_position.x < 0.0 else -1.0
-	m.set_shader_parameter("speed", -2.2 * nx)
-	mi.material_override = m
+	sh.code = PORTAL_SHADER
+	var frame := StandardMaterial3D.new()
+	frame.albedo_color = Color("#2a2b2e")
+	frame.metallic = 0.85
+	frame.roughness = 0.38
+	for k in PORTALS.size():
+		var pair: Array = PORTALS[k]
+		var cols: Array = PORTAL_COLS[k]
+		for i in 2:
+			var at: Vector3 = pair[i * 2]
+			var nx: float = pair[i * 2 + 1]
+			var g := Node3D.new()
+			g.position = Vector3(at.x, at.y, at.z)
+			g.rotation.y = PI / 2 if nx > 0.0 else -PI / 2
+			add_child(g)
+			var q := MeshInstance3D.new()
+			var qm := QuadMesh.new()
+			qm.size = Vector2(PW, PH)
+			q.mesh = qm
+			var m := ShaderMaterial.new()
+			m.shader = sh
+			m.set_shader_parameter("rim", cols[0])
+			m.set_shader_parameter("deep", cols[1])
+			m.set_shader_parameter("hx", PW * 0.5)
+			m.set_shader_parameter("hy", PH * 0.5)
+			q.material_override = m
+			q.position = Vector3(0, FT + PH * 0.5, 0.02)
+			q.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			g.add_child(q)
+			# thin gunmetal frame standing slightly proud of the wall
+			for b in [[PW + 2 * FT, FT, 0.0, FT + PH + FT * 0.5], [PW + 2 * FT, FT, 0.0, FT * 0.5],
+					[FT, PH + 2 * FT, -(PW + FT) * 0.5, (PH + 2 * FT) * 0.5], [FT, PH + 2 * FT, (PW + FT) * 0.5, (PH + 2 * FT) * 0.5]]:
+				var bar := MeshInstance3D.new()
+				var bm := BoxMesh.new()
+				bm.size = Vector3(b[0], b[1], 0.16)
+				bar.mesh = bm
+				bar.material_override = frame
+				bar.position = Vector3(b[2], b[3], 0.06)
+				g.add_child(bar)
+			var l := OmniLight3D.new()
+			l.light_color = cols[0]
+			l.light_energy = 0.55
+			l.omni_range = 3.6
+			l.omni_attenuation = 1.6
+			l.position = Vector3(0, 1.3, 0.7)
+			g.add_child(l)
+
+## the web's portal pieces (black recess, swirl poster, neon frame) sit within half a metre of each portal's wall face
+func _hide_old_portals(n: Node) -> void:
+	for c in n.get_children():
+		var mi := c as MeshInstance3D
+		if mi and mi.mesh:
+			var cp := mi.global_transform * mi.mesh.get_aabb().get_center()
+			for pair in PORTALS:
+				for i in 2:
+					var at: Vector3 = pair[i * 2]
+					if absf(cp.x - at.x) < 0.6 and absf(cp.z - at.z) < 1.3 and cp.y > at.y - 0.1 and cp.y < at.y + 3.3:
+						mi.visible = false
+						for fl in level.floor_things:   # so hiding/showing a floor never brings them back
+							(fl as Array).erase(mi)
+		_hide_old_portals(c)
