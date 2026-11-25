@@ -24,6 +24,7 @@ var shop_pos := Vector3.ZERO
 
 var _grid_tex: ImageTexture
 var _mats := {}
+var skirting := 0     # skirting boards placed
 
 func build() -> void:
 	var f := FileAccess.open("res://level/mansion_layout.json", FileAccess.READ)
@@ -47,6 +48,55 @@ func build() -> void:
 		var body: Variant = bodies.get(int(w.pane))
 		windows.append({"body": body, "ax": bool(w.ax), "at": float(w.at), "a": float(w.a), "b": float(w.b), "s0": float(w.s0), "s1": float(w.s1)})
 	_add_shop()
+	if dressed:
+		_add_skirting()
+
+## skirting boards (AAA phase 3): a satin-white board along the foot of every inside wall face on both floors,
+## so walls meet floors the way they do in a real house. One MultiMesh, so it costs a single draw.
+const SKIRT_H := 0.13
+const SKIRT_D := 0.022
+func _add_skirting() -> void:
+	var xf: Array[Transform3D] = []
+	for bx in layout.boxes:
+		if String(bx.p) != "":
+			continue
+		var b: Array = bx.b
+		var y0: float = b[1]
+		var sx: float = float(b[3]) - float(b[0])
+		var sz: float = float(b[5]) - float(b[2])
+		if float(b[4]) - y0 < 2.0 or minf(sx, sz) > 0.7 or maxf(sx, sz) < 0.8:
+			continue
+		if absf(y0) > 0.05 and absf(y0 - 5.8) > 0.05:
+			continue   # only walls that stand on a floor (not lintels over doorways)
+		var along_x := sx > sz
+		var length := sx if along_x else sz
+		var mid := Vector3((float(b[0]) + float(b[3])) * 0.5, y0 + SKIRT_H * 0.5, (float(b[2]) + float(b[5])) * 0.5)
+		for side in [-1.0, 1.0]:
+			var face := (sz if along_x else sx) * 0.5 + SKIRT_D * 0.5
+			var off := Vector3(0, 0, side * face) if along_x else Vector3(side * face, 0, 0)
+			var beyond := mid + off * (1.0 + 0.3 / face)
+			if absf(beyond.x) > float(house.x) - 0.1 or absf(beyond.z) > float(house.z) - 0.1:
+				continue   # the outside of the house
+			var bs := Basis.from_scale(Vector3(length, SKIRT_H, SKIRT_D) if along_x else Vector3(SKIRT_D, SKIRT_H, length))
+			xf.append(Transform3D(bs, mid + off))
+	if xf.is_empty():
+		return
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.mesh = BoxMesh.new()
+	mm.instance_count = xf.size()
+	for i in xf.size():
+		mm.set_instance_transform(i, xf[i])
+	var m := StandardMaterial3D.new()
+	m.albedo_color = Color(0.9, 0.88, 0.84)
+	m.roughness = 0.38
+	var mi := MultiMeshInstance3D.new()
+	mi.name = "Skirting"
+	mi.multimesh = mm
+	mi.material_override = m
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(mi)
+	skirting = xf.size()
 
 ## the Mansion's look: the imported scene when Godot has imported the .glb, otherwise read straight from the file
 func _load_dressing() -> void:

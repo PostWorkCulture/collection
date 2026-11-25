@@ -7,6 +7,7 @@ extends Node3D
 ## screenshots instead: "combat" and "stars" use seven standing test dummies; "bots_match" plays a full 8-bot match
 ## (you on autopilot too) and reports how it went.
 
+const SKY_SHADER := preload("res://level/sky.gdshader")
 const Fighter := preload("res://fighter/fighter.gd")
 const LevelBuilder := preload("res://level/level_builder.gd")
 const MansionFeatures := preload("res://level/mansion_features.gd")
@@ -298,10 +299,8 @@ func _environment() -> void:
 	var we := WorldEnvironment.new()
 	_env = Environment.new()
 	var sky := Sky.new()
-	var sm := ProceduralSkyMaterial.new()
-	sm.sky_top_color = Color(0.36, 0.55, 0.85)
-	sm.sky_horizon_color = Color(0.72, 0.8, 0.9)
-	sm.ground_horizon_color = Color(0.62, 0.66, 0.6)
+	var sm := ShaderMaterial.new()   # blue sky with soft fair-weather clouds and the sun (level/sky.gdshader)
+	sm.shader = SKY_SHADER
 	sky.sky_material = sm
 	_env.background_mode = Environment.BG_SKY
 	_env.sky = sky

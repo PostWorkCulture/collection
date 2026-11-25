@@ -11,6 +11,8 @@ extends Node3D
 ##   when you get in, wading sounds as you move about (DESIGN §9: jets only, no ducks)
 ## Every fighter (you and the bots) gets the same treatment.
 
+const WATER_SHADER := preload("res://level/water.gdshader")
+const CAUSTICS_SHADER := preload("res://level/caustics.gdshader")
 const Sfx := preload("res://audio/sfx.gd")
 const UF := 5.8                      # upstairs floor height
 const GRAV := 36.0
@@ -90,7 +92,6 @@ void fragment() {
 const POOL_IN := Rect2(11.4, -4.6, 9.2, 9.2)
 const WATER_Y := -0.3
 var _water: Array = []
-var _water_base: Array = []
 
 # ---- ball pit (playroom, upstairs)
 const BR := 0.17
@@ -150,12 +151,10 @@ func setup(g: Node, lv: Node) -> void:
 		var mi := w as MeshInstance3D
 		if mi == null:
 			continue
-		var mat := mi.get_active_material(0)
-		if mat is StandardMaterial3D:
-			mat = mat.duplicate()
-			mi.material_override = mat
-			_water.append(mi)
-			_water_base.append((mat as StandardMaterial3D).uv1_offset)
+		mi.material_override = _water_mat(false)
+		_water.append(mi)
+	if not _water.is_empty():
+		_add_caustics()
 	_build_portals()
 	_setup_disco(parts)
 	_setup_ball_pit()
@@ -548,15 +547,10 @@ func _animate(dt: float) -> void:
 	if _arrow:
 		_arrow.position.y = 4.4 + sin(t * 3.0) * 0.25
 		_arrow.rotation.y = t
-	for i in _water.size():
-		var w: MeshInstance3D = _water[i]
-		var m := w.material_override as StandardMaterial3D
-		m.uv1_offset = _water_base[i] + Vector3(sin(t * 0.13) * 0.4, t * 0.05, 0)
-		w.position.y = WATER_Y + sin(t * 1.3) * 0.012
+	for w in _water:
+		(w as Node3D).position.y = WATER_Y + sin(t * 1.3) * 0.012   # the ripples themselves move in the water shader
 	for tb in _tubs:
 		if tb.water:
-			var wm: StandardMaterial3D = (tb.water as MeshInstance3D).material_override
-			wm.uv1_offset = tb.base + Vector3(sin(t * 0.4) * 0.3, t * 0.12, 0)
 			(tb.water as Node3D).position.y = float(tb.wy) + sin(t * 2.3) * 0.012
 		for r in tb.rings:
 			if r[1] > 1.2:
@@ -662,6 +656,32 @@ func _setup_tubs() -> void:
 	if level.dressing:
 		_find_tub_water(level.dressing)
 
+## the moving net of light on the pool floor (level/caustics.gdshader), on a sheet just above the tiles
+func _add_caustics() -> void:
+	var mi := MeshInstance3D.new()
+	var pm := PlaneMesh.new()
+	pm.size = Vector2(9.2, 9.2)
+	mi.mesh = pm
+	mi.position = Vector3(16.0, -0.79, 0.0)   # the pool: x 11..21, z -5..5, floor at -0.8
+	var m := ShaderMaterial.new()
+	m.shader = CAUSTICS_SHADER
+	mi.material_override = m
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(mi)
+
+## clear water you see the tiles through (level/water.gdshader); the tubs are smaller, livelier and a touch greener
+func _water_mat(tub: bool) -> ShaderMaterial:
+	var m := ShaderMaterial.new()
+	m.shader = WATER_SHADER
+	if tub:
+		m.set_shader_parameter("wave_scale", 1.4)
+		m.set_shader_parameter("speed", 2.6)
+		m.set_shader_parameter("chop", 0.45)
+		m.set_shader_parameter("tint", Color(0.42, 0.82, 0.82))
+		m.set_shader_parameter("deep", Color(0.05, 0.3, 0.32))
+		m.set_shader_parameter("absorb", 1.1)
+	return m
+
 func _find_tub_water(n: Node) -> void:
 	for c in n.get_children():
 		var mi := c as MeshInstance3D
@@ -669,12 +689,8 @@ func _find_tub_water(n: Node) -> void:
 			for t in _tubs:
 				var p := mi.global_position
 				if t.water == null and absf(p.y - float(t.wy)) < 0.05 and Vector2(p.x, p.z).distance_to(t.c) < 0.1:
-					var m := mi.get_active_material(0)
-					if m is StandardMaterial3D:
-						m = m.duplicate()
-						mi.material_override = m
-						t.water = mi
-						t.base = (m as StandardMaterial3D).uv1_offset
+					mi.material_override = _water_mat(true)
+					t.water = mi
 		_find_tub_water(c)
 
 func _tub_splash(t: Dictionary, at: Vector3, size: float) -> void:

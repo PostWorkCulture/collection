@@ -18,6 +18,10 @@ Makes `collection/level/mansion.glb` (the Mansion's look) from the web game, so 
 4. `ROOT=<1v1 checkout> THREE=<three>/build/three.min.js OUT=raw.json python3 probe.py "$(cat tidy.js export.js)"`
    (its output also carries the new `boxes`, `windows`, `doors` and spawns for `mansion_layout.json`)
 5. Decode: `python3 -c "import json,base64;d=json.load(open('raw.json'));open('mansion.glb','wb').write(base64.b64decode(d['glb']))"`
+6. Surface pass (AAA phase 3): `python3 surface_pass.py mansion.glb ../../collection/level/mansion.glb` (needs numpy,
+   scipy, Pillow). It adds a normal map and a roughness map to every lit material whose texture is one of the patterns
+   in `surfaces.json` (matched by a hash of the pixels; each class sets the bump strength, which way the pattern
+   sinks and the roughness of the face and the grooves). It refuses a file that already has the pass.
 
 `export.js` builds the Mansion in Collection mode, moves the furniture that the web hangs under invisible collider boxes onto
 plain nodes (otherwise the exporter drops it with the invisible box), drops sprites, outline edges, lights, the ball pit balls and invisible

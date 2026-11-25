@@ -1,0 +1,329 @@
+{
+ "about": "Surface pass patterns: web-game canvas textures (by pixel hash) -> surface class. See surface_pass.py.",
+ "classes": {
+  "foliage": {
+   "strength": 3.0,
+   "blur": 0.6,
+   "noise": 0.3,
+   "rough_face": 0.65,
+   "rough_groove": 0.85,
+   "note": "bush and hedge leaves"
+  },
+  "stone_tile": {
+   "strength": 2.5,
+   "blur": 0.8,
+   "rough_face": 0.45,
+   "rough_groove": 0.9,
+   "note": "stone floor and wall tiles with grout lines"
+  },
+  "brick": {
+   "strength": 4.0,
+   "blur": 0.8,
+   "mask": "ridges",
+   "noise": 0.15,
+   "rough_face": 0.85,
+   "rough_groove": 0.95,
+   "note": "red brick, light mortar sunk",
+   "ridge": 7
+  },
+  "brick_dark": {
+   "strength": 3.5,
+   "blur": 0.8,
+   "noise": 0.15,
+   "rough_face": 0.8,
+   "rough_groove": 0.95,
+   "note": "painted brick, dark lines sunk"
+  },
+  "marble": {
+   "strength": 0.25,
+   "blur": 1.0,
+   "rough_face": 0.08,
+   "rough_groove": 0.2,
+   "clearcoat": 0.4,
+   "note": "polished marble"
+  },
+  "roof": {
+   "strength": 1.5,
+   "blur": 0.8,
+   "noise": 0.3,
+   "rough_face": 0.8,
+   "rough_groove": 0.95,
+   "note": "roof and terrace stone"
+  },
+  "checker": {
+   "strength": 0.15,
+   "blur": 1.5,
+   "noise": 0.6,
+   "noise_cells": 6,
+   "rough_face": 0.1,
+   "rough_groove": 0.16,
+   "note": "polished checkerboard tiles"
+  },
+  "terrazzo": {
+   "strength": 0.5,
+   "blur": 0.6,
+   "rough_face": 0.22,
+   "rough_groove": 0.35,
+   "note": "speckled polished stone"
+  },
+  "carpet": {
+   "strength": 2.0,
+   "blur": 0.5,
+   "noise": 0.5,
+   "noise_cells": 32,
+   "rough_face": 0.95,
+   "rough_groove": 1.0,
+   "note": "carpet"
+  },
+  "wood_floor": {
+   "strength": 2.0,
+   "blur": 0.7,
+   "noise": 0.15,
+   "rough_face": 0.38,
+   "rough_groove": 0.7,
+   "note": "wood boards, seams sunk"
+  },
+  "panelling": {
+   "strength": 2.0,
+   "blur": 0.7,
+   "rough_face": 0.45,
+   "rough_groove": 0.7,
+   "note": "painted wood panelling along the walls"
+  },
+  "wallpaper": {
+   "strength": 0.5,
+   "blur": 1.0,
+   "noise": 0.4,
+   "noise_cells": 24,
+   "rough_face": 0.7,
+   "rough_groove": 0.8,
+   "note": "striped wallpaper"
+  },
+  "brushed_metal": {
+   "strength": 0.35,
+   "blur": 0.5,
+   "rough_face": 0.28,
+   "rough_groove": 0.38,
+   "note": "brushed metal fittings"
+  },
+  "wood": {
+   "strength": 1.4,
+   "blur": 0.7,
+   "noise": 0.15,
+   "rough_face": 0.45,
+   "rough_groove": 0.65,
+   "note": "wood grain on furniture"
+  },
+  "grass": {
+   "strength": 3.0,
+   "blur": 0.7,
+   "noise": 0.35,
+   "noise_cells": 32,
+   "rough_face": 0.9,
+   "rough_groove": 1.0,
+   "max_size": 512,
+   "note": "lawn"
+  },
+  "plaster": {
+   "strength": 0.9,
+   "blur": 1.2,
+   "noise": 0.45,
+   "noise_cells": 12,
+   "rough_face": 0.8,
+   "rough_groove": 0.9,
+   "note": "plaster walls"
+  },
+  "painted_metal": {
+   "strength": 0.8,
+   "blur": 0.7,
+   "rough_face": 0.32,
+   "rough_groove": 0.5,
+   "note": "painted metal"
+  },
+  "fabric": {
+   "strength": 1.4,
+   "blur": 0.5,
+   "noise": 0.35,
+   "noise_cells": 32,
+   "rough_face": 0.88,
+   "rough_groove": 0.97,
+   "note": "upholstery, curtains, rugs"
+  },
+  "pool_tile": {
+   "strength": 2.5,
+   "blur": 0.7,
+   "mask": "ridges",
+   "rough_face": 0.08,
+   "rough_groove": 0.6,
+   "note": "glazed pool mosaic, light grout sunk",
+   "ridge": 5
+  },
+  "glazed_tile": {
+   "strength": 2.5,
+   "blur": 0.7,
+   "rough_face": 0.1,
+   "rough_groove": 0.65,
+   "note": "glazed wall tiles, dark grout sunk"
+  },
+  "rubber": {
+   "strength": 1.5,
+   "blur": 0.8,
+   "rough_face": 0.7,
+   "rough_groove": 0.85,
+   "note": "rubber gym tiles"
+  },
+  "granite": {
+   "strength": 0.4,
+   "blur": 0.5,
+   "rough_face": 0.25,
+   "rough_groove": 0.4,
+   "note": "granite"
+  }
+ },
+ "patterns": {
+  "f6023aab3470": {
+   "class": "foliage",
+   "export_image": 0
+  },
+  "c35d0ec5a341": {
+   "class": "foliage",
+   "export_image": 18
+  },
+  "b8ab9d018559": {
+   "class": "stone_tile",
+   "export_image": 1
+  },
+  "cac745ed4726": {
+   "class": "brick",
+   "export_image": 3
+  },
+  "e15ecda341f7": {
+   "class": "brick_dark",
+   "export_image": 109
+  },
+  "8e0f433ff51f": {
+   "class": "marble",
+   "export_image": 4
+  },
+  "51773c079052": {
+   "class": "roof",
+   "export_image": 5
+  },
+  "441e010b868d": {
+   "class": "checker",
+   "export_image": 6
+  },
+  "a28c3fbae6c2": {
+   "class": "terrazzo",
+   "export_image": 7
+  },
+  "df98431f45c7": {
+   "class": "carpet",
+   "export_image": 8
+  },
+  "56dd856e2a7e": {
+   "class": "carpet",
+   "export_image": 107
+  },
+  "55a29f3178b0": {
+   "class": "wood_floor",
+   "export_image": 10
+  },
+  "facdf7f6e208": {
+   "class": "wood_floor",
+   "export_image": 9
+  },
+  "bf202807a966": {
+   "class": "panelling",
+   "export_image": 13
+  },
+  "e25102537ee9": {
+   "class": "wallpaper",
+   "export_image": 14
+  },
+  "53e45ea805e0": {
+   "class": "brushed_metal",
+   "export_image": 16
+  },
+  "c6bbb78e62a6": {
+   "class": "wood",
+   "export_image": 17
+  },
+  "bb9be9a7aac1": {
+   "class": "wood",
+   "export_image": 105
+  },
+  "9bc4c4587622": {
+   "class": "grass",
+   "export_image": 103
+  },
+  "6bc666537227": {
+   "class": "plaster",
+   "export_image": 104
+  },
+  "22c522bb9ce3": {
+   "class": "painted_metal",
+   "export_image": 21
+  },
+  "372da69b2219": {
+   "class": "fabric",
+   "export_image": 22
+  },
+  "1d95a29bf66b": {
+   "class": "fabric",
+   "export_image": 15
+  },
+  "790d3e4b4f47": {
+   "class": "fabric",
+   "export_image": 25
+  },
+  "d5348601cd2a": {
+   "class": "fabric",
+   "export_image": 27
+  },
+  "c3f16eeff6d0": {
+   "class": "fabric",
+   "export_image": 28
+  },
+  "3940283aeff8": {
+   "class": "fabric",
+   "export_image": 60
+  },
+  "5f16221353b4": {
+   "class": "fabric",
+   "export_image": 64
+  },
+  "1fe8ab97e46f": {
+   "class": "fabric",
+   "export_image": 65
+  },
+  "a6e442599aba": {
+   "class": "fabric",
+   "export_image": 73
+  },
+  "68227b20ba28": {
+   "class": "fabric",
+   "export_image": 88
+  },
+  "e7735d4a8461": {
+   "class": "pool_tile",
+   "export_image": 106
+  },
+  "192c62786130": {
+   "class": "glazed_tile",
+   "export_image": 11
+  },
+  "b7512cd43da6": {
+   "class": "glazed_tile",
+   "export_image": 12
+  },
+  "b79dbd3232b9": {
+   "class": "rubber",
+   "export_image": 108
+  },
+  "1056c52316cd": {
+   "class": "granite",
+   "export_image": 61
+  }
+ }
+}

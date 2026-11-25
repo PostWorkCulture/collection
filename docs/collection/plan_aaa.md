@@ -1,6 +1,6 @@
 # Collection: plan to AAA
 
-**Status:** approved by Pete on 25 Nov 2026, after he signed off all six phases of `plan.md`. Phase 0 done; next: phase 1 (characters, Wednesday first).
+**Status:** approved by Pete on 25 Nov 2026, after he signed off all six phases of `plan.md`. Phase 0 done. Phase 1 (characters, Wednesday first) waits for Mixamo access on Pete's PC; phase 3 (materials and light) is under way meanwhile, first part ready for Pete.
 
 **Goal:** the same game, which is still DESIGN.md (Collection mode, 8 players, The Mansion, 10 stars), made to look, sound and feel like a premium shooter all the way through.
 
@@ -160,6 +160,15 @@ Nothing new gets built until Pete approves it. The new features below were appro
 - F3 now shows fps, average and worst frame time, draw calls, triangles, objects and video memory.
 - There are 33 reference shots (every room from a fixed spot, both lawns and the shop) with the performance at each, in `docs/screenshots/aaa_reference/` (`perf_high.csv`). The shot run writes `shots/perf.csv` every time, so any later phase can be compared spot by spot.
 - The vertical slice is the hall, kitchen, bar, gym and master bedroom.
+
+### Phase 3 · The Mansion: materials and light, first part (25 Nov 2026)
+
+- **Materials:** the web Mansion's textures are flat greyscale patterns tinted by each material. A pass that runs after every export (`tools/mansion_export/surface_pass.py`) works out a height field for each of the 36 patterns on lit surfaces (matched by pixel hash in `surfaces.json`, so a fresh export still maps) and adds a normal map and a roughness map, giving 200 materials real surface detail: sunk grout and board seams, shiny tile and wood, matte carpet, fabric and plaster, polished marble, brick with sunk mortar. Layout, colliders, colours and UVs are unchanged.
+- **Water:** the pool and both hot tubs are clear water you see the tiles through, bent by small moving ripples, bluer where deeper, with sharp reflections; the pool floor has moving light (caustics).
+- **Sky:** soft fair-weather clouds and a sun disc; it doesn't move, so the sky light is worked out once.
+- **Detail on surfaces:** skirting boards along every inside wall on both floors (235, drawn in one call).
+- **Frame rate (High, two runs):** every one of the 33 spots is at 120 fps or above, including the five that were under it (games room 134–147, cinema 145–149, lawn front 122–125, lawn back 124–127, kitchen 120–122). The pool view costs most (155 → 131) because of its water. A clear-coat on the big glossy floors cost the kitchen about 10 fps, so only marble keeps it. Before/after pictures and the numbers: `docs/screenshots/aaa_phase3/`.
+- **Still to do in phase 3:** baked lighting inside (a lightmap bake in the editor), window light shafts, trims and wear, real trees and hedges outside (with phase 4's models).
 
 ## How progress is tracked
 

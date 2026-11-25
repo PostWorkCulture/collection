@@ -32,11 +32,11 @@ One Godot project in `/collection/` (open `collection/project.godot`). Folders a
 /collection/audio/         sfx.gd (buses, wall muffling) + sfx/ and music/ (1v1's own sound and music files)
 /collection/level/         Mansion builder + mansion_layout.json (colliders, ladders, lifts, spawns, short cuts), mansion.glb (its look,
                            exported from the web game with /tools/mansion_export/), mansion_features.gd (lifts, pole, trampolines,
-                           portals, pool, ball pit, ballroom, windows), mansion_lights.gd (each room's lights)
+                           portals, pool, ball pit, ballroom, windows), mansion_lights.gd (each room's lights), water/caustics/sky shaders
 /collection/autotest.json  scripted checks ("enabled": true runs them and quits; "combat" and "stars" check fights and Collection rules on standing dummies; "bots_match" plays a whole 8-bot match, with "difficulty", "match_secs" and "speed"; "menu" walks the start screen, pause, settings and rebinding; "mansion" rides the lifts, pole, trampolines and portals and tries the pool and ball pit; "bots": false leaves the house empty for preview shots; "shots" are the 33 AAA reference spots and each run writes `shots/perf.csv` with fps, worst frame, draw calls and triangles per spot)
 /collection/<feature>/     new features get their own folder
 /docs/screenshots/         preview images for Pete, one folder per phase
-/tools/                    helpers outside the game (mansion_export: rebuilds level/mansion.glb from the web game)
+/tools/                    helpers outside the game (mansion_export: rebuilds level/mansion.glb from the web game, then surface_pass.py adds its normal and roughness maps)
 ```
 Update DESIGN.md → "Build status" when a part moves forward.
 
