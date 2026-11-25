@@ -1,10 +1,10 @@
 # Collection: plan to AAA
 
-**Status:** draft for Pete, written 25 Nov 2026, after he signed off all six phases of `plan.md`.
+**Status:** approved by Pete on 25 Nov 2026, after he signed off all six phases of `plan.md`. Next: phase 0.
 
 **Goal:** the same game, which is still DESIGN.md (Collection mode, 8 players, The Mansion, 10 stars), made to look, sound and feel like a premium shooter all the way through.
 
-Nothing new gets built until Pete approves it. Anything that adds a feature not already in DESIGN.md is marked **(needs Pete's yes)**. Until he approves it, it stays in DESIGN.md → Parking lot.
+Nothing new gets built until Pete approves it. The new features below were approved on 25 Nov.
 
 ## Where we start
 
@@ -15,21 +15,12 @@ Nothing new gets built until Pete approves it. Anything that adds a feature not 
   3. **Weapons and hits.** Guns are block models, and recoil, ADS, impacts and hit feedback are basic.
   4. **Front end.** The menus are functional rather than showpieces, and there is no win moment with the characters.
 
-## Decisions for Pete before we start
+## Decisions (Pete, 25 Nov)
 
-1. **Platform first.** Recommended: **Windows PC**, because AAA quality needs a desktop GPU. Web and Android could follow later as cut-down builds. This decision sets the performance budget below and when exports get set up.
-2. **Character models.** There are two routes:
-   - **(a)** Rig the Tripo models already in 1v1. This is fast, but they're low detail and split into 6 parts.
-   - **(b)** Make new higher-detail Tripo models of the same 10 characters and rig them properly.
-
-   Recommended: **(b)**, using the existing ones as reference so each character stays recognisable.
-3. **New features in this plan.** Each needs a yes or no:
-   - character select with a 3D line-up
-   - a win podium with the characters
-   - a short kill-cam or a "who got you" card
-   - an announcer voice
-   - a first-run tutorial
-4. **Asset spend.** This covers Tripo credits for characters and props, and ElevenLabs for sound and voice. Each phase lists what it needs.
+1. **Platform: Windows PC.** The frame-rate budget is set for PC; web and Android may come later as cut-down builds.
+2. **Character models: start from the 1v1 Tripo models Pete has just made.** In phase 1, one character (Wednesday) is tried first: its six parts are joined into one body and rigged, then shown to Pete in third person, first person and close up. New higher-detail versions are only made for any character that doesn't hold up close.
+3. **New features: yes to all.** Character select with a 3D line-up, the win podium, the kill-cam or "who got you" card, an announcer voice and a first-run tutorial are approved and listed in DESIGN.md.
+4. **Asset spend: yes, where needed.** That means Tripo or Meshy credits for characters and props, and ElevenLabs for sound and voice.
 
 ## Rules for every phase
 
@@ -49,15 +40,15 @@ Nothing new gets built until Pete approves it. Anything that adds a feature not 
 
 | # | Phase | What gets built | Gate: what Pete plays and checks | Needs |
 |---|---|---|---|---|
-| 0 | Groundwork | See below | The game opens instantly in the editor and in a build; the frame-rate readout is on in F3 | Platform decision |
-| 1 | Characters | See below | Watch an 8-bot match in third person and play in first person: every character reads as themselves, moves naturally, falls and dies convincingly | Tripo credits; model route (a) or (b) |
+| 0 | Groundwork | See below | The game opens instantly in the editor and in a build; the frame-rate readout is on in F3 | — |
+| 1 | Characters | See below | Watch an 8-bot match in third person and play in first person: every character reads as themselves, moves naturally, falls and dies convincingly | Tripo credits if a character needs remaking |
 | 2 | Weapons and combat feel | See below | A firing range plus a match: every gun feels distinct, ADS feels right, every hit is unmistakable | Pete's ADS notes |
 | 3 | The Mansion: materials and light | See below | Walk all 30 rooms and the grounds against the reference shots: it reads as a real house in afternoon light | — |
 | 4 | Props and set dressing | See below | Walk every room: each has its own character, and the flow is unchanged | Tripo or Meshy credits |
 | 5 | Sound and music | See below | Play a match with headphones: you can place every shot and footstep; the music lifts and drops with the match | ElevenLabs credits |
-| 6 | Front end and moments | See below | From launch to rematch, every screen feels finished | Pete's yes on each new screen |
+| 6 | Front end and moments | See below | From launch to rematch, every screen feels finished | — |
 | 7 | Bots 2.0 | See below | Play Easy, Normal and Hard: bots feel human, varied and fair | — |
-| 8 | Performance, polish, ship | See below | A clean hour of play on the chosen platform; the build is ready to share | Platform and publishing decision |
+| 8 | Performance, polish, ship | See below | A clean hour of play on the chosen platform; the build is ready to share | How to publish the PC build |
 
 ### 0 · Groundwork
 
@@ -68,7 +59,7 @@ Nothing new gets built until Pete approves it. Anything that adds a feature not 
 
 ### 1 · Characters
 
-- **Models:** the 10 cast characters as proper models (route a or b), each rigged to one shared humanoid skeleton.
+- **Models:** the 10 cast characters from 1v1, each joined into one body and rigged to one shared humanoid skeleton (Wednesday first, as the test); any that don't hold up close are remade at higher detail.
 - **Animations:**
   - an 8-way walk and run blend
   - sprint, crouch, jump, fall and land
@@ -125,7 +116,7 @@ Nothing new gets built until Pete approves it. Anything that adds a feature not 
   - lifts, pole, portals, pool and tubs
 - **Mix:** mixed properly on the existing buses.
 - **Music:** dark, bass-led trap beats in layers, for the menu, the match and the final star, rising as someone nears 10. A preview goes to Pete before anything is published.
-- **Announcer voice:** optional **(needs Pete's yes)**.
+- **Announcer voice:** optional.
 
 ### 6 · Front end and moments
 
@@ -134,7 +125,7 @@ Nothing new gets built until Pete approves it. Anything that adds a feature not 
   - a loading screen
   - HUD polish
   - the results screen
-- **New, each needs Pete's yes:**
+- **New (approved 25 Nov):**
   - character select with the 3D line-up
   - the win podium
   - the kill-cam or "who got you" card
