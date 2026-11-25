@@ -19,6 +19,7 @@ const Weapons := preload("res://weapons/weapons.gd")
 const WeaponModel := preload("res://weapons/weapon_model.gd")
 const Effects := preload("res://weapons/effects.gd")
 const Sfx := preload("res://audio/sfx.gd")
+const CharacterModel := preload("res://characters/character_model.gd")
 
 const RADIUS := 0.45
 const HEIGHT := 2.25
@@ -61,6 +62,8 @@ const SHOT_MASK := LAYER_WORLD | LAYER_BODY | LAYER_DOWNED
 var is_player := true
 var display_name := "You"
 var band_color := Color(0.18, 0.5, 0.88)
+var character := ""              # rigged model id (characters/<id>/); "" = from the display name
+var model: Node3D = null         # the rigged, motion-captured body when this character has one (AAA phase 1)
 var game: Node = null            # the match (main.gd's CollectionGame node), set before add_child
 var home: Variant = null         # test dummies respawn at their own spot: [Vector3, yaw]
 
@@ -210,6 +213,7 @@ func _ready() -> void:
 	_held.position = Vector3(-0.42, 0.15, 0.32)
 	_held.rotation.y = PI    # models point down -Z
 	_body_mesh.add_child(_held)
+	_make_model()
 	# camera rig: pivot at the eyes, spring arm for the third person view (pulls in when a wall is behind you)
 	_pivot = Node3D.new()
 	_pivot.position.y = EYE
@@ -254,12 +258,29 @@ func _ready() -> void:
 
 # ---------------------------------------------------------------- views and models
 
+## the rigged character, if this one has been built (characters/<id>/<id>.glb); otherwise the grey capsule stays
+func _make_model() -> void:
+	var cid := character if character != "" else display_name.to_lower().replace(" ", "")
+	if not CharacterModel.exists(cid):
+		return
+	character = cid
+	model = CharacterModel.new()
+	model.name = "Model"
+	add_child(model)
+	model.setup(cid)
+	_body_mesh.mesh = null
+	for c in _body_mesh.get_children():
+		if c != _shell and c != _held:
+			c.queue_free()
+
 func apply_camera_mode() -> void:
 	var fp := Settings.camera_mode == "first" and not downed and is_player
 	_arm.spring_length = 0.0 if fp else 4.2
 	_arm.position = Vector3.ZERO if fp else Vector3(0.9, 0.55, 0)   # over the right shoulder
 	_body_mesh.visible = (not fp) and alive
 	_view.visible = fp and alive and is_player
+	if model:
+		model.set_shadow_only(fp and alive)
 	cam.fov = Settings.fov
 
 func first_person() -> bool:
@@ -292,7 +313,7 @@ func muzzle_pos() -> Vector3:
 	var model := _view_model if first_person() else _held_model
 	if model:
 		var nm := "Muzzle2" if current_weapon() == "duals" and dual_left else "Muzzle"
-		var m := model.get_node_or_null(nm)
+		var m := model.find_child(nm, true, false)
 		if m:
 			return (m as Node3D).global_position
 	return eye_pos() + aim_forward() * 0.9
@@ -413,6 +434,8 @@ func set_marked(on: bool) -> void:
 	marked = on
 	_body_mat.stencil_mode = BaseMaterial3D.STENCIL_MODE_XRAY if on else BaseMaterial3D.STENCIL_MODE_DISABLED
 	_body_mat.stencil_color = Color(0.91, 0.16, 0.16, 0.85)
+	if model:
+		model.set_marked(on)
 
 # ---------------------------------------------------------------- pickups
 
@@ -443,6 +466,8 @@ func take_damage(amount: float, src: Node, head := false, _gun := "") -> bool:
 	last_hurt = _now()
 	last_by = src
 	hurt.emit(dmg, src, head)
+	if model and not downed:
+		model.hurt(dmg >= 40 or head)   # the bigger flinch for a heavy hit or a headshot
 	if downed:
 		dhp -= dmg
 		if dhp <= 0.0:
@@ -527,6 +552,8 @@ func respawn_at(p: Vector3, y: float) -> void:
 	ride = -1
 	place(p, y)
 	_set_pose_standing()
+	if model:
+		model.restart()
 	apply_camera_mode()
 	Sfx.play(get_parent(), "respawn", global_position, -4.0, 1.0, 20.0)
 	respawned.emit()
@@ -567,6 +594,8 @@ func _attack() -> void:
 func _melee(id: String, g: Dictionary) -> void:
 	swing_t = 0.26
 	punch_left = not punch_left
+	if model:
+		model.attack(id, punch_left)
 	var lunge: float = g.lunge
 	velocity.x += sin(yaw) * lunge
 	velocity.z += cos(yaw) * lunge
@@ -646,6 +675,8 @@ func _shoot(id: String, g: Dictionary) -> void:
 	if id == "duals":
 		dual_left = not dual_left
 	kick_t = 1.0
+	if model:
+		model.fired()
 	var world := get_parent()
 	var origin := eye_pos()
 	var dir := Weapons.spread_dir(aim_direction(), current_spread())
@@ -712,6 +743,8 @@ func _physics_process(dt: float) -> void:
 		in_aim = false
 	if not alive:
 		respawn_t -= dt
+		if model:   # the death fall plays out until the respawn
+			model.tick(dt, self)
 		if respawn_t <= 0.0 and game:
 			game.respawn(self)
 		return
@@ -931,7 +964,9 @@ func _update_view(dt: float) -> void:
 	if is_player:
 		cam.fov = lerpf(Settings.fov, float(g.get("zoom", Settings.fov)), ads_k) if not Weapons.is_melee(current_weapon()) else Settings.fov
 		if not fp:
-			_arm.spring_length = lerpf(4.2, 2.4, ads_k) if not downed else 3.4
+			_arm.spring_length = lerpf(4.2, 3.2, ads_k) if not downed else 3.4
+			# aiming: the camera drops to shoulder height and moves out, so she sits at the side of the frame
+			_arm.position = Vector3(lerpf(0.9, 1.45, ads_k), lerpf(0.55, 0.35, ads_k), 0)
 	# first person hands: punches jab forward, guns kick back and come to the centre when aiming
 	swing_t = maxf(0.0, swing_t - dt)
 	kick_t = maxf(0.0, kick_t - dt * 14.0)
@@ -959,8 +994,11 @@ func _update_view(dt: float) -> void:
 				hip += Vector3(lerpf(0.0, -0.4, e), 0.08 * sin(u * PI), -0.1 * sin(u * PI)) if swing_t > 0.0 else Vector3.ZERO
 			var zoom_k := tan(deg_to_rad(Settings.fov) * 0.5) / tan(deg_to_rad(cam.fov) * 0.5)
 			_view_model.position = (hip.lerp(aimed, ads_k) + Vector3(0, 0, 0.045 * kick_t)) * zoom_k
+	if model:
+		model.tick(dt, self)
+		_hold_in_hand()
 	# third person: the bat sweeps across from the right shoulder when swung; at rest it's held up and back
-	if current_weapon() == "bat" and swing_t > 0.0:
+	elif current_weapon() == "bat" and swing_t > 0.0:
 		var u2 := 1.0 - swing_t / 0.26
 		var e2 := u2 * u2 * (3.0 - 2.0 * u2)
 		_held.rotation = Vector3(0.6 * sin(u2 * PI), PI + lerpf(1.3, -1.4, e2), 0.0)
@@ -969,6 +1007,84 @@ func _update_view(dt: float) -> void:
 	_shell.visible = shield_t > 0.0 and _body_mesh.visible
 	if _shell.visible:
 		_shell_mat.albedo_color.a = 0.22 * clampf(shield_t / SHIELD, 0.0, 1.0)
+
+## the weapon in the model's hands, following the hands so it moves with every clip; third-person weapons are drawn
+## at full size (the first-person models are made small for the camera)
+## - a gun lies along the line from the right palm to the left one (both hands are on it in every gun clip), its
+##   grip in the right hand; aiming or firing turns it the rest of the way onto the aim
+## - dual pistols: one in each hand, along the hand, onto the aim
+## - the bat: held in both fists (it leaves them on the thumb side, the way a handle does) while the hands are
+##   together, in the right fist alone when they're apart; carried hanging from the right hand
+## - running with a gun (not aiming): the low ready, muzzle forward and down
+const GUN_SCALE := 1.7
+const GUN_GRIP := Vector3(0.0, -0.08, 0.03)      # where the right hand holds an SMG, in the gun model
+const PISTOL_GRIP := Vector3(0.0, -0.05, 0.0)
+const GUN_LEN := {"mp5": 0.42, "uzi": 0.3, "vector": 0.38, "p90": 0.45, "ump": 0.46, "sting": 0.26}   # weapon_model.gd
+const BAT_TILT := 0.52                           # the bat model points this far above its -Z
+func _hold_in_hand() -> void:
+	var w := current_weapon()
+	if w == "fists":
+		return
+	var r: Vector3 = model.palm(true)
+	var l: Vector3 = model.palm(false)
+	var rw: Vector3 = model.hand_transform(true).origin    # the wrists line up along a held bat or gun (the palms
+	var lw: Vector3 = model.hand_transform(false).origin   # are turned differently, so they don't)
+	var aim := aim_forward()
+	var raised: bool = ads or kick_t > 0.0 or model._fire_t > 0.0
+	if w == "bat":
+		var g: Array = model.grip_axes()
+		var dir: Vector3 = g[0]
+		var at := r
+		if swing_t <= 0.0 and model._combat <= 0.0:
+			dir = (dir * 0.35 + Vector3.DOWN + forward() * 0.25).normalized()   # carried, tip down and a little forward
+		else:   # swinging: the bat leaves the right fist; the left hand is put on the handle below it (IK), always
+			dir = model.fist_dir(true)
+			if rw.distance_to(lw) < 0.32:   # hands together in the clip: both fists agree on the line
+				dir = ((model.fist_dir(true) as Vector3) + (model.fist_dir(false) as Vector3)).normalized()
+			at = r - dir * 0.17
+			model.hik.targets[1] = at + dir * 0.05 - (model.hand_dir(false) as Vector3) * 0.07
+			model.hik.weights = [0.0, 1.0]
+		var b := _aim_basis(dir, g[1]) * Basis(Vector3.RIGHT, -BAT_TILT)
+		_held.global_transform = Transform3D(b, at)
+		return
+	if w == "duals":
+		# arms out but not locked: each wrist drawn 12% back towards its shoulder, so the elbows give
+		model.hik.pulls = [0.12, 0.12]
+		model.hik.weights = [1.0, 1.0]
+		_held.global_transform = Transform3D(Basis(), r)
+		for side in ["R", "L"]:
+			var p := _held_model.get_node_or_null("Pistol" + side) as Node3D
+			if not p:
+				continue
+			var is_r: bool = side == "R"
+			var d: Vector3 = aim   # both pistols on the aim, so they converge on the target
+			var pb := _aim_basis(d, Vector3.UP).scaled(Vector3.ONE * GUN_SCALE)
+			p.global_transform = Transform3D(pb, (r if is_r else l) - pb * PISTOL_GRIP)
+		return
+	if raised:   # aiming: the gun along the hands (the aim clip has them on it), turned onto the aim
+		var gb := _aim_basis(aim, Vector3.UP).scaled(Vector3.ONE * GUN_SCALE)
+		_held.global_transform = Transform3D(gb, r - gb * GUN_GRIP)
+		return
+	# carried at the low ready: the gun sits steady in front of the chest, muzzle forward and a little down, and the
+	# hands are put on its grip and handguard (two-bone IK), so it doesn't swing with the arms
+	var ab := global_transform.basis.orthonormalized() * Basis(Vector3.UP, model.body_yaw)
+	var fw := ab.z
+	var lf := ab.x
+	var gb2 := _aim_basis((fw + Vector3.DOWN * 0.3).normalized(), Vector3.UP).scaled(Vector3.ONE * GUN_SCALE)
+	var grip_at: Vector3 = model.bone_world("Spine2") - lf * 0.14 + fw * 0.3 + Vector3.DOWN * 0.24
+	_held.global_transform = Transform3D(gb2, grip_at - gb2 * GUN_GRIP)
+	var fore := _held.global_transform * Vector3(0.0, -0.035, -minf(0.24, float(GUN_LEN.get(w, 0.42)) * 0.6))
+	model.hik.targets = [grip_at - (model.hand_dir(true) as Vector3) * 0.07, fore - (model.hand_dir(false) as Vector3) * 0.07]
+	model.hik.weights = [1.0, 1.0]
+
+## a basis whose -Z points along dir, kept as upright as it can be
+func _aim_basis(dir: Vector3, up: Vector3) -> Basis:
+	var u := up - dir * up.dot(dir)
+	if u.length() < 0.05:
+		u = Vector3.UP - dir * dir.y
+		if u.length() < 0.05:
+			u = Vector3.FORWARD
+	return Basis.looking_at(dir, u.normalized())
 
 ## stairs and kerbs up to 0.55 m: if we ran into something low while walking, try the same move from 0.55 m higher
 func _step_up(before: Vector3, motion: Vector3, was_grounded: bool) -> void:

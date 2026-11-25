@@ -1,6 +1,6 @@
 # Collection: plan to AAA
 
-**Status:** approved by Pete on 25 Nov 2026, after he signed off all six phases of `plan.md`. Phase 0 done. Phase 1 (characters, Wednesday first) waits for Mixamo access on Pete's PC; phase 3 (materials and light) is under way meanwhile, first part ready for Pete.
+**Status:** approved by Pete on 25 Nov 2026, after he signed off all six phases of `plan.md`. Phase 0 done. Phase 1 (characters): Wednesday rigged and animated, ready for Pete; the other nine wait for his yes. Phase 3 (materials and light), first part ready for Pete.
 
 **Goal:** the same game, which is still DESIGN.md (Collection mode, 8 players, The Mansion, 10 stars), made to look, sound and feel like a premium shooter all the way through.
 

@@ -26,3 +26,6 @@ mono_crash.*
 
 # Collection autotest output
 collection/shots/
+
+# Mixamo source clips stay on the PC (see tools/characters/README.md)
+tools/characters/mixamo/*.fbx

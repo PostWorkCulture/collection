@@ -14,12 +14,14 @@ const MansionFeatures := preload("res://level/mansion_features.gd")
 const MansionLights := preload("res://level/mansion_lights.gd")
 const CollectionGame := preload("res://game/collection_game.gd")
 const DummyBrain := preload("res://fighter/dummy_brain.gd")
+const CharacterModel := preload("res://characters/character_model.gd")
 const BotBrain := preload("res://fighter/bot_brain.gd")
 ## the cast: imok 1v1's ten playable characters and their colours (DESIGN §5); 7 are drawn at random as bots each match
 const CAST := [
 	["Wednesday", "#d0202a"], ["Lil Pink", "#ff6fae"], ["North West", "#2e8bff"], ["Johnny Rotten", "#e0202a"],
 	["Emo Bunny", "#b79cff"], ["Glitch", "#1fd6ff"], ["Kitty", "#a77bff"], ["Puffa", "#ffd21a"], ["Raven", "#d0202a"], ["Toxic", "#5dff3a"],
 ]
+const PLAYER_CHARACTER := "wednesday"   # who you play until character select exists (AAA phase 1: Wednesday is the first rigged character)
 const Hud := preload("res://ui/hud.gd")
 const Menu := preload("res://ui/menu.gd")
 const Sfx := preload("res://audio/sfx.gd")
@@ -81,6 +83,7 @@ func _ready() -> void:
 	features.setup(game, level)
 	player = Fighter.new()
 	player.name = "Player"
+	player.character = PLAYER_CHARACTER
 	player.ladders = level.ladders
 	player.lifts = level.lifts
 	player.game = game
@@ -114,7 +117,11 @@ func _ready() -> void:
 	music = AudioStreamPlayer.new()
 	music.bus = "Music"
 	add_child(music)
-	game.won.connect(func(_f): _music("matchend"))
+	game.won.connect(func(f):
+		_music("matchend")
+		# the winner celebrates, then dances on the spot through the results
+		if f.model:
+			f.model.emote("cel_cheer", CharacterModel.DANCES.pick_random()))
 	var skip_menu: bool = (testing and not auto.get("menu", false)) or Settings.play_now
 	Settings.play_now = false
 	await game.start(skip_menu)
@@ -186,7 +193,7 @@ func _add_dummies() -> void:
 func _add_bots() -> void:
 	var styles: Array = BotBrain.STYLES.keys()
 	styles.shuffle()
-	var cast: Array = CAST.duplicate()
+	var cast: Array = CAST.filter(func(c): return c[0].to_lower().replace(" ", "") != PLAYER_CHARACTER)
 	cast.shuffle()
 	for i in 7:
 		var f := _new_fighter(cast[i][0], Color(cast[i][1]))
@@ -449,6 +456,8 @@ func _run_autotest(cfg: Dictionary) -> void:
 	_log("AUTOTEST boxes=%d ladders=%d lifts=%d spawns=%d dressed=%s, %d small things with a draw distance, floor furniture %d + %d" % [level.get_child_count(), level.ladders.size(), level.lifts.size(), level.spawns.size(), level.dressed, level.ranged, level.floor_things[0].size(), level.floor_things[1].size()])
 	while game.state != "fight":   # the 3 s countdown
 		await get_tree().physics_frame
+	if cfg.get("character", false):
+		await _character_preview(cfg)
 	if cfg.get("movement", true):
 		await _movement_checks(cfg)
 	if cfg.get("mansion", false):
@@ -700,6 +709,114 @@ func _snap(file: String) -> void:
 	var img := get_viewport().get_texture().get_image()
 	img.save_png(ProjectSettings.globalize_path("res://shots/" + file))
 	_log("AUTOTEST shot " + file)
+
+## AAA phase 1: film the player's rigged character doing everything, from the side, the front and over the shoulder.
+## Writes shots/char_<action>_<view>_<n>.png ("character": true in autotest.json; "character_actions" picks some).
+func _character_preview(cfg: Dictionary) -> void:
+	if not player.model:
+		_log("AUTOTEST character: the player has no rigged model")
+		return
+	var p := player
+	p.invulnerable = true
+	p.autopilot = true
+	Settings.camera_mode = "third"
+	p.apply_camera_mode()
+	for key in cfg.get("env", {}):   # lighting experiments for the preview only
+		_env.set(key, cfg.env[key])
+	var pc := Camera3D.new()
+	pc.fov = 40.0
+	add_child(pc)
+	var start := Vector3(-34, 0.05, -33)   # the front lawn between the hedges and the house: every action moves east along it
+	var acts: Array = cfg.get("character_actions", ["idle", "run", "strafe_right", "strafe_left", "run_back", "diagonal",
+			"walk", "crouch_walk", "jump", "punch", "bat", "smg_run", "smg_aim", "duals", "hit", "downed", "death", "victory"])
+	for act in acts:
+		p.respawn_at(start, PI * 0.5)
+		p.shield_t = 0.0
+		p.in_move = Vector2.ZERO
+		p.in_fire = false
+		p.in_aim = false
+		p.in_jump = false
+		p._set_crouch(false)
+		p.gun_id = ""
+		p.has_bat = false
+		p.slot = "melee"
+		p._refresh_weapon_models()
+		await _wait(0.4)
+		var mv := Vector2.ZERO
+		match act:
+			"run": mv = Vector2(0, 1)
+			"walk": mv = Vector2(0, 0.25)
+			"strafe_right": mv = Vector2(1, 0)
+			"strafe_left": mv = Vector2(-1, 0)
+			"run_back": mv = Vector2(0, -1)
+			"diagonal": mv = Vector2(-0.7, 0.7)
+			"crouch_walk":
+				p._set_crouch(true)
+				mv = Vector2(0, 1)
+			"jump": mv = Vector2(0, 1)
+			"bat":
+				p.give_bat()
+				p.select_slot("melee")
+			"smg_run":
+				p.give_gun("mp5")
+				mv = Vector2(0, 1)
+			"smg_aim":
+				p.give_gun("mp5")
+				p.in_aim = true
+				mv = Vector2(0.6, 0)
+			"duals":
+				p.give_gun("duals")
+				mv = Vector2(0, 0.5)
+			"downed":
+				p.invulnerable = false
+				p._go_down(null)
+				p.invulnerable = true
+				mv = Vector2(0, 1)
+		if mv.length() > 0.01:   # face so that the movement goes east, whichever way it is relative to the body
+			p.yaw = PI * 0.5 + atan2(mv.x, mv.y)
+		p.in_move = mv
+		if act in ["strafe_left", "strafe_right", "run_back"]:   # squared up to fight (just swung): the strafe set
+			p.model._combat = 99.0
+		await _wait(0.7 if act != "jump" else 0.5)
+		if act == "jump":
+			p.in_jump = true
+		if act == "death":
+			p._die(null)
+		if act == "victory":   # the win: a celebration into a dance
+			p.model.emote("cel_cheer", "dance_raise_roof")
+		var shots := 10
+		for i in shots:
+			if act in ["punch", "bat"]:
+				p.in_fire = i % 3 == 0
+			if act == "hit" and i % 3 == 0:
+				p.model.hurt()
+			if act == "jump" and i == 1:
+				p.in_jump = false
+			for view in (["side", "front", "tp"] if i % 3 == 0 else ["side"]):
+				var c: Vector3 = p.global_position + Vector3.UP * 1.1
+				if view == "side":   # from the house side, square on to the run east (the hedge behind her)
+					pc.global_position = c + Vector3(0, 0.3, 4.6)
+					pc.look_at(c, Vector3.UP)
+					pc.current = true
+				elif view == "front":   # ahead of the run, a little towards the house
+					pc.global_position = c + Vector3(4.2, 0.45, 1.6)
+					pc.look_at(c + Vector3.UP * 0.25, Vector3.UP)
+					pc.current = true
+				else:
+					p.cam.current = true
+				if DisplayServer.get_name() != "headless":
+					await RenderingServer.frame_post_draw
+					get_viewport().get_texture().get_image().save_png(ProjectSettings.globalize_path("res://shots/char_%s_%s_%d.png" % [act, view, i]))
+				else:
+					await get_tree().process_frame
+			await _wait(0.07)
+		_log("AUTOTEST character %s: state %s, speed %.1f, body turn %.0f deg, at %v, wall %s" % [act, p.model._state, Vector2(p.velocity.x, p.velocity.z).length(), rad_to_deg(wrapf(p.model.body_yaw - p.yaw, -PI, PI)), p.global_position, p.is_on_wall()])
+	p.in_move = Vector2.ZERO
+	p.autopilot = false
+	p.invulnerable = false
+	p.cam.current = true
+	pc.queue_free()
+	p.respawn_at(start, 0.0)
 
 func _wait(secs: float) -> void:
 	await get_tree().create_timer(secs).timeout

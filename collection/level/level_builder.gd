@@ -179,6 +179,9 @@ func _fix_materials(n: Node, seen: Dictionary) -> void:
 		if mi and mi.mesh:
 			for si in mi.mesh.get_surface_count():
 				var m := mi.mesh.surface_get_material(si) as StandardMaterial3D
+				if m and m.has_meta("extras") and str(m.get_meta("extras")).contains("\"grass\""):
+					# the lawn doesn't bounce light: its bright green turned faces and walls lime in the shade
+					mi.gi_mode = GeometryInstance3D.GI_MODE_DISABLED
 				if m == null or seen.has(m):
 					continue
 				seen[m] = true

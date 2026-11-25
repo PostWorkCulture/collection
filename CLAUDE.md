@@ -24,6 +24,8 @@ One Godot project in `/collection/` (open `collection/project.godot`). Folders a
 /collection/project.godot, main.tscn, main.gd   entry point
 /collection/autoload/      singletons (settings.gd)
 /collection/game/          the match node: state and clock, fighters, stars, pickups, shop cash-in, win, respawns, glass, kill feed
+/collection/characters/    rigged characters: character_model.gd (animation tree, clip speeds, emotes), spine_twist.gd and hand_ik.gd
+                           (after-animation turns and hand IK), one folder per character (<id>.glb + <id>.json clip list)
 /collection/fighter/       player/bot body, movement, camera, health, weapons in hand; bot_brain.gd (the bots); dummy_brain.gd for tests
 /collection/weapons/       weapon stats (from the web game), block models, hit/gun effects
 /collection/pickups/       weapon pickups
@@ -36,7 +38,7 @@ One Godot project in `/collection/` (open `collection/project.godot`). Folders a
 /collection/autotest.json  scripted checks ("enabled": true runs them and quits; "combat" and "stars" check fights and Collection rules on standing dummies; "bots_match" plays a whole 8-bot match, with "difficulty", "match_secs" and "speed"; "menu" walks the start screen, pause, settings and rebinding; "mansion" rides the lifts, pole, trampolines and portals and tries the pool and ball pit; "bots": false leaves the house empty for preview shots; "shots" are the 33 AAA reference spots and each run writes `shots/perf.csv` with fps, worst frame, draw calls and triangles per spot)
 /collection/<feature>/     new features get their own folder
 /docs/screenshots/         preview images for Pete, one folder per phase
-/tools/                    helpers outside the game (mansion_export: rebuilds level/mansion.glb from the web game, then surface_pass.py adds its normal and roughness maps)
+/tools/                    helpers outside the game (mansion_export: rebuilds level/mansion.glb from the web game, then surface_pass.py adds its normal and roughness maps; characters: rigs a 1v1 model and moves the Mixamo clips onto it, see its README)
 ```
 Update DESIGN.md → "Build status" when a part moves forward.
 

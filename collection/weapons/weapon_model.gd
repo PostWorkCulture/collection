@@ -85,13 +85,14 @@ static func make(id: String) -> Node3D:
 			bat.add_child(grip)
 		"duals":
 			for side in [-1.0, 1.0]:
-				var p := Node3D.new()
+				var p := Node3D.new()   # each pistol its own node, so a character can hold one in each hand
+				p.name = "PistolR" if side > 0.0 else "PistolL"
 				p.position = Vector3(0.11 * side, 0, 0)
 				root.add_child(p)
 				_box(p, Vector3(0.035, 0.045, 0.2), Vector3(0, 0.02, -0.06), steel)
 				_box(p, Vector3(0.032, 0.11, 0.05), Vector3(0, -0.05, 0.0), black)
 				_box(p, Vector3(0.036, 0.012, 0.16), Vector3(0, 0.048, -0.06), accent)
-				_muzzle(root, Vector3(0.11 * side, 0.02, -0.17), "Muzzle" if side < 0 else "Muzzle2")
+				_muzzle(p, Vector3(0, 0.02, -0.17), "Muzzle" if side < 0 else "Muzzle2")
 		_:
 			# SMG family: receiver, barrel, magazine, grip, stock and iron sights, sized per gun
 			var length := 0.42
