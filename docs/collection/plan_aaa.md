@@ -1,6 +1,6 @@
 # Collection: plan to AAA
 
-**Status:** approved by Pete on 25 Nov 2026, after he signed off all six phases of `plan.md`. Next: phase 0.
+**Status:** approved by Pete on 25 Nov 2026, after he signed off all six phases of `plan.md`. Phase 0 done; next: phase 1 (characters, Wednesday first).
 
 **Goal:** the same game, which is still DESIGN.md (Collection mode, 8 players, The Mansion, 10 stars), made to look, sound and feel like a premium shooter all the way through.
 
@@ -150,6 +150,16 @@ Nothing new gets built until Pete approves it. The new features below were appro
 ## After this plan (parking lot)
 
 - Online multiplayer. Family play by room code, one host plus friends, with bots filling the empty slots. It's a large job of its own and is best started once phase 8 is done.
+
+## Results
+
+### Phase 0 · Groundwork (25 Nov 2026)
+
+- The Mansion is imported by Godot instead of read from the raw file at start-up, so the game is playable in 3.4 s instead of 4.8 s. Generated levels of detail and separate shadow meshes are off: with them on, the house drew 15% slower.
+- The frame-rate budget is in DESIGN.md. On High it averages 149 fps across 33 spots. Five spots are under 120 fps: games room 99, cinema 104, lawn front 107, lawn back 116 and kitchen 117.
+- F3 now shows fps, average and worst frame time, draw calls, triangles, objects and video memory.
+- There are 33 reference shots (every room from a fixed spot, both lawns and the shop) with the performance at each, in `docs/screenshots/aaa_reference/` (`perf_high.csv`). The shot run writes `shots/perf.csv` every time, so any later phase can be compared spot by spot.
+- The vertical slice is the hall, kitchen, bar, gym and master bedroom.
 
 ## How progress is tracked
 

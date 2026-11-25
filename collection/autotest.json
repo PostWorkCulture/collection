@@ -65,244 +65,400 @@
  ],
  "shots": [
   {
-   "file": "01_lawn.png",
-   "pos": [
-    -6,
-    0.05,
-    -40
-   ],
-   "yaw": 0.15,
-   "pitch": -0.02,
-   "cam": "third",
-   "wait": 5
-  },
-  {
-   "file": "02_foyer.png",
+   "file": "ref_00_lawn_front.png",
    "pos": [
     0,
     0.05,
-    -24
+    -44
    ],
-   "yaw": 0.0,
-   "pitch": 0.0,
-   "cam": "first",
-   "wait": 3
-  },
-  {
-   "file": "03_hall.png",
-   "pos": [
-    -4,
-    0.05,
-    -6
-   ],
-   "yaw": 0.6,
-   "pitch": 0.0,
-   "cam": "first",
-   "wait": 3
-  },
-  {
-   "file": "04_ballroom.png",
-   "pos": [
-    -10,
-    0.05,
-    11
-   ],
-   "yaw": -0.785,
-   "pitch": 0.0,
-   "cam": "first",
-   "wait": 3
-  },
-  {
-   "file": "05_gym.png",
-   "pos": [
-    26,
-    0.05,
-    4
-   ],
-   "yaw": 2.16,
-   "pitch": 0.0,
-   "cam": "first",
-   "wait": 3
-  },
-  {
-   "file": "06_pool.png",
-   "pos": [
-    12,
-    0.05,
-    6
-   ],
-   "yaw": 2.55,
-   "pitch": 0.0,
-   "cam": "first",
-   "wait": 3
-  },
-  {
-   "file": "07_games_room.png",
-   "pos": [
-    -27,
-    0.05,
-    -5
-   ],
-   "yaw": -0.785,
-   "pitch": 0.0,
-   "cam": "first",
-   "wait": 3
-  },
-  {
-   "file": "08_cinema.png",
-   "pos": [
-    -16,
-    0.05,
-    -6
-   ],
-   "yaw": 0.0,
-   "pitch": 0.0,
-   "cam": "first",
-   "wait": 3
-  },
-  {
-   "file": "09_garage.png",
-   "pos": [
-    30,
-    0.05,
-    11
-   ],
-   "yaw": 0.0,
-   "pitch": 0.0,
-   "cam": "first",
-   "wait": 3
-  },
-  {
-   "file": "10_library.png",
-   "pos": [
-    -30,
-    0.05,
-    -15
-   ],
-   "yaw": 1.2,
-   "pitch": 0.0,
+   "yaw": 0,
+   "pitch": 0.05,
    "cam": "third",
    "wait": 3
   },
   {
-   "file": "11_kitchen.png",
+   "file": "ref_00_lawn_back.png",
    "pos": [
-    -34,
+    0,
     0.05,
-    -24
+    40
    ],
-   "yaw": 0.6,
-   "pitch": 0.0,
-   "cam": "first",
-   "wait": 3
-  },
-  {
-   "file": "12_bar.png",
-   "pos": [
-    -35,
-    0.05,
-    15
-   ],
-   "yaw": -0.9,
-   "pitch": 0.0,
+   "yaw": 3.14159,
+   "pitch": 0.05,
    "cam": "third",
    "wait": 3
   },
   {
-   "file": "13_playroom.png",
+   "file": "ref_00_shop.png",
    "pos": [
-    -29,
-    5.85,
-    -2
+    6,
+    0.05,
+    -36
    ],
-   "yaw": -0.785,
-   "pitch": -0.15,
+   "yaw": 2.2,
+   "pitch": 0,
    "cam": "first",
-   "wait": 3
+   "wait": 2.5
   },
   {
-   "file": "14_kids_room.png",
+   "file": "ref_g_01_kitchen.png",
    "pos": [
-    -12,
-    5.85,
-    12
+    -36.8,
+    0.05,
+    -23.4
    ],
-   "yaw": -0.67,
-   "pitch": 0.0,
+   "yaw": 0.727,
+   "pitch": -0.06,
    "cam": "first",
-   "wait": 3
+   "wait": 2.5
   },
   {
-   "file": "15_panic_room.png",
+   "file": "ref_g_02_dining.png",
    "pos": [
-    -30,
-    5.85,
-    12
+    -20.8,
+    0.05,
+    -23.4
    ],
-   "yaw": 0.4,
-   "pitch": 0.0,
+   "yaw": 0.727,
+   "pitch": -0.06,
    "cam": "first",
-   "wait": 3
+   "wait": 2.5
   },
   {
-   "file": "16_mirrors.png",
+   "file": "ref_g_03_foyer.png",
    "pos": [
-    -4,
-    5.85,
-    12
+    -4.8,
+    0.05,
+    -23.4
    ],
-   "yaw": 0.4,
-   "pitch": 0.0,
+   "yaw": 0.727,
+   "pitch": -0.06,
    "cam": "first",
-   "wait": 3
+   "wait": 2.5
   },
   {
-   "file": "17_lab.png",
+   "file": "ref_g_04_library.png",
    "pos": [
-    12,
-    5.85,
-    12
+    11.2,
+    0.05,
+    -23.4
    ],
-   "yaw": 0.6,
-   "pitch": 0.0,
+   "yaw": 0.727,
+   "pitch": -0.06,
    "cam": "first",
-   "wait": 3
+   "wait": 2.5
   },
   {
-   "file": "18_trophy_room.png",
+   "file": "ref_g_05_conserv.png",
    "pos": [
-    29,
-    5.85,
-    -5
+    27.2,
+    0.05,
+    -23.4
    ],
-   "yaw": 0.69,
-   "pitch": 0.0,
+   "yaw": 0.727,
+   "pitch": -0.06,
    "cam": "first",
-   "wait": 3
+   "wait": 2.5
   },
   {
-   "file": "19_landing.png",
+   "file": "ref_g_06_games.png",
    "pos": [
-    13,
-    5.85,
-    1
+    -36.8,
+    0.05,
+    -5.4
    ],
-   "yaw": -2.4,
-   "pitch": 0.0,
+   "yaw": 0.727,
+   "pitch": -0.06,
    "cam": "first",
-   "wait": 3
+   "wait": 2.5
   },
   {
-   "file": "20_master_bedroom.png",
+   "file": "ref_g_07_cinema.png",
    "pos": [
-    -34,
-    5.85,
-    -24
+    -20.8,
+    0.05,
+    -5.4
    ],
-   "yaw": 0.6,
-   "pitch": 0.0,
+   "yaw": 0.727,
+   "pitch": -0.06,
    "cam": "first",
-   "wait": 3
+   "wait": 2.5
+  },
+  {
+   "file": "ref_g_08_hall.png",
+   "pos": [
+    -4.8,
+    0.05,
+    -5.4
+   ],
+   "yaw": 0.727,
+   "pitch": -0.06,
+   "cam": "first",
+   "wait": 2.5
+  },
+  {
+   "file": "ref_g_09_pool.png",
+   "pos": [
+    11.2,
+    0.05,
+    -5.4
+   ],
+   "yaw": 0.727,
+   "pitch": -0.06,
+   "cam": "first",
+   "wait": 2.5
+  },
+  {
+   "file": "ref_g_10_gym.png",
+   "pos": [
+    27.2,
+    0.05,
+    -5.4
+   ],
+   "yaw": 0.727,
+   "pitch": -0.06,
+   "cam": "first",
+   "wait": 2.5
+  },
+  {
+   "file": "ref_g_11_bar.png",
+   "pos": [
+    -36.8,
+    0.05,
+    12.6
+   ],
+   "yaw": 0.727,
+   "pitch": -0.06,
+   "cam": "first",
+   "wait": 2.5
+  },
+  {
+   "file": "ref_g_12_ballroom.png",
+   "pos": [
+    -20.8,
+    0.05,
+    12.6
+   ],
+   "yaw": 0.727,
+   "pitch": -0.06,
+   "cam": "first",
+   "wait": 2.5
+  },
+  {
+   "file": "ref_g_13_gallery.png",
+   "pos": [
+    -4.8,
+    0.05,
+    12.6
+   ],
+   "yaw": 0.727,
+   "pitch": -0.06,
+   "cam": "first",
+   "wait": 2.5
+  },
+  {
+   "file": "ref_g_14_music.png",
+   "pos": [
+    11.2,
+    0.05,
+    12.6
+   ],
+   "yaw": 0.727,
+   "pitch": -0.06,
+   "cam": "first",
+   "wait": 2.5
+  },
+  {
+   "file": "ref_g_15_garage.png",
+   "pos": [
+    27.2,
+    0.05,
+    12.6
+   ],
+   "yaw": 0.727,
+   "pitch": -0.06,
+   "cam": "first",
+   "wait": 2.5
+  },
+  {
+   "file": "ref_u_16_master.png",
+   "pos": [
+    -36.8,
+    5.85,
+    -23.4
+   ],
+   "yaw": 0.727,
+   "pitch": -0.06,
+   "cam": "first",
+   "wait": 2.5
+  },
+  {
+   "file": "ref_u_17_dressing.png",
+   "pos": [
+    -20.8,
+    5.85,
+    -23.4
+   ],
+   "yaw": 0.727,
+   "pitch": -0.06,
+   "cam": "first",
+   "wait": 2.5
+  },
+  {
+   "file": "ref_u_18_landing.png",
+   "pos": [
+    -4.8,
+    5.85,
+    -23.4
+   ],
+   "yaw": 0.727,
+   "pitch": -0.06,
+   "cam": "first",
+   "wait": 2.5
+  },
+  {
+   "file": "ref_u_19_study.png",
+   "pos": [
+    11.2,
+    5.85,
+    -23.4
+   ],
+   "yaw": 0.727,
+   "pitch": -0.06,
+   "cam": "first",
+   "wait": 2.5
+  },
+  {
+   "file": "ref_u_20_observ.png",
+   "pos": [
+    27.2,
+    5.85,
+    -23.4
+   ],
+   "yaw": 0.727,
+   "pitch": -0.06,
+   "cam": "first",
+   "wait": 2.5
+  },
+  {
+   "file": "ref_u_21_play.png",
+   "pos": [
+    -36.8,
+    5.85,
+    -5.4
+   ],
+   "yaw": 0.727,
+   "pitch": -0.06,
+   "cam": "first",
+   "wait": 2.5
+  },
+  {
+   "file": "ref_u_22_spa.png",
+   "pos": [
+    -20.8,
+    5.85,
+    -5.4
+   ],
+   "yaw": 0.727,
+   "pitch": -0.06,
+   "cam": "first",
+   "wait": 2.5
+  },
+  {
+   "file": "ref_u_23_atrium.png",
+   "pos": [
+    -4.8,
+    5.85,
+    -5.4
+   ],
+   "yaw": 0.727,
+   "pitch": -0.06,
+   "cam": "first",
+   "wait": 2.5
+  },
+  {
+   "file": "ref_u_24_guest.png",
+   "pos": [
+    11.2,
+    5.85,
+    -5.4
+   ],
+   "yaw": 0.727,
+   "pitch": -0.06,
+   "cam": "first",
+   "wait": 2.5
+  },
+  {
+   "file": "ref_u_25_trophy.png",
+   "pos": [
+    27.2,
+    5.85,
+    -5.4
+   ],
+   "yaw": 0.727,
+   "pitch": -0.06,
+   "cam": "first",
+   "wait": 2.5
+  },
+  {
+   "file": "ref_u_26_panic.png",
+   "pos": [
+    -36.8,
+    5.85,
+    12.6
+   ],
+   "yaw": 0.727,
+   "pitch": -0.06,
+   "cam": "first",
+   "wait": 2.5
+  },
+  {
+   "file": "ref_u_27_kids.png",
+   "pos": [
+    -20.8,
+    5.85,
+    12.6
+   ],
+   "yaw": 0.727,
+   "pitch": -0.06,
+   "cam": "first",
+   "wait": 2.5
+  },
+  {
+   "file": "ref_u_28_mirrors.png",
+   "pos": [
+    -4.8,
+    5.85,
+    12.6
+   ],
+   "yaw": 0.727,
+   "pitch": -0.06,
+   "cam": "first",
+   "wait": 2.5
+  },
+  {
+   "file": "ref_u_29_lab.png",
+   "pos": [
+    11.2,
+    5.85,
+    12.6
+   ],
+   "yaw": 0.727,
+   "pitch": -0.06,
+   "cam": "first",
+   "wait": 2.5
+  },
+  {
+   "file": "ref_u_30_terrace.png",
+   "pos": [
+    27.2,
+    5.85,
+    12.6
+   ],
+   "yaw": 0.727,
+   "pitch": -0.06,
+   "cam": "first",
+   "wait": 2.5
   }
  ],
  "combat": true,

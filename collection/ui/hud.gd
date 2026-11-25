@@ -33,6 +33,11 @@ var game: Node = null
 
 var _font: SystemFont
 var _help: Label
+var _perf: Label
+var _pf_frames := 0
+var _pf_time := 0.0
+var _pf_worst := 0.0
+var _pf_text := ""
 var _hp_num: Label
 var _hp_bar: ColorRect
 var _hp_back: ColorRect
@@ -92,6 +97,11 @@ func _ready() -> void:
 	edge.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	edge.material = _edge_mat
 	add_child(edge)
+	# F3: performance readout (AAA plan phase 0) under the players card
+	_perf = _label(12, Color(0.85, 0.9, 0.85, 0.95))
+	_pin(_perf, Control.PRESET_TOP_LEFT, 20, 96, false, false)
+	_perf.visible = false
+	add_child(_perf)
 	_help = _label(11, Color(0.6, 0.6, 0.6, 0.8))
 	_pin(_help, Control.PRESET_CENTER_BOTTOM, -400, -16, false, true)
 	_help.custom_minimum_size.x = 800
@@ -177,6 +187,26 @@ func _ready() -> void:
 		game.feed_msg.connect(add_feed)
 
 ## anchor a control to a corner/edge, `ox, oy` px in from it; grow_*_begin makes it expand towards the screen
+## fps, average and worst frame time over the last second, and what the renderer drew (F3)
+func _perf_tick(dt: float) -> void:
+	var on: bool = game != null and game.debug
+	_perf.visible = on
+	_pf_frames += 1
+	_pf_time += dt
+	_pf_worst = maxf(_pf_worst, dt)
+	if _pf_time >= 1.0:
+		_pf_text = "%d fps · %.1f ms avg · %.1f ms worst\n%d draw calls · %.0fk triangles · %d objects\nVRAM %.0f MB" % [
+			_pf_frames, 1000.0 * _pf_time / _pf_frames, 1000.0 * _pf_worst,
+			Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME),
+			Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME) / 1000.0,
+			Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME),
+			Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED) / 1048576.0]
+		_pf_frames = 0
+		_pf_time = 0.0
+		_pf_worst = 0.0
+	if on:
+		_perf.text = _pf_text
+
 func _pin(c: Control, preset: int, ox: float, oy: float, grow_h_begin: bool, grow_v_begin: bool) -> void:
 	c.set_anchors_preset(preset)
 	c.offset_left = ox
@@ -454,7 +484,8 @@ func _process(dt: float) -> void:
 		_center.text = ""
 		_center_sub.text = ""
 	_shield.visible = player.alive and player.shield_t > 0.0
-	_help.text = "imok Collection · Godot (phase 6) · WASD move · Space jump · C crouch · V camera · LMB attack · RMB aim · 1 fists/bat · 2 gun · F3 bot view · Esc pause · %d fps" % Engine.get_frames_per_second()
+	_perf_tick(dt)
+	_help.text = "imok Collection · Godot · WASD move · Space jump · C crouch · V camera · LMB attack · RMB aim · 1 fists/bat · 2 gun · F3 bot view · Esc pause · %d fps" % Engine.get_frames_per_second()
 	_process_phase3(dt)
 	_cross.queue_redraw()
 

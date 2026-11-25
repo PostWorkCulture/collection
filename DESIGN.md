@@ -192,11 +192,17 @@ Agreed with Pete in the rebuild plan ([`docs/collection/plan.md`](docs/collectio
 - Match length after the star change (24 Nov, headless 8-bot runs): Easy 3½–5 minutes, Normal 1½–3 minutes, Hard about 45 s (before it: Easy about 40 s, Normal about 25 s). For Pete to judge in play.
 - Fuel cans in the garage stay solid (on the web they're fire hazards, not in DESIGN.md).
 
-## Open questions
+## Performance budget (AAA plan, 25 Nov)
+- Windows PC, 1080p. High: at least 120 fps on the RTX 5060 laptop at every reference spot (`docs/screenshots/aaa_reference/`, measured by the shot run into `shots/perf.csv`); Medium: at least 60 fps on a mid-range card (GTX 1660 / RTX 3050 class).
+- Starting point (25 Nov, High): 149 fps on average across the 33 spots; under 120 at five: games room 99, cinema 104, lawn front 107, lawn back 116, kitchen 117. Those get fixed in `plan_aaa.md` phase 8 at the latest, and no phase may make them worse.
+- F3 shows fps, average and worst frame time, draw calls, triangles, objects and video memory.
+
+
 - Publishing method for the Windows PC build: not decided (platform decided 25 Nov: Windows PC first).
 
 ## Decision log
 Newest first. Date — decision — why.
+- 2026-11-25 — AAA phase 0: the Mansion is now imported by Godot (loading 4.8 → 3.4 s) with generated levels of detail and separate shadow meshes switched off: with them on, the imported house drew 15% slower (128 vs 149 fps on average); without, it matches the raw file. Frame-rate budget recorded above; F3 now also shows performance; 33 reference shots (every room, both lawns, the shop) are the before pictures for every later phase.
 - 2026-11-25 — AAA plan approved (Pete): Windows PC first; characters start from the 1v1 Tripo models (Wednesday tried first, joined into one body and rigged; any that don't hold up close get remade); yes to character select with a 3D line-up, a win podium, a kill-cam or "who got you" card, an announcer voice and a first-run tutorial (now part of the design, to be built in `plan_aaa.md` phases 5–6); asset spend on Tripo / Meshy and ElevenLabs where needed.
 - 2026-11-25 — Pete signed off all six phases of `docs/collection/plan.md`. Next plan: `docs/collection/plan_aaa.md` (a premium, AAA-quality game throughout), waiting for his decisions on platform, character models, new screens and asset spend; nothing in it is built until he approves it.
 - 2026-11-25 — Portals (Pete: cheap and tacky; subtler colours, more depth): the web's swirl posters in neon frames are replaced by a doorway with depth: a shader follows your view into a tunnel the size of the doorway, with soft bands drifting slowly inward and a dim glow at the far end; a thin gunmetal frame; a soft light on the floor. Each pair shares one muted colour so linked corners match: warm copper downstairs, sea-glass teal upstairs. The shop (Pete: horrible, in the way, yellow box on top): moved from the middle of the turning circle (9, −33) to the grass verge behind it (11, −41.6), facing the house; its glowing SHOP lightbox is gone. The haze outside (Pete: mist still over the house from outside): the light-shaft fog is a quarter as thick (density 0.005 → 0.0012) and glow no longer blooms over the whole picture, only over bright lamps and signs.

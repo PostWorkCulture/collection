@@ -50,7 +50,11 @@ var _sun: DirectionalLight3D
 var _probes: Node3D
 var _key_defaults := {}
 
+var _t_start := 0
+var load_ms := 0
+
 func _ready() -> void:
+	_t_start = Time.get_ticks_msec()
 	_inputs()
 	Sfx.setup()
 	_environment()
@@ -115,6 +119,7 @@ func _ready() -> void:
 	await game.start(skip_menu)
 	_lawn_spawns()
 	_add_probes()
+	load_ms = Time.get_ticks_msec() - _t_start   # everything built and the nav ready
 	if testing:
 		if not skip_menu:
 			hud.visible = false
@@ -441,6 +446,7 @@ func _run_autotest(cfg: Dictionary) -> void:
 	await get_tree().create_timer(1.0).timeout
 	if cfg.get("menu", false):
 		await _menu_checks()
+	_log("AUTOTEST load: %d ms from start to playable" % load_ms)
 	_log("AUTOTEST boxes=%d ladders=%d lifts=%d spawns=%d dressed=%s, %d small things with a draw distance, floor furniture %d + %d" % [level.get_child_count(), level.ladders.size(), level.lifts.size(), level.spawns.size(), level.dressed, level.ranged, level.floor_things[0].size(), level.floor_things[1].size()])
 	while game.state != "fight":   # the 3 s countdown
 		await get_tree().physics_frame
@@ -455,6 +461,7 @@ func _run_autotest(cfg: Dictionary) -> void:
 	if cfg.get("bots_match", false):
 		await _bots_match(cfg)
 	# screenshots
+	var perf_rows: PackedStringArray = []
 	for sh in cfg.get("shots", []):
 		player.invulnerable = true   # nobody spoils a screenshot
 		if sh.has("quality") and sh.quality != Settings.quality:
@@ -474,9 +481,27 @@ func _run_autotest(cfg: Dictionary) -> void:
 			await _wait(0.12)
 			Input.action_release("fire")
 			player.force_input = false
+		# performance at this spot: frames over one second, the worst frame, and what was drawn
+		var frames := 0
+		var worst := 0.0
+		var t0 := Time.get_ticks_usec()
+		var last := t0
+		while Time.get_ticks_usec() - t0 < 1000000:
+			await get_tree().process_frame
+			var now := Time.get_ticks_usec()
+			worst = maxf(worst, (now - last) / 1000.0)
+			last = now
+			frames += 1
+		var draws: int = int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME))
+		var tris: int = int(Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME))
 		var img := get_viewport().get_texture().get_image()
 		img.save_png(ProjectSettings.globalize_path("res://shots/" + sh.file))
-		_log("AUTOTEST shot " + sh.file)
+		_log("AUTOTEST shot %s: %d fps, worst frame %.1f ms, %d draw calls, %dk triangles" % [sh.file, frames, worst, draws, tris / 1000])
+		perf_rows.append("%s,%s,%d,%.1f,%d,%d" % [sh.file, Settings.quality, frames, worst, draws, tris])
+	if not perf_rows.is_empty() and DisplayServer.get_name() != "headless":
+		var pf := FileAccess.open(ProjectSettings.globalize_path("res://shots/perf.csv"), FileAccess.WRITE)
+		if pf:
+			pf.store_string("shot,quality,fps,worst_ms,draw_calls,triangles\n" + "\n".join(perf_rows) + "\n")
 	Settings.camera_mode = "third"
 	_log("AUTOTEST done")
 	if cfg.get("quit", true):
