@@ -152,7 +152,7 @@ The HUD and menus copy the web game's monochrome look (black and white, red high
 
 ## Build plan
 
-Six phases (the sixth added 24 Nov, when Pete settled on Godot for Collection as its own game); each ends with Pete playing it, and nothing moves on until he's happy with the last. Status (24 Nov): phases 1–5 and the first part of phase 6 (the Mansion's look and its moving parts) are built and published; the second part (stairs, windows, room lights) is published; the third part (furniture, smashable props, fewer stars) is published; the last part (hot tubs, speed) is built, which finishes phase 6. Pete played phases 1 and 2 (notes in DESIGN.md → Known issues); phases 3–6 wait for him to play. Next: Pete plays phase 6; the plan's six phases are then done.
+Six phases (the sixth added 24 Nov, when Pete settled on Godot for Collection as its own game); each ends with Pete playing it, and nothing moves on until he's happy with the last. Status (25 Nov): all six phases are built and published. Since Pete started playing (24–25 Nov) his notes have gone in too: running slowed to 8.5 m/s, stars cut to 6 and spread out, the flow pass (4.4 m doorways, no glass walls, bigger windows that break when you jump in, mirror maze gone, furniture against the walls), portals with depth, the shop moved to the verge, and the haze over the house cleared. Next: Pete plays full matches and signs off each phase's gate; open items are in DESIGN.md → Known issues (ADS, match pace) and Open questions (platforms).
 
 | Phase | What gets built | Gate: what Pete plays and checks |
 | --- | --- | --- |
@@ -161,7 +161,7 @@ Six phases (the sixth added 24 Nov, when Pete settled on Godot for Collection as
 | 3 · Collection rules | Stars, shop cash-in, 2 lost when downed, all lost on death; leader outline and minimap marker; HUD and leaderboard | Play a full solo match: find 10 stars and cash in. **Built; waiting for Pete.** |
 | 4 · Bots | Nav mesh, searching by sight, hearing, fighting, targeting; 7 bots at Easy, Normal, Hard; a debug view of what they see | Play full 8-player matches: bots feel fair at every level. **Built; waiting for Pete.** |
 | 5 · Look and sound | Lighting, reflections, fog, post effects, particles, glass; 3D sound through walls, room echo, menus, settings, controller | Play it with everything switched on (Pete decided on 24 Nov to carry on in Godot regardless). **Built; waiting for Pete.** |
-| 6 · The Mansion in full | The grey box built out into the real Mansion: every room's look, props, glass, lifts, pole, portals, trampolines, ball pit, pool, lighting per room (DESIGN §9) | Walk every room and play full matches |
+| 6 · The Mansion in full | The grey box built out into the real Mansion: every room's look, props, glass, lifts, pole, portals, trampolines, ball pit, pool, lighting per room (DESIGN §9) | Walk every room and play full matches. **Built and tidied with Pete's notes; waiting for his sign-off.** |
 
 How each phase is checked before it reaches Pete:
 
