@@ -8,6 +8,8 @@ extends Node3D
 ## ladders and glass (drawn here so it can break) stay. Moving parts in it are named (lift_car, tramp_mat, disco_*, pool_water,
 ## portal_swirl) for level/mansion_features.gd to animate.
 
+const MansionEdits := preload("res://level/mansion_edits.gd")
+
 var layout: Dictionary = {}
 var ladders: Array[AABB] = []
 var ladder_normals: Array[Vector3] = []   # per ladder: out from the wall, towards whoever climbs it
@@ -22,6 +24,8 @@ var windows: Array = []          # the 40 big windows: {body, ax (pane runs alon
 var spawns: Array = []
 var house: Dictionary = {}
 var shop_pos := Vector3.ZERO
+var edits := {}                  # mansion_edits.gd's result: {scope (the telescope's pivot), ...}
+var _removed: Node3D
 
 var _grid_tex: ImageTexture
 var _mats := {}
@@ -38,8 +42,19 @@ func build() -> void:
 	_grid_tex = _make_grid()
 	_load_dressing()
 	_build_ground()
+	_removed = Node3D.new()   # what Pete had taken out (mansion_edits.gd): its look parked here, hidden
+	_removed.name = "Removed"
+	_removed.visible = false
+	add_child(_removed)
 	for i in layout.boxes.size():
-		_add_box(layout.boxes[i], i)
+		var b: Dictionary = layout.boxes[i]
+		if MansionEdits.removed(b):
+			if box_nodes.has(i):
+				(box_nodes[i] as Node).reparent(_removed, true)
+				box_nodes.erase(i)
+			continue
+		b = MansionEdits.move_scope_box(MansionEdits.move_box(b))
+		_add_box(b, i)
 	for l in layout.ladders:
 		_add_ladder(l)
 	for st in layout.get("stairs", []):
@@ -49,6 +64,7 @@ func build() -> void:
 		var body: Variant = bodies.get(int(w.pane))
 		windows.append({"body": body, "ax": bool(w.ax), "at": float(w.at), "a": float(w.a), "b": float(w.b), "s0": float(w.s0), "s1": float(w.s1)})
 	_add_shop()
+	edits = MansionEdits.apply(self)
 	if dressed:
 		_add_skirting()
 

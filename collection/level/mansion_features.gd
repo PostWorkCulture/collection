@@ -14,6 +14,7 @@ extends Node3D
 const WATER_SHADER := preload("res://level/water.gdshader")
 const CAUSTICS_SHADER := preload("res://level/caustics.gdshader")
 const Sfx := preload("res://audio/sfx.gd")
+const MansionEdits := preload("res://level/mansion_edits.gd")
 const UF := 5.8                      # upstairs floor height
 const GRAV := 36.0
 const JUMP := 12.0
@@ -118,8 +119,8 @@ var _disco_light: OmniLight3D
 var _cars: Array = []                # [node, lift index]
 
 # ---- hot tubs: x, z (both on the upstairs floor, deck 0.3 m, water 0.42 m above it)
-const TUBS := [Vector2(-16, 4), Vector2(30, 23)]
-const TUB_R := 1.5
+## the spa's and the roof terrace's (moved into the corner and 25% bigger since 26 Nov: level/mansion_edits.gd)
+const TUBS := [[Vector2(-16, 4), 1.5], [Vector2(MansionEdits.TUB_TO.x, MansionEdits.TUB_TO.z), 1.5 * MansionEdits.TUB_SCALE]]
 var _tubs: Array = []                # {c, wy, water, base, burst, rings: [[mesh, t, s]], ri, inside: {}}
 
 func setup(g: Node, lv: Node) -> void:
@@ -159,6 +160,9 @@ func setup(g: Node, lv: Node) -> void:
 	_setup_disco(parts)
 	_setup_ball_pit()
 	_setup_tubs()
+	_setup_hall_of_fame()
+	_setup_star_ceiling()
+	_scope = level.edits.get("scope") as Node3D
 	if game.has_signal("state_changed"):
 		game.state_changed.connect(func(s: String) -> void:
 			if s == "countdown":
@@ -184,7 +188,11 @@ func _physics_process(dt: float) -> void:
 		_pool_step(f, s, dt)
 		_window_step(f)
 		_tub_step(f, s)
+		_scope_step(f, s)
 	_ball_pit(dt)
+	if _scope:   # the telescope spins down slowly
+		_scope.rotation.y += _scope_v * dt
+		_scope_v *= exp(-dt * 0.7)
 
 func _process(dt: float) -> void:
 	_animate(dt)
@@ -593,9 +601,11 @@ func _setup_tubs() -> void:
 	ring.outer_radius = 1.0
 	ring.rings = 28
 	ring.ring_segments = 4
-	for c in TUBS:
+	for tub in TUBS:
+		var c: Vector2 = tub[0]
+		var tub_r: float = tub[1]
 		var wy := UF + 0.3 + 0.42
-		var t := {"c": c, "wy": wy, "rings": [], "ri": 0, "inside": {}, "water": null}
+		var t := {"c": c, "r": tub_r, "wy": wy, "rings": [], "ri": 0, "inside": {}, "water": null}
 		# the jets: six, streaming in from the rim just under the surface
 		for i in 6:
 			var a := float(i) / 6.0 * TAU + 0.3
@@ -614,7 +624,7 @@ func _setup_tubs() -> void:
 			jet.lifetime = 0.35
 			jet.local_coords = false
 			jet.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-			jet.position = Vector3(c.x + cos(a) * (TUB_R - 0.1), wy - 0.06, c.y + sin(a) * (TUB_R - 0.1))
+			jet.position = Vector3(c.x + cos(a) * (tub_r - 0.1), wy - 0.06, c.y + sin(a) * (tub_r - 0.1))
 			jet.visibility_aabb = AABB(Vector3(-2, -1, -2), Vector3(4, 2, 4))
 			add_child(jet)
 		# a burst of spray for getting in
@@ -654,7 +664,7 @@ func _setup_tubs() -> void:
 			t.rings.append([rm, 9.0, 1.0])
 		_tubs.append(t)
 	if level.dressing:
-		_find_tub_water(level.dressing)
+		_find_tub_water(level)   # (the dressing, and the terrace tub moved out of it by mansion_edits.gd)
 
 ## the moving net of light on the pool floor (level/caustics.gdshader), on a sheet just above the tiles
 func _add_caustics() -> void:
@@ -711,7 +721,7 @@ func _tub_step(f: Node, s: Dictionary) -> void:
 	for t in _tubs:
 		var c: Vector2 = t.c
 		var wy: float = t.wy
-		var inn: bool = Vector2(p.x - c.x, p.z - c.y).length() < TUB_R + 0.05 and p.y < wy + 0.6 and p.y > wy - 0.75
+		var inn: bool = Vector2(p.x - c.x, p.z - c.y).length() < float(t.r) + 0.05 and p.y < wy + 0.6 and p.y > wy - 0.75
 		var was: bool = t.inside.get(k, false)
 		if inn and not was:
 			var size := minf(1.6, 0.6 + maxf(0.0, -float(s.vy if s.has("vy") else 0.0)) / 9.0)
@@ -799,3 +809,133 @@ func _hide_old_portals(n: Node) -> void:
 						for fl in level.floor_things:   # so hiding/showing a floor never brings them back
 							(fl as Array).erase(mi)
 		_hide_old_portals(c)
+
+# ---------------------------------------------------------------- Hall of Fame (the trophy room, Pete 26 Nov)
+
+## rock singers and guitarists as gig posters (level/hall_of_fame, made by tools/hall_of_fame/make_posters.py) in
+## glittery gold frames, round the walls above the trophy cases: [name, centre on the wall, the way it faces]
+const FAME_Y := UF + 3.2
+const FAME := [
+	["freddie_mercury", Vector3(24.23, FAME_Y, -7.6), Vector3.RIGHT], ["brian_may", Vector3(24.23, FAME_Y, -5.4), Vector3.RIGHT],
+	["slash", Vector3(24.23, FAME_Y, -1.8), Vector3.RIGHT], ["axl_rose", Vector3(24.23, FAME_Y, 5.6), Vector3.RIGHT],
+	["jimi_hendrix", Vector3(24.23, FAME_Y, 7.7), Vector3.RIGHT],
+	["robert_plant", Vector3(33.5, FAME_Y, 8.77), Vector3.FORWARD], ["jimmy_page", Vector3(35.8, FAME_Y, 8.77), Vector3.FORWARD],
+	["mick_jagger", Vector3(38.1, FAME_Y, 8.77), Vector3.FORWARD],
+	["eddie_van_halen", Vector3(36.4, FAME_Y, -8.77), Vector3.BACK], ["kurt_cobain", Vector3(38.7, FAME_Y, -8.77), Vector3.BACK],
+]
+const POSTER := Vector2(1.0, 1.267)   # the 600 x 760 art
+const GLITTER := """shader_type spatial;
+// gold leaf with glitter: tiny flakes that catch the light and twinkle as you move past
+render_mode specular_schlick_ggx;
+varying vec3 wp;
+float hash(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
+void vertex() { wp = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz; }
+void fragment() {
+	vec3 cell = floor(wp * 160.0);
+	float h = hash(cell);
+	float flake = step(0.82, h);
+	float tw = pow(max(0.0, sin(TIME * 2.5 + h * 60.0 + dot(VIEW, vec3(9.0, 7.0, 5.0)))), 16.0);
+	ALBEDO = mix(vec3(0.86, 0.62, 0.24), vec3(1.0, 0.86, 0.5), flake * 0.6);
+	METALLIC = 1.0;
+	ROUGHNESS = mix(0.32, 0.12, flake);
+	EMISSION = vec3(1.0, 0.9, 0.65) * flake * tw * 2.2;
+}"""
+
+func _setup_hall_of_fame() -> void:
+	var gm := ShaderMaterial.new()
+	var sh := Shader.new()
+	sh.code = GLITTER
+	gm.shader = sh
+	for e in FAME:
+		var tex := load("res://level/hall_of_fame/%s.jpg" % e[0]) as Texture2D
+		if tex == null:
+			continue
+		var n: Vector3 = e[2]
+		var root := Node3D.new()
+		add_child(root)
+		root.global_position = e[1] + n * 0.02
+		root.global_basis = Basis.looking_at(-n, Vector3.UP)   # +Z of the frame faces out of the wall
+		var pic := MeshInstance3D.new()
+		var q := QuadMesh.new()
+		q.size = POSTER
+		pic.mesh = q
+		var pm := StandardMaterial3D.new()
+		pm.albedo_texture = tex
+		pm.roughness = 0.45
+		pm.emission_enabled = true   # (a touch of its own light, so it reads like a lit print behind glass)
+		pm.emission_texture = tex
+		pm.emission_energy_multiplier = 0.18
+		pic.material_override = pm
+		pic.position.z = 0.035
+		root.add_child(pic)
+		var fw := 0.11   # the frame: four bars round it, standing proud of the picture
+		for bar in [[Vector3(0, POSTER.y * 0.5 + fw * 0.5, 0), Vector3(POSTER.x + fw * 2.0, fw, 0.08)],
+				[Vector3(0, -POSTER.y * 0.5 - fw * 0.5, 0), Vector3(POSTER.x + fw * 2.0, fw, 0.08)],
+				[Vector3(-POSTER.x * 0.5 - fw * 0.5, 0, 0), Vector3(fw, POSTER.y, 0.08)],
+				[Vector3(POSTER.x * 0.5 + fw * 0.5, 0, 0), Vector3(fw, POSTER.y, 0.08)]]:
+			var mi := MeshInstance3D.new()
+			var bm := BoxMesh.new()
+			bm.size = bar[1]
+			mi.mesh = bm
+			mi.material_override = gm
+			mi.position = bar[0] + Vector3(0, 0, 0.04)
+			root.add_child(mi)
+
+# ---------------------------------------------------------------- the observatory (the space room, Pete 26 Nov)
+
+## a ceiling full of stars: thousands of points that twinkle, a faint band of the Milky Way and a little nebula colour
+const STARS_SHADER := """shader_type spatial;
+render_mode unshaded, cull_disabled, shadows_disabled;
+float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float noise(vec2 p) { vec2 i = floor(p); vec2 f = fract(p); f = f * f * (3.0 - 2.0 * f);
+	return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), f.x), f.y); }
+float stars(vec2 uv, float scale, float thresh, float t) {
+	vec2 g = uv * scale; vec2 c = floor(g); vec2 f = fract(g) - 0.5;
+	float h = hash(c);
+	vec2 o = vec2(hash(c + 3.1), hash(c + 7.7)) - 0.5;
+	float d = length(f - o * 0.7);
+	float s = smoothstep(0.08, 0.0, d) * step(thresh, h);
+	return s * (0.6 + 0.4 * sin(t * (1.0 + h * 3.0) + h * 40.0));
+}
+void fragment() {
+	vec2 uv = UV * vec2(1.0, 1.15);
+	float band = exp(-pow((uv.x + uv.y * 0.6 - 0.85) * 3.2, 2.0));
+	float neb = noise(uv * 4.0) * noise(uv * 9.0 + 2.0);
+	vec3 col = vec3(0.012, 0.016, 0.04) + band * vec3(0.06, 0.06, 0.1) * (0.5 + neb)
+		+ vec3(0.12, 0.03, 0.16) * smoothstep(0.35, 0.8, neb) * 0.5;
+	float s = stars(uv, 90.0, 0.86, TIME) + stars(uv, 45.0, 0.9, TIME * 0.7) * 1.6 + stars(uv, 160.0, 0.8, TIME * 1.3) * 0.6 * (0.4 + band);
+	col += vec3(1.0, 0.97, 0.9) * s;
+	ALBEDO = col;
+}"""
+
+func _setup_star_ceiling() -> void:
+	var mi := MeshInstance3D.new()
+	var pm := PlaneMesh.new()
+	pm.size = Vector2(15.6, 17.6)   # the room: x 24..40, z -27..-9, ceiling at 11
+	pm.flip_faces = true            # seen from below
+	mi.mesh = pm
+	var m := ShaderMaterial.new()
+	var sh := Shader.new()
+	sh.code = STARS_SHADER
+	m.shader = sh
+	mi.material_override = m
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(mi)
+	mi.global_position = Vector3(32.0, 10.95, -18.0)
+
+## walk up to the telescope and it spins round (each time someone comes up to it)
+var _scope: Node3D
+var _scope_v := 0.0
+const SCOPE_NEAR := 2.6
+func _scope_step(f: Node, s: Dictionary) -> void:
+	if _scope == null:
+		return
+	var d: Vector3 = f.global_position - _scope.global_position
+	var near := Vector2(d.x, d.z).length() < SCOPE_NEAR and absf(d.y) < 2.0
+	if near and not s.get("scope", false):
+		if absf(_scope_v) < 1.0:
+			_scope_v = 7.0 if randf() < 0.5 else -7.0   # off it goes, one way or the other
+		else:
+			_scope_v += signf(_scope_v) * 4.0          # already turning: faster
+		Sfx.play(self, "fistwhoosh", _scope.global_position + Vector3.UP * 2.0, -6.0, 0.6, 12.0)
+	s["scope"] = near

@@ -705,6 +705,32 @@ func _mansion_checks() -> void:
 		if float(rg[1]) < 1.2:
 			rings_on += 1
 	_log("AUTOTEST hot tub: in it=%s at y %.2f, splash rings %d, water found=%s, jets %d" % [tub.inside.get(player.get_instance_id(), false), player.global_position.y, rings_on, tub.water != null, features.get_children().filter(func(c): return c is GPUParticles3D).size()])
+	# the roof terrace's tub, moved into the corner and bigger (Pete, 26 Nov)
+	var tub2: Dictionary = features._tubs[1]
+	player.place(Vector3(tub2.c.x, 8.5, tub2.c.y), 0.0)
+	await get_tree().create_timer(1.0).timeout
+	_log("AUTOTEST terrace tub: at (%.1f, %.1f) radius %.2f, in it=%s at y %.2f, water found=%s" % [tub2.c.x, tub2.c.y, tub2.r, tub2.inside.get(player.get_instance_id(), false), player.global_position.y, tub2.water != null])
+	await _snap("p6_10_terrace_tub_third.png")
+	# the telescope spins when you walk up to it; the Hall of Fame and the star ceiling are there
+	var scope: Node3D = features._scope
+	if scope:
+		player.place(scope.global_position + Vector3(4.0, 0.05, 0), -PI * 0.5)
+		await _wait(0.4)
+		var r0 := scope.rotation.y
+		player.place(scope.global_position + Vector3(2.0, 0.05, 0), -PI * 0.5)
+		await _wait(0.6)
+		_log("AUTOTEST telescope: turned %.0f deg in 0.6 s after walking up" % rad_to_deg(absf(scope.rotation.y - r0)))
+		player.place(scope.global_position + Vector3(6.0, 0.05, 2.0), -PI * 0.6)
+		player.pitch = 0.5
+		await _wait(0.8)
+		await _snap("p6_11_observatory_third.png")
+		player.pitch = 0.0
+	else:
+		_log("AUTOTEST telescope: not found")
+	player.place(Vector3(30.0, 5.85, -4.0), -PI * 0.5)
+	await _wait(0.8)
+	await _snap("p6_12_hall_of_fame_third.png")
+	_log("AUTOTEST stairs kept clear: garage foot %s, kitchen foot %s, kitchen top %s" % [_clear_at(Vector3(38.2, 0.5, 9.9)), _clear_at(Vector3(-38.2, 0.5, -9.6)), _clear_at(Vector3(-39.2, 6.6, -18.5))])
 	# smashable props: shoot one apart, then it grows back once its 40 s are up
 	var kinds := {}
 	var with_look := 0
@@ -861,6 +887,16 @@ func _character_preview(cfg: Dictionary) -> void:
 	p.cam.current = true
 	pc.queue_free()
 	p.respawn_at(start, 0.0)
+
+## nothing solid here (a small sphere test)
+func _clear_at(p: Vector3) -> bool:
+	var q := PhysicsShapeQueryParameters3D.new()
+	var sp := SphereShape3D.new()
+	sp.radius = 0.25
+	q.shape = sp
+	q.transform = Transform3D(Basis(), p)
+	q.collision_mask = 1
+	return get_world_3d().direct_space_state.intersect_shape(q, 1).is_empty()
 
 func _wait(secs: float) -> void:
 	await get_tree().create_timer(secs).timeout
