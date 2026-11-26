@@ -161,7 +161,7 @@ func show_start() -> void:
 	_clear()
 	_label("COLLECTION", 46, WHITE)
 	_label("8 players · The Mansion", 15, GREY)
-	_label("Start with a bat, find 10 hidden stars, cash them in at the shop outside. First to cash in wins.", 14, GREY)
+	_label("Start with a bat, find 10 hidden stars, cash them in at the open shop outside (it moves round the four lawn corners). First to cash in wins.", 14, GREY)
 	_box.add_child(HSeparator.new())
 	_button("PLAY", func(): hide_menu(); play.emit())
 	var bots := _cycle(["easy", "normal", "hard"], Settings.bots, func(v):

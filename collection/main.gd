@@ -1124,9 +1124,40 @@ func _star_checks() -> void:
 	player.place(d0.global_position + Vector3(0, 0.05, 0), 0.0)
 	await _wait(0.2)
 	_log("AUTOTEST picked up a dropped star: you have %d, dropped stars left %d" % [player.stars, game.drops.size()])
+	# the shops (Pete, 26 Nov): one open of four; the clock, a shot cash-in and stars taken nearby each move it
+	var spots: Array = game.level.shop_spots
+	_log("AUTOTEST shops: %d, open the %s one at %v" % [spots.size(), spots[game.shop_i].name, spots[game.shop_i].pos])
+	var was: int = game.shop_i
+	game.shop_t = 0.0
+	await _wait(0.1)
+	_log("AUTOTEST shop after a minute: moved=%s (now %s), clock back to %.0f s" % [game.shop_i != was, spots[game.shop_i].name, game.shop_t])
+	game.add_stars(player, game.STARS - player.stars)
+	var face: Vector3 = spots[game.shop_i].face
+	player.place(game.cash_point + face * 12.0 + Vector3(0, 0.05, 0), atan2(-face.x, -face.z))
+	await _wait(1.2)
+	await _snap("p3_05a_open_shop_third.png")
+	player.place(game.cash_point + Vector3(0, 0.05, 0), atan2(-face.x, -face.z))
+	await _wait(0.8)
+	was = game.shop_i
+	var part: float = game.cash_progress(player)
+	player.take_damage(5, dummies[1])
+	await _wait(0.1)
+	_log("AUTOTEST shop cash-in shot at %.0f%%: moved=%s (now %s), hp %d" % [part * 100.0, game.shop_i != was, spots[game.shop_i].name, player.hp])
+	var dm: Node = dummies[2]
+	var near: Vector3 = game.cash_point + spots[game.shop_i].face * 5.0
+	dm.place(near + Vector3(0, 0.05, 0), 0.0)
+	await _wait(0.2)
+	game.add_stars(dm, 2)
+	game.lose_stars(dm, 2)
+	was = game.shop_i
+	player.stars = 0
+	player.place(game.drops[game.drops.size() - 1].global_position + Vector3(0, 0.05, 0), 0.0)
+	await _wait(0.2)
+	_log("AUTOTEST shop stars taken near it: moved=%s (now %s)" % [game.shop_i != was, spots[game.shop_i].name])
 	# cash in: 10 stars, stand still at the shop for 2 s
 	game.add_stars(player, game.STARS - player.stars)
-	player.place(game.cash_point + Vector3(0, 0.05, 0), PI)
+	face = spots[game.shop_i].face
+	player.place(game.cash_point + Vector3(0, 0.05, 0), atan2(-face.x, -face.z))
 	var t0 := Time.get_ticks_msec()
 	await _wait(1.0)
 	await _snap("p3_05_cashing_in_third.png")

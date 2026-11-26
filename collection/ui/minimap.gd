@@ -140,6 +140,16 @@ func _draw() -> void:
 			if s.length() > rad - 9.0:
 				s = s.normalized() * (rad - 9.0)
 			_star(c + s, 8.0)
+	# the open shop: a gold-edged square with a white S, pinned to the rim when it's out of range
+	if game and game.level and game.level.shop_spots.size() > 0:
+		var d: Vector3 = game.cash_point - me
+		var s := Vector2(d.x * r.x + d.z * r.z, -(d.x * f.x + d.z * f.z)) * k
+		if s.length() > rad - 9.0:
+			s = s.normalized() * (rad - 9.0)
+		var box := Rect2(c + s - Vector2(7, 7), Vector2(14, 14))
+		draw_rect(box, Color(0.08, 0.08, 0.08, 0.9))
+		draw_rect(box, GOLD, false, 1.5)
+		draw_string(ThemeDB.fallback_font, box.position + Vector2(3.5, 11.5), "S", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(1, 1, 1))
 	# you: a white arrow pointing the way you face
 	var tri := PackedVector2Array([c + Vector2(0, -8), c + Vector2(6, 6), c + Vector2(0, 3), c + Vector2(-6, 6)])
 	draw_colored_polygon(tri, Color(1, 1, 1))

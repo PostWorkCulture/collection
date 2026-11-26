@@ -262,8 +262,8 @@ func _build_phase3() -> void:
 	_star_card.add_child(_star_lbl)
 	_shop_hint = _label(14, GOLD)
 	_shop_hint.text = "Cash in at the shop outside"
-	_pin(_shop_hint, Control.PRESET_CENTER_TOP, -150, 152, false, false)
-	_shop_hint.custom_minimum_size.x = 300
+	_pin(_shop_hint, Control.PRESET_CENTER_TOP, -200, 152, false, false)
+	_shop_hint.custom_minimum_size.x = 400
 	_shop_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_child(_shop_hint)
 	# minimap, top right (the kill feed sits under it)
@@ -305,7 +305,7 @@ func _build_phase3() -> void:
 	l1.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lv.add_child(l1)
 	var l2 := _label(14, GREY)
-	l2.text = "Start with a bat · find 10 hidden stars · cash them in at the shop outside · first to cash in wins"
+	l2.text = "Start with a bat · find 10 hidden stars · cash them in at the open shop outside · first to cash in wins"
 	l2.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lv.add_child(l2)
 	_load_bots = _label(13, GREY)
@@ -528,6 +528,8 @@ func _process_phase3(dt: float) -> void:
 	st.border_color = GOLD if n >= game.STARS else EDGE
 	st.set_border_width_all(2 if n >= game.STARS else 1)
 	_shop_hint.visible = n >= game.STARS and game.state == "fight"
+	if _shop_hint.visible:
+		_shop_hint.text = "Cash in at the shop: %s lawn, %s" % Array(String(game.level.shop_spots[game.shop_i].name).split(" "))
 	var cp: float = game.cash_progress(player)
 	_cash_card.visible = cp > 0.0 and game.state == "fight"
 	_cash_bar.size.x = 230.0 * cp

@@ -5,10 +5,13 @@ extends Node3D
 ##
 ## Rules (DESIGN §2–6): 6 stars hidden inside the house (both floors, never the roof), each at least 7 m from other
 ## stars, pickups and players and as far from the other stars as it can be; a taken star comes back 8-14 s later at
-## least 25 m away. Hold 10 and you can't pick up more: get to the shop on the front lawn and stand at it.
+## least 25 m away. Hold 10 and you can't pick up more: get to the open shop and stand at it.
 ## Going down costs 2 stars, dying costs the rest; lost stars lie where you fell for 20 s (approved improvement).
 ## 8+ stars and you're marked: outlined through walls and pinned on every minimap. Cashing in takes 2 s standing
 ## still at the shop (approved improvement; getting hurt or moving away starts it again). First to cash in wins.
+## Four shops, one in each lawn corner against the boundary hedge; only one is open (pad and light beam). It moves to
+## another corner every minute, when a cash-in there is cut short by a hit, and when stars dropped by a downed or killed
+## player are picked up near it (Pete, 26 Nov).
 ## Weapons: everyone carries a bat (a random colour); 8 gun pickups, 80% indoors, 6 m apart, back somewhere new 15 s
 ## after being taken. Standing on a different gun offers a swap (interact): yours drops there with its bullets for 20 s.
 ## Respawn 3 s after dying at the spawn point furthest from everyone, leaving out the 3 roof spawns (test dummies go
@@ -19,6 +22,7 @@ signal center_msg(title: String, sub: String, secs: float)
 signal leader_marked(f: Node)         # someone just reached 8 stars: cue + screen-edge flash
 signal state_changed(state: String)
 signal won(f: Node)
+signal shop_moved(i: int)            # the open shop is now shop i (level.shop_spots)
 signal noise(pos: Vector3, radius: float, src: Node)   # gunshots and punches; bots within earshot may go and look
 
 const Weapons := preload("res://weapons/weapons.gd")
@@ -42,6 +46,8 @@ const STAR_H := 1.6           # and up/down
 const DROP_LIFE := 20.0       # lost stars and dropped bats lie there this long
 const CASH_TIME := 2.0
 const CASH_R := 2.2
+const SHOP_MOVE := 60.0       # the open shop moves to another corner after this long (Pete, 26 Nov)
+const SHOP_NEAR := 15.0       # stars from a fallen player picked up this close to the open shop move it too
 const COUNTDOWN := 3.0
 const GUN_PICKS := 8   # (Pete, 26 Nov: everyone carries a bat, so the two bat pickups became guns)
 const BAT_PICKS := 0
@@ -62,6 +68,10 @@ var countdown := COUNTDOWN
 var winner: Node = null
 var cash_point := Vector3.ZERO       # where you stand to cash in: just in front of the shop
 var cash_t := {}                     # fighter → seconds stood at the shop
+var shop_i := 0                      # which of level.shop_spots is open
+var shop_t := SHOP_MOVE              # seconds until it moves on its own
+var _pad: MeshInstance3D
+var _beam: MeshInstance3D
 var nav_region: NavigationRegion3D
 var ladder_links := 0
 var warp_links := 0
@@ -74,7 +84,7 @@ func add_fighter(f: Node) -> void:
 	f.went_down.connect(_on_down.bind(f))
 	f.died.connect(_on_died.bind(f))
 	f.got_up.connect(_on_up.bind(f))
-	f.hurt.connect(func(_a, _s, _h): cash_t[f] = 0.0)
+	f.hurt.connect(_on_hurt.bind(f))
 
 func fighting() -> bool:
 	return state == "fight"
@@ -86,8 +96,8 @@ func start(begin := true) -> void:
 	await get_tree().physics_frame
 	_find_spots()
 	await _bake_nav()
-	cash_point = level.shop_pos + Vector3(0, 0, 1.7)   # the shop faces the house (+z); you stand in front of it
 	_make_pad()
+	_open_shop(randi() % level.shop_spots.size())
 	for i in ON_MAP:
 		var s := Star.new()
 		add_child(s)
@@ -142,6 +152,9 @@ func _physics_process(dt: float) -> void:
 			clock += dt
 			_tick_stars(dt)
 			_tick_cash_in(dt)
+			shop_t -= dt
+			if shop_t <= 0.0 and not _cashing():   # (never mid cash-in)
+				move_shop("")
 
 func _tick_stars(dt: float) -> void:
 	# taking stars
@@ -202,6 +215,8 @@ func _take_star(f: Node, s: Node) -> void:
 	if s.dropped:
 		drops.erase(s)
 		s.queue_free()
+		if state == "fight" and Vector2(at.x - cash_point.x, at.z - cash_point.z).length() < SHOP_NEAR:
+			move_shop("stars taken near it")
 	else:
 		s.hide_star()
 		_star_from[s] = at
@@ -262,21 +277,80 @@ func lose_stars(f: Node, n: int) -> void:
 # ---------------------------------------------------------------- the shop
 
 func _make_pad() -> void:
-	var pad := MeshInstance3D.new()
+	_pad = MeshInstance3D.new()
 	var cm := CylinderMesh.new()
 	cm.top_radius = 1.2
 	cm.bottom_radius = 1.2
 	cm.height = 0.02
 	cm.radial_segments = 40
-	pad.mesh = cm
+	_pad.mesh = cm
 	_pad_mat = StandardMaterial3D.new()
 	_pad_mat.albedo_color = Color(1, 1, 1, 0.35)
 	_pad_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	_pad_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	pad.material_override = _pad_mat
-	pad.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(pad)
-	pad.global_position = cash_point + Vector3(0, 0.02, 0)
+	_pad.material_override = _pad_mat
+	_pad.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(_pad)
+	# a soft column of warm light over the open shop, so it can be found from across the lawn
+	_beam = MeshInstance3D.new()
+	var bm := CylinderMesh.new()
+	bm.top_radius = 0.9
+	bm.bottom_radius = 0.9
+	bm.height = 40.0
+	bm.radial_segments = 24
+	bm.cap_top = false
+	bm.cap_bottom = false
+	_beam.mesh = bm
+	var mat := ShaderMaterial.new()
+	var sh := Shader.new()
+	sh.code = """shader_type spatial;
+render_mode unshaded, blend_add, cull_disabled, depth_draw_never, shadows_disabled;
+void fragment() {
+	float fade = smoothstep(0.0, 0.1, UV.y) * (1.0 - UV.y);   // soft at the top, gone at the ground
+	float rim = pow(1.0 - abs(dot(NORMAL, VIEW)), 2.0);
+	ALBEDO = vec3(1.0, 0.86, 0.55);
+	ALPHA = 0.16 * fade * (0.35 + rim);
+}"""
+	mat.shader = sh
+	_beam.material_override = mat
+	_beam.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(_beam)
+
+## open shop i: the pad and beam go there, and so does everyone heading to cash in
+func _open_shop(i: int) -> void:
+	shop_i = i
+	shop_t = SHOP_MOVE
+	var sp: Dictionary = level.shop_spots[i]
+	cash_point = sp.pos + sp.face * 1.7   # you stand in front of it
+	_pad.global_position = cash_point + Vector3(0, 0.02, 0)
+	_beam.global_position = sp.pos + Vector3(0, 20.0, 0)
+	for f in cash_t:
+		cash_t[f] = 0.0
+	shop_moved.emit(i)
+
+## the open shop moves to one of the other three corners
+func move_shop(why: String) -> void:
+	var others: Array = []
+	for i in level.shop_spots.size():
+		if i != shop_i:
+			others.append(i)
+	_open_shop(others.pick_random())
+	var where: String = level.shop_spots[shop_i].name
+	feed_msg.emit("The shop has moved: %s%s" % [where, (" (%s)" % why) if why != "" else ""], false)
+	Sfx.play_ui(self, "gong", -10.0)
+
+func _cashing() -> bool:
+	for f in cash_t:
+		if float(cash_t[f]) > 0.0:
+			return true
+	return false
+
+## a hit resets your cash-in; a cash-in cut short by a hit moves the shop (Pete, 26 Nov)
+func _on_hurt(_amount: int, _src: Node, _head: bool, f: Node) -> void:
+	var was := float(cash_t.get(f, 0.0))
+	cash_t[f] = 0.0
+	if was > 0.0 and state == "fight":
+		move_shop("a cash-in was shot")
 
 func at_shop(f: Node) -> bool:
 	var d: Vector3 = f.global_position - cash_point

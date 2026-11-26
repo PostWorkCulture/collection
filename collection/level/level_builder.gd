@@ -424,41 +424,65 @@ func _add_ladder(l: Dictionary) -> void:
 		add_child(rung)
 		y += 0.35
 
-## the cash-in shop on the front lawn: a grey kiosk with a lit SHOP sign facing the front door (phase 3 makes it work)
+## the four cash-in shops (Pete, 26 Nov): one in each corner of the front and back lawns, backed up against the
+## boundary hedge and facing the house. Only one is open at a time (CollectionGame moves it). The web Mansion's
+## kiosk (in the dressing, on the front lawn) is lifted out and copied to each corner; its own collider goes.
+const SHOP_SPOTS := [Vector3(-56, 0, -44.1), Vector3(56, 0, -44.1), Vector3(-56, 0, 44.1), Vector3(56, 0, 44.1)]
+const SHOP_NAMES := ["front left", "front right", "back left", "back right"]   # left = -x, seen from the front lawn
+const SHOP_SIZE := Vector3(2.34, 4.35, 1.34)
+var shop_spots: Array = []       # {pos, face (the way it faces: where you stand), name, look}
+
 func _add_shop() -> void:
-	var body := StaticBody3D.new()
-	if dressed:   # the dressing has the kiosk; keep it solid
-		body.position = shop_pos + Vector3(0, 1.4, 0)
-		var c2 := CollisionShape3D.new()
-		var s2 := BoxShape3D.new()
-		s2.size = Vector3(2.2, 2.8, 1.2)
-		c2.shape = s2
-		body.add_child(c2)
+	var old := shop_pos
+	for i in bodies:   # the old kiosk's collider
+		var a: Array = layout.boxes[i].b
+		var c := Vector3(a[0] + a[3], 0, a[2] + a[5]) * 0.5
+		if absf(c.x - old.x) < 1.0 and absf(c.z - old.z) < 1.0 and float(a[4]) > 3.0:
+			(bodies[i] as Node).queue_free()
+			bodies.erase(i)
+			break
+	var look := Node3D.new()
+	look.name = "ShopLook"
+	add_child(look)
+	look.global_position = old
+	var lifted := 0
+	if dressed:
+		for n in dressing.find_children("*", "MeshInstance3D", true, false):
+			var mi := n as MeshInstance3D
+			var ab: AABB = mi.global_transform * mi.get_aabb()
+			var c := ab.get_center()
+			if absf(c.x - old.x) < 1.6 and absf(c.z - old.z) < 1.2 and c.y < 5.0 and ab.size.x < 3.0 and ab.size.z < 3.0:
+				mi.reparent(look, true)
+				lifted += 1
+	if lifted == 0:   # grey box: a kiosk with a SHOP sign
+		var mi := MeshInstance3D.new()
+		var bm := BoxMesh.new()
+		bm.size = SHOP_SIZE
+		mi.mesh = bm
+		mi.material_override = _mat("#9a9a9a", false)
+		mi.position.y = SHOP_SIZE.y * 0.5
+		look.add_child(mi)
+		var sign_lbl := Label3D.new()
+		sign_lbl.text = "SHOP"
+		sign_lbl.font_size = 96
+		sign_lbl.pixel_size = 0.006
+		sign_lbl.position = Vector3(0, 3.6, SHOP_SIZE.z * 0.5 + 0.02)
+		look.add_child(sign_lbl)
+	for i in SHOP_SPOTS.size():
+		var pos: Vector3 = SHOP_SPOTS[i]
+		var face := Vector3(0, 0, 1) if pos.z < 0.0 else Vector3(0, 0, -1)   # towards the house
+		var copy: Node3D = look if i == 0 else look.duplicate() as Node3D
+		if i > 0:
+			add_child(copy)
+		copy.name = "Shop%d" % i
+		copy.global_position = pos
+		copy.rotation.y = 0.0 if face.z > 0.0 else PI
+		var body := StaticBody3D.new()
+		var cs := CollisionShape3D.new()
+		var sh := BoxShape3D.new()
+		sh.size = SHOP_SIZE
+		cs.shape = sh
+		body.add_child(cs)
 		add_child(body)
-		return
-	body.position = shop_pos + Vector3(0, 1.4, 0)
-	var cs := CollisionShape3D.new()
-	var sh := BoxShape3D.new()
-	sh.size = Vector3(2.2, 2.8, 1.2)
-	cs.shape = sh
-	body.add_child(cs)
-	var mi := MeshInstance3D.new()
-	var bm := BoxMesh.new()
-	bm.size = sh.size
-	mi.mesh = bm
-	mi.material_override = _mat("#9a9a9a", false)
-	body.add_child(mi)
-	var sign_lbl := Label3D.new()
-	sign_lbl.text = "SHOP"
-	sign_lbl.font_size = 96
-	sign_lbl.pixel_size = 0.006
-	sign_lbl.modulate = Color(1, 1, 1)
-	sign_lbl.outline_size = 0
-	sign_lbl.position = Vector3(0, 1.0, 0.62)
-	body.add_child(sign_lbl)
-	var lamp := OmniLight3D.new()
-	lamp.position = Vector3(0, 1.0, 1.2)
-	lamp.light_energy = 1.2
-	lamp.omni_range = 5
-	body.add_child(lamp)
-	add_child(body)
+		body.global_position = pos + Vector3(0, SHOP_SIZE.y * 0.5, 0)
+		shop_spots.append({"pos": pos, "face": face, "name": SHOP_NAMES[i], "look": copy})
