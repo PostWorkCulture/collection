@@ -85,6 +85,7 @@ func _ready() -> void:
 	player.name = "Player"
 	player.character = PLAYER_CHARACTER
 	player.ladders = level.ladders
+	player.ladder_normals = level.ladder_normals
 	player.lifts = level.lifts
 	player.game = game
 	add_child(player)
@@ -208,6 +209,7 @@ func _new_fighter(nm: String, col := Color(0.91, 0.27, 0.23)) -> CharacterBody3D
 	f.display_name = nm
 	f.band_color = col
 	f.ladders = level.ladders
+	f.ladder_normals = level.ladder_normals
 	f.lifts = level.lifts
 	f.game = game
 	add_child(f)
@@ -564,6 +566,39 @@ func _movement_checks(cfg: Dictionary) -> void:
 			py = player.global_position.y
 		Input.action_release("move_forward")
 		_log("AUTOTEST walk %s: ended at %v, biggest step in one frame %.2f m" % [s.name, player.global_position, pop])
+	await _ladder_checks()
+
+## ladders (Pete, 26 Nov): locked on and straight while climbing (strafing doesn't move you off the middle), a jump
+## pushes you off, and climbing on at the top steps you over onto the floor
+func _ladder_checks() -> void:
+	player.place(Vector3(-24, 0.05, -29.3), 0.0)   # the front ladder, from the lawn
+	await _wait(0.4)
+	Input.action_press("move_forward")
+	await _wait(1.2)
+	Input.action_press("move_right")
+	var drift := 0.0
+	for i in 40:
+		await get_tree().physics_frame
+		drift = maxf(drift, absf(player.global_position.x + 24.0))
+	Input.action_release("move_right")
+	var y: float = player.global_position.y
+	var out: float = -27.32 - player.global_position.z   # out from the rungs (the middle of the zone)
+	_log("AUTOTEST ladder lock: at y %.1f, climbing=%s, off the middle at most %.2f m while strafing, %.2f m out from the rungs, body turn %.0f deg" % [y, player.on_ladder, drift, out, rad_to_deg(wrapf(player.model.body_yaw, -PI, PI)) if player.model else 0.0])
+	Input.action_press("jump")
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	Input.action_release("jump")
+	await _wait(0.5)
+	_log("AUTOTEST ladder jump off: now %.1f m out from the wall, on ladder=%s" % [-27.0 - player.global_position.z, player.on_ladder])
+	Input.action_release("move_forward")
+	await _wait(2.0)
+	player.place(Vector3(-24, 0.05, -29.3), 0.0)
+	await _wait(0.4)
+	Input.action_press("move_forward")
+	await _wait(5.5)
+	Input.action_release("move_forward")
+	await _wait(0.5)
+	_log("AUTOTEST ladder to the top: ended at %v (top 11.35), on floor=%s" % [player.global_position, player.is_on_floor()])
 
 # ---------------- phase 6 Mansion feature checks ----------------
 func _hold(action: String, secs: float) -> void:
@@ -728,7 +763,7 @@ func _character_preview(cfg: Dictionary) -> void:
 	add_child(pc)
 	var start := Vector3(-34, 0.05, -33)   # the front lawn between the hedges and the house: every action moves east along it
 	var acts: Array = cfg.get("character_actions", ["idle", "run", "strafe_right", "strafe_left", "run_back", "diagonal",
-			"walk", "crouch_walk", "jump", "punch", "bat", "smg_run", "smg_aim", "duals", "hit", "downed", "death", "victory"])
+			"walk", "crouch_walk", "jump", "punch", "bat", "smg_run", "smg_aim", "duals", "hit", "downed", "death", "victory", "ladder"])
 	for act in acts:
 		p.respawn_at(start, PI * 0.5)
 		p.shield_t = 0.0
@@ -767,12 +802,16 @@ func _character_preview(cfg: Dictionary) -> void:
 			"duals":
 				p.give_gun("duals")
 				mv = Vector2(0, 0.5)
+			"ladder":   # the front ladder by the porch (on the lawn side of the front wall): face it and climb
+				p.respawn_at(Vector3(-24, 0.05, -28.6), 0.0)
+				await _wait(0.3)
+				mv = Vector2(0, 1)
 			"downed":
 				p.invulnerable = false
 				p._go_down(null)
 				p.invulnerable = true
 				mv = Vector2(0, 1)
-		if mv.length() > 0.01:   # face so that the movement goes east, whichever way it is relative to the body
+		if mv.length() > 0.01 and act != "ladder":   # face so that the movement goes east, whichever way it is relative to the body
 			p.yaw = PI * 0.5 + atan2(mv.x, mv.y)
 		p.in_move = mv
 		if act in ["strafe_left", "strafe_right", "run_back"]:   # squared up to fight (just swung): the strafe set
@@ -794,7 +833,11 @@ func _character_preview(cfg: Dictionary) -> void:
 				p.in_jump = false
 			for view in (["side", "front", "tp"] if i % 3 == 0 else ["side"]):
 				var c: Vector3 = p.global_position + Vector3.UP * 1.1
-				if view == "side":   # from the house side, square on to the run east (the hedge behind her)
+				if act == "ladder" and view != "tp":   # side on from the east, and from behind over the lawn
+					pc.global_position = c + (Vector3(4.4, 0.2, -0.9) if view == "side" else Vector3(2.2, 0.6, -3.8))
+					pc.look_at(c, Vector3.UP)
+					pc.current = true
+				elif view == "side":   # from the house side, square on to the run east (the hedge behind her)
 					pc.global_position = c + Vector3(0, 0.3, 4.6)
 					pc.look_at(c, Vector3.UP)
 					pc.current = true

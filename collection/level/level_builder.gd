@@ -10,6 +10,7 @@ extends Node3D
 
 var layout: Dictionary = {}
 var ladders: Array[AABB] = []
+var ladder_normals: Array[Vector3] = []   # per ladder: out from the wall, towards whoever climbs it
 var lifts: Array = []            # the 2 lifts and the fireman's pole: {box, nx, nz, rung}; ridden, not climbed
 var dressed := false             # mansion.glb loaded
 var dressing: Node3D = null
@@ -396,6 +397,7 @@ func _add_ladder(l: Dictionary) -> void:
 		lifts.append({"box": box, "nx": float(l.nx), "nz": float(l.nz), "rung": float(l.rung)})
 		return
 	ladders.append(box)
+	ladder_normals.append(-Vector3(float(l.get("nx", 0)), 0, float(l.get("nz", 0))))   # out from the wall (the layout's nx/nz point up and over, into it)
 	if dressed:   # the dressing has the white ladders
 		return
 	var m := StandardMaterial3D.new()

@@ -14,7 +14,7 @@ python3 "$HERE/retarget.py" "$OUT/${ID}_rig.blend" "$OUT/$ID.glb" \
   "$M/crouch_idle.fbx=crouch_idle:loop" "$M/crouch_fwd.fbx=crouch_fwd:inplace,loop" "$M/crouch_back.fbx=crouch_back:inplace,loop" \
   "$M/crouch_left.fbx=crouch_left:inplace,loop" "$M/crouch_right.fbx=crouch_right:inplace,loop" \
   "$M/jump.fbx=jump:inplace,novert" "$M/fall.fbx=fall:inplace,novert,loop" "$M/land.fbx=land:inplace" \
-  "$M/ladder_climb.fbx=ladder_climb:inplace,novert,loop" \
+  "$M/ladder_climb.fbx=ladder_climb:inplace,novert,loop,turn" \
   "$M/punch_jab.fbx=punch_jab:inplace" "$M/punch_cross.fbx=punch_cross:inplace" "$M/bat_swing.fbx=bat_swing:inplace" \
   "$M/smg_idle.fbx=smg_idle:loop" "$M/pistol_idle.fbx=pistol_idle:loop" "$M/hit.fbx=hit:inplace" \
   "$M/go_down.fbx=go_down:inplace" "$M/downed_crawl.fbx=downed_crawl:inplace,loop" "$M/get_up.fbx=get_up:inplace" \

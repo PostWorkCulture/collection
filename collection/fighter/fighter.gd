@@ -32,7 +32,10 @@ const ACC_AIR := 22.0           # was 28
 const GRAV := 36.0
 const JUMP := 12.0
 const STEP := 0.55
-const LADDER_SPEED := 6.0
+const LADDER_SPEED := 3.0   # (Pete, 26 Nov: was the web's 6, too fast for a climb to look right)
+const LADDER_HOLD := 0.34    # on the rungs the body is held this far out from them, in the middle of the ladder (Pete,
+                             # 26 Nov: locked on and straight while climbing; only a jump takes you off)
+const LADDER_OFF := Vector2(4.5, 0.55)   # jumping off a ladder: out from the wall at 4.5 m/s, up at 0.55 of a jump
 const STAM_MAX := 100.0
 const DJ_COST := 15.0
 const STAM_REGEN := 40.0
@@ -86,7 +89,13 @@ var stamina := STAM_MAX
 var stam_rest := 0.0
 var air_jumps := 1
 var ladders: Array[AABB] = []
+var ladder_normals: Array[Vector3] = []
+var ladder_n := Vector3.ZERO      # the ladder being climbed: out from its wall
+var ladder_rungs := 0.0            # and the rungs' distance along ladder_n (the middle of the zone)
 var on_ladder := false
+var ladder_c := Vector3.ZERO      # the middle of the ladder being climbed
+var ladder_top := 0.0             # and the height of its top
+var ladder_off_t := 0.0           # just jumped off a ladder: don't grab it again for a moment
 var lifts: Array = []            # lifts and the fireman's pole (level.lifts): ride at 14 m/s, can't steer
 var ride := -1                   # the lift being ridden, or -1
 var ride_dir := 1
@@ -734,6 +743,7 @@ func _set_crouch(on: bool) -> void:
 # ---------------------------------------------------------------- every physics tick
 
 func _physics_process(dt: float) -> void:
+	ladder_off_t -= dt
 	if is_player and not autopilot:
 		_read_player_input(dt)
 	if game and not game.fighting():   # countdown and after the win: nobody moves or attacks
@@ -775,16 +785,22 @@ func _physics_process(dt: float) -> void:
 	var grounded := is_on_floor()
 	if grounded:
 		air_jumps = 1
+		ladder_off_t = minf(ladder_off_t, 0.0)
 	clock += dt
 	if _ride_step(dt, wish, jump):
 		_update_view(dt)
 		return
 	on_ladder = false
-	if not downed:   # ladders: inside a ladder zone and pushing forward = climb
+	if not downed and ladder_off_t <= 0.0:   # ladders: inside a ladder zone and pushing forward = climb
 		var feet := global_position
-		for l in ladders:
+		for li in ladders.size():
+			var l: AABB = ladders[li]
 			if l.grow(0.55).has_point(feet + Vector3.UP * 0.6) or l.grow(0.55).has_point(feet + Vector3.UP * 1.6):
 				on_ladder = true
+				ladder_n = ladder_normals[li] if li < ladder_normals.size() else Vector3.ZERO
+				ladder_rungs = l.get_center().dot(ladder_n)   # the rungs run through the middle of the zone
+				ladder_c = l.get_center()
+				ladder_top = l.end.y
 				break
 	var speed := RUN * (FISTS_MUL if melee else float(Weapons.stat(id).get("weight", 1.0)))
 	if ads:
@@ -799,6 +815,23 @@ func _physics_process(dt: float) -> void:
 	var acc := ACC_GROUND if grounded else ACC_AIR
 	var hv := Vector3(velocity.x, 0, velocity.z)
 	hv = hv.move_toward(target, acc * dt)
+	# on the rungs (off the floor) you're locked on: held in the middle of the ladder, just out from the rungs, and
+	# facing it; up and down only. Near the top, climbing on steps you over onto the floor; a jump pushes you off.
+	var latched := on_ladder and not grounded and ladder_n != Vector3.ZERO
+	if latched and jump_press:
+		hv = ladder_n * LADDER_OFF.x
+		velocity.y = JUMP * LADDER_OFF.y
+		on_ladder = false
+		latched = false
+		ladder_off_t = 1.0   # no grabbing it again until you land (or a second has gone)
+		jump_press = false   # the push-off is this press, not a double jump too
+	elif latched and mv.y > 0.1 and global_position.y > ladder_top - 0.6:
+		hv = -ladder_n * 3.0
+	elif latched:
+		var side := Vector3(ladder_n.z, 0, -ladder_n.x)
+		var to := ladder_c - global_position
+		var out := ladder_rungs + LADDER_HOLD - global_position.dot(ladder_n)
+		hv = side * clampf(to.dot(side) * 12.0, -4.0, 4.0) + ladder_n * clampf(out * 12.0, -4.0, 4.0)
 	velocity.x = hv.x
 	velocity.z = hv.z
 	if on_ladder and mv.y > 0.1:
@@ -1031,6 +1064,20 @@ func _hold_in_hand() -> void:
 	var lw: Vector3 = model.hand_transform(false).origin   # are turned differently, so they don't)
 	var aim := aim_forward()
 	var raised: bool = ads or kick_t > 0.0 or model._fire_t > 0.0
+	if model._climbing:   # both hands on the rungs: the bat or gun is slung across her back
+		var side := Vector3(ladder_n.z, 0, -ladder_n.x)
+		var mid: Vector3 = model.bone_world("Spine2") + ladder_n * 0.15
+		var sd := (Vector3.UP + side * (0.55 if w == "bat" else -0.8)).normalized()
+		var sb := _aim_basis(sd, ladder_n)
+		if w == "bat":
+			_held.global_transform = Transform3D(sb * Basis(Vector3.RIGHT, -BAT_TILT), mid - sd * 0.35)
+		else:
+			_held.global_transform = Transform3D(sb.scaled(Vector3.ONE * GUN_SCALE), mid - sd * 0.2)
+			for side_name in ["R", "L"]:   # the duals: one over the other
+				var pn := _held_model.get_node_or_null("Pistol" + side_name) as Node3D
+				if pn:
+					pn.global_transform = Transform3D(sb.scaled(Vector3.ONE * GUN_SCALE), mid + sd * (0.12 if side_name == "R" else -0.12))
+		return
 	if w == "bat":
 		var g: Array = model.grip_axes()
 		var dir: Vector3 = g[0]

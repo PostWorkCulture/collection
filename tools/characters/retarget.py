@@ -4,7 +4,8 @@ python3 retarget.py <rig.blend> <out.glb> <clip.fbx>=<name>[:flag,flag] ...
 flags: inplace (remove travel across the floor, keep sway), novert (hips keep their rest height: for clips in the air,
 where the game moves the body), loop, grip (two-handed holds: the left hand is put back where the source has it
 relative to the right hand, by two-bone IK on the left arm, so a gun or bat held in both hands stays in both hands
-on our shorter arms and wider shoulders; it fades out when the source lets go). A <out>.json next to the GLB records each clip's frames, loop and the speed it
+on our shorter arms and wider shoulders; it fades out when the source lets go), turn (the source faces backwards:
+turn it round 180 degrees). A <out>.json next to the GLB records each clip's frames, loop and the speed it
 travelled in the source (model units per second), so the game can match the feet to its own speed.
 World-space rotation transfer: for each mapped bone, the rotation the source bone has made away from its T-pose rest
 is applied to our bone's T-pose rest. The hips' height is scaled by the ratio of hip heights. With ':inplace' the hips'
@@ -117,6 +118,12 @@ for spec in clips:
             grips.append((dR.inverted() @ (Ls - Rs) * scale, gap))
         hips_pos.append(Vector(((hp.x - s_hips_rest.x) * scale, (hp.y - s_hips_rest.y) * scale, (hp.z - s_hips_rest.z) * scale)))
         poses.append(world)
+    if 'turn' in flags:   # the source faces backwards (Mixamo's ladder climb): turn the whole clip round to face the way the rest do
+        R = Quaternion((0.0, 0.0, 1.0), math.pi)
+        for k, world in enumerate(poses):
+            for n in world:
+                world[n] = R @ world[n]
+            hips_pos[k] = R @ hips_pos[k]
     travel = (Vector((hips_pos[-1].x, hips_pos[-1].y, 0)) - Vector((hips_pos[0].x, hips_pos[0].y, 0))).length
     secs = max(1, len(hips_pos) - 1) / 30.0
     meta[name] = {'frames': len(hips_pos), 'loop': 'loop' in flags, 'speed': round(travel / secs, 4)}
@@ -124,7 +131,7 @@ for spec in clips:
         for p in hips_pos:
             p.z = 0.0
     if 'inplace' in flags and len(hips_pos) > 1:
-        a, b = hips_pos[0], hips_pos[-1]
+        a, b = hips_pos[0].copy(), hips_pos[-1].copy()   # copies: the loop below changes hips_pos[0] itself
         for i, p in enumerate(hips_pos):
             t = i / (len(hips_pos) - 1)
             p.x -= a.x + (b.x - a.x) * t

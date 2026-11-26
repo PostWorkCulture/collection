@@ -37,6 +37,8 @@ const LOOPS := ["idle", "walk", "run", "sprint", "run_back", "strafe_left", "str
 		"dance_running_man", "dance_arm_wave", "dance_shimmy", "dance_tut", "dance_step", "dance_twist", "dance_salsa",
 		"dance_side_to_side", "cel_victory_idle_vegas", "cel_victory_idle_aj", "pose_hand_hip", "pose_happy_idle", "pose_bored"]
 const PALM := 0.07
+const LADDER_RISE := 0.66         # metres a second the ladder climb clip goes up at its own speed
+const LADDER_GAP := 0.34          # how far her body hangs out from the rungs on a ladder (hands and feet on them)
 ## celebrations (once), dances and poses (looping); Mixamo clips, see tools/characters/build_character.sh
 const CELEBRATIONS := ["cel_victory", "cel_cheer", "cel_flex", "cel_arms_back"]
 const DANCES := ["dance_kick_step", "dance_raise_roof", "dance_running_man", "dance_arm_wave", "dance_shimmy", "dance_tut",
@@ -62,6 +64,7 @@ var hand_up := Vector3.UP
 var _fist := [Vector3.FORWARD, Vector3.FORWARD]   # per hand: the way a gripped bat leaves the fist (forward in the T-pose)
 var _along := [Vector3.UP, Vector3.UP]   # per hand (right, left), in its bone space: wrist to fingers in the T-pose
 var body_yaw := 0.0
+var _climbing := false   # on a ladder's rungs: square to it, chest and head straight
 
 var _state := ""
 var _kind := ""
@@ -429,9 +432,19 @@ func tick(dt: float, f) -> void:
 		var side_k := clampf((deg_to_rad(80.0) - absf(rel)) / deg_to_rad(35.0), 0.0, 1.0)
 		if absf(rel) < PI * 0.62:
 			target = yaw + clampf(rel, -FIGHT_TURN, FIGHT_TURN) * side_k
-	body_yaw = lerp_angle(body_yaw, target, minf(1.0, dt * (14.0 if fighting else 9.0)))
+	var climbing: bool = alive and f.on_ladder and not ground and f.ladder_n != Vector3.ZERO
+	_climbing = climbing
+	if climbing:   # on a ladder she faces the wall, whatever the camera does
+		target = atan2(-f.ladder_n.x, -f.ladder_n.z)
+	body_yaw = lerp_angle(body_yaw, target, minf(1.0, dt * (14.0 if fighting or climbing else 9.0)))
 	if f.downed:
 		body_yaw = yaw
+	# and hangs just off the rungs: the body is drawn in (or out) to the ladder, wherever the capsule is in the zone
+	var hang := Vector3.ZERO
+	if climbing:
+		var d: float = (f.global_position as Vector3).dot(f.ladder_n) - float(f.ladder_rungs)
+		hang = f.ladder_n * clampf(LADDER_GAP - d, -0.7, 0.7)
+	position = position.lerp(hang, minf(1.0, dt * 10.0))
 	# a fighter stands bladed (lead shoulder to the target): the boxing clips turn the hips about 40 degrees to the
 	# right, so standing in the fight stance the whole body is turned back partway to the left
 	# the strafe clips run with the body turned about 65 degrees towards where she's going; turned back by that much,
@@ -473,7 +486,8 @@ func tick(dt: float, f) -> void:
 		tree.set("parameters/crawl_ts/scale", clampf(speed / maxf(0.1, _speed("crawl2")), 0.0, 3.0) if speed > 0.2 else 0.0)
 	elif f.on_ladder and not ground:
 		_go("ladder")
-		tree.set("parameters/ladder_ts/scale", clampf(absf(v.y) / 3.0, 0.0, 2.2))
+		# the climb covers 0.66 m a second: play it at the speed she's going up or down (paused when she hangs still)
+		tree.set("parameters/ladder_ts/scale", clampf(absf(v.y) / LADDER_RISE, 0.0, 5.0))
 	elif ground or _air_t < 0.12:
 		if _state in ["fall", "jump"] and ground:
 			if _fall_t > 0.3 or _air_t > 0.25:
@@ -579,9 +593,11 @@ func tick(dt: float, f) -> void:
 	tree.set("parameters/hit/blend_amount", amt if alive else 0.0)
 	# spine and head: free running looks back towards the aim; fighting keeps the chest on the aim
 	var to_aim := wrapf(yaw - body_yaw, -PI, PI)
-	twist.yaw = clampf(to_aim, -FREE_TWIST, FREE_TWIST) if alive else 0.0
+	twist.yaw = clampf(to_aim, -FREE_TWIST, FREE_TWIST) if alive and not _climbing else 0.0
 	twist.pitch = clampf(f.pitch, -0.9, 0.9) * (0.7 if alive and fighting else 0.25 if alive else 0.0) + 0.35 * amt \
 			- (0.22 if alive and f.crouching and not fighting else 0.0)   # + the flinch rocks the chest back; sneaking leans in
+	if _climbing:
+		twist.pitch = 0.0
 	twist.steady = (1.0 if fighting else 0.9) if alive else (0.8 if f.downed and f.alive else 0.0)
 	twist.head_up = 0.8 if f.downed and f.alive else (0.5 if alive and f.crouching else (0.25 if alive and fighting and not gun else 0.0))   # eyes on the target over the guard   # crawling, crouching: look ahead
 	twist.head_max = 1.4 if f.downed else (0.8 if f.crouching or fighting else 0.6)
