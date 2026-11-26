@@ -138,6 +138,8 @@ var has_stun := false
 var boost_t := 0.0                # speed boost left (seconds)
 var daze_t := 0.0                 # stunned: a quarter speed, can't attack
 var flash_a := 0.0                # the white flash of a stun grenade on your own screen (the player)
+var zip_ride := false             # on a zipline (ziplines/ziplines.gd moves you)
+var zip_handle := Vector3.INF     # where the handle is, for the hands
 var _fire_ads_t := 0.0            # firing aims for you (Pete, 26 Nov): you stay aimed this long after letting go
 var slot := "melee"              # "melee" (fists or bat) or "gun"
 var fire_t := 0.0
@@ -837,6 +839,10 @@ func _physics_process(dt: float) -> void:
 	if _ride_step(dt, wish, jump):
 		_update_view(dt)
 		return
+	if zip_ride:   # hanging from a zipline handle: the zipline moves you
+		velocity = Vector3.ZERO
+		_update_view(dt)
+		return
 	on_ladder = false
 	if not downed and ladder_off_t <= 0.0:   # ladders: inside a ladder zone and pushing forward = climb
 		var feet := global_position
@@ -1116,7 +1122,12 @@ func _hold_in_hand() -> void:
 	var lw: Vector3 = model.hand_transform(false).origin   # are turned differently, so they don't)
 	var aim := aim_forward()
 	var raised: bool = ads or kick_t > 0.0 or model._fire_t > 0.0
-	_held.visible = not model._climbing   # both hands on the rungs: the bat or gun is put away (Pete, 26 Nov)
+	_held.visible = not model._climbing and not zip_ride   # both hands on the rungs or the handle: put away (Pete, 26 Nov)
+	if zip_ride and zip_handle != Vector3.INF:   # both hands up on the zipline's bar
+		var sd := right()
+		model.hik.targets = [zip_handle + Vector3.DOWN * 0.32 + sd * 0.16, zip_handle + Vector3.DOWN * 0.32 - sd * 0.16]
+		model.hik.weights = [1.0, 1.0]
+		return
 	if model._climbing:
 		return
 	if w == "bat":

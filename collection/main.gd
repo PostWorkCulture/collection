@@ -11,6 +11,7 @@ const SKY_SHADER := preload("res://level/sky.gdshader")
 const Fighter := preload("res://fighter/fighter.gd")
 const LevelBuilder := preload("res://level/level_builder.gd")
 const MansionFeatures := preload("res://level/mansion_features.gd")
+const Ziplines := preload("res://ziplines/ziplines.gd")
 const MansionLights := preload("res://level/mansion_lights.gd")
 const CollectionGame := preload("res://game/collection_game.gd")
 const DummyBrain := preload("res://fighter/dummy_brain.gd")
@@ -40,6 +41,7 @@ const DUMMIES := [
 
 var level: Node3D
 var features: Node3D
+var ziplines: Node3D
 var lights: Node3D
 var game: Node3D
 var player: CharacterBody3D
@@ -81,6 +83,10 @@ func _ready() -> void:
 	features.name = "MansionFeatures"
 	add_child(features)
 	features.setup(game, level)
+	ziplines = Ziplines.new()
+	ziplines.name = "Ziplines"
+	add_child(ziplines)
+	ziplines.setup(game, level)
 	player = Fighter.new()
 	player.name = "Player"
 	player.character = PLAYER_CHARACTER
@@ -730,6 +736,25 @@ func _mansion_checks() -> void:
 	player.place(Vector3(30.0, 5.85, -4.0), -PI * 0.5)
 	await _wait(0.8)
 	await _snap("p6_12_hall_of_fame_third.png")
+	# the ziplines (Pete, 26 Nov): jump on the pad at the top of the stairs, up through the skylight onto the roof
+	var zl: Dictionary = ziplines.lines[0]
+	player.place(zl.pad + Vector3(0, 0.05, 0), PI)
+	await _wait(0.4)
+	var had_pane: bool = zl.pane != null
+	Input.action_press("jump")
+	await _wait(0.15)
+	Input.action_release("jump")
+	var rode: bool = player.zip_ride
+	await _wait(0.7)
+	await _snap("p6_13_zipline_third.png")
+	var t1 := Time.get_ticks_msec()
+	while player.zip_ride and Time.get_ticks_msec() - t1 < 4000:
+		await get_tree().physics_frame
+	await _wait(0.8)
+	var pane_gone: bool = zl.pane == null
+	_log("AUTOTEST zipline: pane there=%s, grabbed=%s, ended at %v on floor=%s (roof 11.35), pane broken=%s" % [had_pane, rode, player.global_position, player.is_on_floor(), pane_gone])
+	await _wait(5.0)
+	_log("AUTOTEST zipline glass: back after 5 s=%s" % [ziplines._pane_near(zl.pane_at) != null])
 	_log("AUTOTEST stairs kept clear: garage foot %s, kitchen foot %s, kitchen top %s" % [_clear_at(Vector3(38.2, 0.5, 9.9)), _clear_at(Vector3(-38.2, 0.5, -9.6)), _clear_at(Vector3(-39.2, 6.6, -18.5))])
 	# smashable props: shoot one apart, then it grows back once its 40 s are up
 	var kinds := {}

@@ -724,6 +724,10 @@ func break_glass(body: StaticBody3D, pos: Vector3) -> void:
 		var look: Variant = level.box_nodes.get(int(body.get_meta("index")))
 		if look:
 			(look as Node3D).visible = false
+	if level and body.has_meta("rebuild") and body.has_meta("index"):   # (the zipline skylights: back after 5 s)
+		var idx: int = body.get_meta("index")
+		get_tree().create_timer(float(body.get_meta("rebuild"))).timeout.connect(func() -> void:
+			level._add_box(level.layout.boxes[idx], idx))
 	body.queue_free()
 
 const SHARD_POOL := 360
