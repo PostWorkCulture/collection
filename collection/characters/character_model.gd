@@ -64,6 +64,11 @@ var hand_up := Vector3.UP
 var _fist := [Vector3.FORWARD, Vector3.FORWARD]   # per hand: the way a gripped bat leaves the fist (forward in the T-pose)
 var _along := [Vector3.UP, Vector3.UP]   # per hand (right, left), in its bone space: wrist to fingers in the T-pose
 var body_yaw := 0.0
+var _lift := 0.0         # lifted this much so that lying down, no part of her is under the floor
+# each part as a ball round a bone, in the model's own units (measured from her mesh): [bone, towards bone, along, radius]
+const LIE_BALLS := [["Head", "Neck", -0.42, 0.45], ["Spine2", "", 0.0, 0.28], ["Spine1", "", 0.0, 0.3], ["Hips", "", 0.0, 0.26],
+	["LeftHand", "", 0.0, 0.17], ["RightHand", "", 0.0, 0.17], ["LeftForeArm", "", 0.0, 0.2], ["RightForeArm", "", 0.0, 0.2],
+	["LeftLeg", "", 0.0, 0.22], ["RightLeg", "", 0.0, 0.22], ["LeftFoot", "", 0.0, 0.12], ["RightFoot", "", 0.0, 0.12]]
 var _climbing := false   # on a ladder's rungs: square to it, chest and head straight
 
 var _state := ""
@@ -444,6 +449,10 @@ func tick(dt: float, f) -> void:
 	if climbing:
 		var d: float = (f.global_position as Vector3).dot(f.ladder_n) - float(f.ladder_rungs)
 		hang = f.ladder_n * clampf(LADDER_GAP - d, -0.7, 0.7)
+	# lying down (dead or downed) she never sinks into the floor: the clips were made on a slimmer body, and her big
+	# head and chunky clothes would go through it, so the whole model is lifted until every part clears the floor
+	_lift = move_toward(_lift, _floor_clear(f) if (not alive or f.downed) else 0.0, dt * (3.0 if not alive or f.downed else 6.0))
+	hang.y += _lift
 	position = position.lerp(hang, minf(1.0, dt * 10.0))
 	# a fighter stands bladed (lead shoulder to the target): the boxing clips turn the hips about 40 degrees to the
 	# right, so standing in the fight stance the whole body is turned back partway to the left
@@ -664,6 +673,19 @@ func restart() -> void:
 	body_yaw = float(p.yaw) if p else 0.0
 
 ## a bone's position in the world
+## how far she has to be lifted for every part (LIE_BALLS) to clear the floor she's lying on
+func _floor_clear(f: Node) -> float:
+	var k: float = skel.global_transform.basis.get_scale().y
+	var floor_y: float = (f.global_position as Vector3).y
+	var need := 0.0
+	for ball in LIE_BALLS:
+		var at := bone_world(ball[0])
+		if String(ball[1]) != "":   # the head: its middle is out past the bone, away from the neck
+			var from := bone_world(ball[1])
+			at += (from - at).normalized() * float(ball[2]) * k
+		need = maxf(need, float(ball[3]) * k - (at.y - _lift - floor_y))
+	return clampf(need, 0.0, 0.6)
+
 func bone_world(bname: String) -> Vector3:
 	var b := skel.find_bone(bname)
 	if b < 0:

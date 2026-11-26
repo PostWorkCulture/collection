@@ -901,6 +901,7 @@ func _combat_checks() -> void:
 	player.place(dum.global_position + Vector3(0, 0, -2.2), 0.0)
 	await _wait(0.5)
 	hits[0] = 0
+	dum.shield_t = 0.0   # (just spawned: its spawn shield would soak the first hits)
 	await _attack_until(dum, func(): return dum.downed, 3.0, 1, "p2_01_punch_third.png")
 	_log("AUTOTEST bat: down after %d hits (downed=%s dhp=%d)" % [hits[0], dum.downed, dum.dhp])
 	await _wait(0.8)
@@ -1140,6 +1141,7 @@ func _star_checks() -> void:
 	await _wait(0.8)
 	was = game.shop_i
 	var part: float = game.cash_progress(player)
+	player.shield_t = 0.0   # (just respawned: the spawn shield would stop the hit)
 	player.take_damage(5, dummies[1])
 	await _wait(0.1)
 	_log("AUTOTEST shop cash-in shot at %.0f%%: moved=%s (now %s), hp %d" % [part * 100.0, game.shop_i != was, spots[game.shop_i].name, player.hp])

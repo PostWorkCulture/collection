@@ -52,7 +52,7 @@ const REGEN_DELAY := 3.0
 const REGEN_RATE := 10.0
 const CRAWL := 3.0
 const RESPAWN := 3.0
-const SHIELD := 2.0
+const SHIELD := 4.0   # spawn shield (Pete, 26 Nov: doubled from 2 s)
 const SWAP := 0.3
 const HEAD_TOP := 0.55          # the top 0.55 m of a standing body counts as the head
 
@@ -1014,6 +1014,7 @@ func _update_view(dt: float) -> void:
 			var active := (i == 0) == punch_left
 			_gloves[i].position = Vector3(0.17 * side, -0.19 + (0.06 * jab if active else 0.0), -0.48 - (0.3 * jab if active else 0.0))
 		if _view_model:
+			_view_model.visible = not (on_ladder and not is_on_floor())   # put away on a ladder
 			# aimed: the sights sit just under the centre of the screen so you look over the front post, not
 			# through the gun; the whole hand is pushed out as the view zooms so the gun keeps its size on screen
 			var hip := Vector3(0.2, -0.2, -0.5)
@@ -1068,19 +1069,8 @@ func _hold_in_hand() -> void:
 	var lw: Vector3 = model.hand_transform(false).origin   # are turned differently, so they don't)
 	var aim := aim_forward()
 	var raised: bool = ads or kick_t > 0.0 or model._fire_t > 0.0
-	if model._climbing:   # both hands on the rungs: the bat or gun is slung across her back
-		var side := Vector3(ladder_n.z, 0, -ladder_n.x)
-		var mid: Vector3 = model.bone_world("Spine2") + ladder_n * 0.15
-		var sd := (Vector3.UP + side * (0.55 if w == "bat" else -0.8)).normalized()
-		var sb := _aim_basis(sd, ladder_n)
-		if w == "bat":
-			_held.global_transform = Transform3D(sb * Basis(Vector3.RIGHT, -BAT_TILT), mid - sd * 0.35)
-		else:
-			_held.global_transform = Transform3D(sb.scaled(Vector3.ONE * GUN_SCALE), mid - sd * 0.2)
-			for side_name in ["R", "L"]:   # the duals: one over the other
-				var pn := _held_model.get_node_or_null("Pistol" + side_name) as Node3D
-				if pn:
-					pn.global_transform = Transform3D(sb.scaled(Vector3.ONE * GUN_SCALE), mid + sd * (0.12 if side_name == "R" else -0.12))
+	_held.visible = not model._climbing   # both hands on the rungs: the bat or gun is put away (Pete, 26 Nov)
+	if model._climbing:
 		return
 	if w == "bat":
 		var g: Array = model.grip_axes()

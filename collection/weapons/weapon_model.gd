@@ -73,11 +73,11 @@ static func make(id: String, tint := Color(0.75, 0.1, 0.13)) -> Node3D:
 			root.add_child(bat)
 			var shaft := MeshInstance3D.new()
 			var cm := CylinderMesh.new()
-			cm.top_radius = 0.045
-			cm.bottom_radius = 0.022
-			cm.height = 0.82
+			cm.top_radius = 0.05
+			cm.bottom_radius = 0.023
+			cm.height = 1.0   # (Pete, 26 Nov: a little longer so a hit reads clearly; was 0.82)
 			shaft.mesh = cm
-			shaft.position = Vector3(0, 0.41, 0)
+			shaft.position = Vector3(0, 0.5, 0)
 			shaft.material_override = _mat(tint, 0.1, 0.45)
 			bat.add_child(shaft)
 			var grip := MeshInstance3D.new()
