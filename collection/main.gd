@@ -247,7 +247,7 @@ func _inputs() -> void:
 		"move_forward": [KEY_W, KEY_UP], "move_back": [KEY_S, KEY_DOWN], "move_left": [KEY_A, KEY_LEFT], "move_right": [KEY_D, KEY_RIGHT],
 		"jump": [KEY_SPACE], "crouch": [KEY_C], "camera_toggle": [KEY_V], "pause": [KEY_ESCAPE, KEY_P],
 		"weapon_melee": [KEY_1], "weapon_gun": [KEY_2],
-		"fire": [], "aim": [], "weapon_next": [], "weapon_fists": [], "interact": [KEY_E],
+		"fire": [], "aim": [], "weapon_next": [], "weapon_fists": [], "interact": [KEY_E], "use_mine": [KEY_Q], "use_stun": [KEY_G],
 		"look_left": [], "look_right": [], "look_up": [], "look_down": [],
 	}
 	for a in keys:
@@ -263,7 +263,7 @@ func _inputs() -> void:
 		mb.button_index = pair[1]
 		InputMap.action_add_event(pair[0], mb)
 	# controller: left stick moves, right stick looks, RT attacks, LT aims, RB swaps, A jumps, B crouches, X swaps guns
-	# on a pickup, Back camera
+	# on a pickup, D-pad left lays a mine, D-pad right throws a stun grenade, Back camera
 	var pad := {"move_left": [JOY_AXIS_LEFT_X, -1.0], "move_right": [JOY_AXIS_LEFT_X, 1.0], "move_forward": [JOY_AXIS_LEFT_Y, -1.0], "move_back": [JOY_AXIS_LEFT_Y, 1.0],
 		"look_left": [JOY_AXIS_RIGHT_X, -1.0], "look_right": [JOY_AXIS_RIGHT_X, 1.0], "look_up": [JOY_AXIS_RIGHT_Y, -1.0], "look_down": [JOY_AXIS_RIGHT_Y, 1.0],
 		"fire": [JOY_AXIS_TRIGGER_RIGHT, 1.0], "aim": [JOY_AXIS_TRIGGER_LEFT, 1.0]}
@@ -272,7 +272,7 @@ func _inputs() -> void:
 		m.axis = pad[a][0]
 		m.axis_value = pad[a][1]
 		InputMap.action_add_event(a, m)
-	for pair in [["jump", JOY_BUTTON_A], ["crouch", JOY_BUTTON_B], ["camera_toggle", JOY_BUTTON_BACK], ["pause", JOY_BUTTON_START], ["weapon_next", JOY_BUTTON_RIGHT_SHOULDER], ["interact", JOY_BUTTON_X]]:
+	for pair in [["jump", JOY_BUTTON_A], ["crouch", JOY_BUTTON_B], ["camera_toggle", JOY_BUTTON_BACK], ["pause", JOY_BUTTON_START], ["weapon_next", JOY_BUTTON_RIGHT_SHOULDER], ["interact", JOY_BUTTON_X], ["use_mine", JOY_BUTTON_DPAD_LEFT], ["use_stun", JOY_BUTTON_DPAD_RIGHT]]:
 		var b := InputEventJoypadButton.new()
 		b.button_index = pair[1]
 		InputMap.action_add_event(pair[0], b)
@@ -1056,6 +1056,7 @@ func _combat_checks() -> void:
 			_log("AUTOTEST swap: offered=%s, %s (14) -> holding %s with %d bullets, old gun dropped=%d" % [offered, had, player.gun_id, player.ammo, dropped])
 	else:
 		_log("AUTOTEST pickup: no gun pickup placed!")
+	await _gadget_checks()
 	# a pane of upright glass breaks in one hit
 	var pane: StaticBody3D = null
 	for c in level.get_children():
@@ -1087,6 +1088,69 @@ func _combat_checks() -> void:
 	player.dealt_hit.disconnect(count)
 	_log("AUTOTEST you respawned: alive=%s at %v, nearest dummy %.1f m, shield %.1f, weapon %s" % [player.alive, player.global_position, nearest, player.shield_t, player.current_weapon()])
 	player.force_input = false
+
+## auto-aim on firing, mines, stun grenades and the speed boost (Pete, 26 Nov)
+func _gadget_checks() -> void:
+	var kinds := {}
+	for p in game.pickups:
+		if p.kind != "gun":
+			kinds[p.kind] = int(kinds.get(p.kind, 0)) + 1
+	_log("AUTOTEST gadget pickups: %s" % [kinds])
+	# firing a gun aims by itself
+	player.place(Vector3(-20, 0.05, -40), 0.0)
+	player.give_gun("mp5")
+	player.select_slot("gun")
+	await _wait(0.4)
+	Input.action_press("fire")
+	await _wait(0.3)
+	var aimed: bool = player.ads
+	Input.action_release("fire")
+	await _wait(0.6)
+	_log("AUTOTEST auto aim: aimed while firing=%s, back to the hip after=%s" % [aimed, not player.ads])
+	player.select_slot("melee")
+	# a mine: laid, armed after 1 s, goes off when someone walks onto it
+	var dm: Node = dummies[3]
+	dm.shield_t = 0.0
+	var hp0: int = dm.hp
+	player.place(Vector3(-20, 0.05, -40), 0.0)
+	player.has_mine = true
+	await _wait(0.2)
+	var laid: bool = player.use_mine()
+	var mine_at: Vector3 = game.gadgets.mines[0].pos if not game.gadgets.mines.is_empty() else Vector3.ZERO
+	player.place(mine_at + Vector3(-7.0, 0.05, -1.5), PI * 0.5)
+	_face(player, mine_at + Vector3.UP * 0.5)
+	await _wait(1.3)
+	dm.place(mine_at + Vector3(0.5, 0.05, 0), 0.0)
+	await _wait(0.25)
+	await _snap("p2_09_mine_blast_third.png")
+	_log("AUTOTEST mine: laid=%s at %v, gone off=%s, dummy hp %d -> %d (downed %s)" % [laid, mine_at, game.gadgets.mines.is_empty(), hp0, dm.hp, dm.downed])
+	# a stun grenade thrown at a dummy 8 m away
+	var dm2: Node = dummies[5]
+	var target: Vector3 = dm2.global_position
+	player.place(target + Vector3(0, 0.05, -8.0), 0.0)
+	_face(player, target + Vector3.UP * 0.4)
+	player.has_stun = true
+	await _wait(0.3)
+	var thrown: bool = player.use_stun()
+	var most := 0.0
+	var t0 := Time.get_ticks_msec()
+	while Time.get_ticks_msec() - t0 < 2500:
+		most = maxf(most, dm2.daze_t)
+		await get_tree().physics_frame
+	_log("AUTOTEST stun: thrown=%s, dummy stunned up to %.2f s, your flash %.2f" % [thrown, most, player.flash_a])
+	# a speed boost: half as fast again for 10 s
+	player.place(Vector3(-30, 0.05, -40), PI * 0.5)
+	await _wait(0.3)
+	var a0: Vector3 = player.global_position
+	await _hold("move_forward", 1.0)
+	var plain := player.global_position.distance_to(a0)
+	player.place(Vector3(-30, 0.05, -40), PI * 0.5)
+	player.boost_t = player.BOOST_T
+	await _wait(0.3)
+	a0 = player.global_position
+	await _hold("move_forward", 1.0)
+	_log("AUTOTEST boost: 1 s run %.2f m, boosted %.2f m, %.0f s left" % [plain, player.global_position.distance_to(a0), player.boost_t])
+	player.boost_t = 0.0
 
 # ---------------- phase 3 Collection rules checks ----------------
 func _active_stars() -> Array:

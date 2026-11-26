@@ -46,6 +46,8 @@ var _hp_title: Label
 var _wpn_name: Label
 var _wpn_ammo: Label
 var _wpn_slots: Label
+var _gadget_lbl: Label   # "Q  MINE   G  STUN   BOOST 7" (what you carry, and the boost left)
+var _white: ColorRect      # a stun grenade's flash over the whole screen
 var _feed: VBoxContainer
 var _center: Label
 var _center_sub: Label
@@ -156,6 +158,14 @@ func _ready() -> void:
 	_wpn_slots = _label(12, GREY)
 	_wpn_slots.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	wv.add_child(_wpn_slots)
+	_gadget_lbl = _label(12, GOLD)
+	_gadget_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	wv.add_child(_gadget_lbl)
+	_white = ColorRect.new()
+	_white.color = Color(1, 1, 1, 0)
+	_white.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_white.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_white)
 	# kill feed, top right
 	_feed = VBoxContainer.new()
 	_pin(_feed, Control.PRESET_TOP_RIGHT, -20, 250, true, false)
@@ -483,6 +493,18 @@ func _process(dt: float) -> void:
 	var melee_name := "BAT" if player.has_bat else "FISTS"   # (everyone carries a bat now)
 	var gun_name := String(Weapons.stat(player.gun_id).name).to_upper() if player.gun_id != "" else "—"
 	_wpn_slots.text = "1  %s     2  %s" % [melee_name, gun_name]
+	var gl: Array[String] = []
+	if player.has_mine:
+		gl.append("%s  MINE" % _key_of("use_mine"))
+	if player.has_stun:
+		gl.append("%s  STUN" % _key_of("use_stun"))
+	if player.boost_t > 0.0:
+		gl.append("BOOST %d" % ceili(player.boost_t))
+	if player.daze_t > 0.0:
+		gl.append("STUNNED")
+	_gadget_lbl.text = "     ".join(gl)
+	_gadget_lbl.visible = not gl.is_empty()
+	_white.color.a = player.flash_a
 	# centre messages
 	if not player.alive:
 		_center.text = "ELIMINATED"
@@ -500,7 +522,7 @@ func _process(dt: float) -> void:
 			Weapons.stat(player.gun_id).name, player.ammo, Weapons.stat(offer.id).name, offer.ammo]
 	_shield.visible = player.alive and player.shield_t > 0.0
 	_perf_tick(dt)
-	_help.text = "imok Collection · Godot · WASD move · Space jump · C crouch · V camera · LMB attack · RMB aim · 1 bat · 2 gun · E swap gun · F3 bot view · Esc pause · %d fps" % Engine.get_frames_per_second()
+	_help.text = "imok Collection · Godot · WASD move · Space jump · C crouch · V camera · LMB attack · RMB aim · 1 bat · 2 gun · E swap gun · Q mine · G stun · F3 bot view · Esc pause · %d fps" % Engine.get_frames_per_second()
 	_process_phase3(dt)
 	_cross.queue_redraw()
 

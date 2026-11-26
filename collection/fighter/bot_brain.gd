@@ -53,6 +53,7 @@ var killer: Node = null            # who eliminated it last (revenge)
 var _d: Dictionary
 var _s: Dictionary
 var _think_t := 0.0
+var _gadget_t := 2.0
 var _explore_t := 0.0
 var _heard := Vector3.INF
 var _heard_t := 0.0
@@ -267,11 +268,13 @@ func _best_item() -> Variant:
 		if not is_star:
 			if it.kind == "gun" and _armed():
 				continue
+			if (it.kind == "mine" and f.has_mine) or (it.kind == "stun" and f.has_stun):
+				continue
 			if it.kind == "bat" and f.has_bat:
 				continue
 		var d: Vector3 = it.global_position - f.global_position
 		var score := Vector2(d.x, d.z).length() + 3.0 * absf(d.y)
-		if not is_star and unarmed:
+		if not is_star and unarmed and it.kind == "gun":
 			score -= 4.0
 		if score < best_d:
 			best_d = score
@@ -356,6 +359,17 @@ func _physics_process(dt: float) -> void:
 		fire = false
 	f.in_fire = fire
 	f.in_aim = aim
+	# gadgets (Pete, 26 Nov): a stun grenade into a fight at middle range once roughly facing it; a mine left behind
+	# while moving through the house, as a trap
+	_gadget_t -= dt
+	if _gadget_t <= 0.0:
+		_gadget_t = randf_range(0.8, 1.6)
+		if f.has_stun and tvis and target and absf(wrapf(want_yaw - f.yaw, -PI, PI)) < 0.2:
+			var td: float = target.global_position.distance_to(f.global_position)
+			if td > 5.0 and td < 15.0 and randf() < 0.5:
+				f.use_stun()
+		elif f.has_mine and state in ["explore", "item", "listen"] and randf() < 0.25:
+			f.use_mine()
 	# movement relative to where it's facing (so it can strafe while aiming)
 	var fw: Vector3 = f.forward()
 	var rt: Vector3 = f.right()

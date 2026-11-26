@@ -21,7 +21,7 @@ const GOLD := Color("#ffc83a")
 const ACTIONS := [
 	["move_forward", "Forward"], ["move_back", "Back"], ["move_left", "Left"], ["move_right", "Right"],
 	["jump", "Jump"], ["crouch", "Crouch"], ["fire", "Attack"], ["aim", "Aim"],
-	["weapon_melee", "Bat"], ["weapon_gun", "Gun"], ["interact", "Swap gun"], ["camera_toggle", "Camera"],
+	["weapon_melee", "Bat"], ["weapon_gun", "Gun"], ["interact", "Swap gun"], ["use_mine", "Lay mine"], ["use_stun", "Throw stun"], ["camera_toggle", "Camera"],
 ]
 
 var defaults := {}        # action -> its first keyboard/mouse event as set up by main.gd (for RESET)

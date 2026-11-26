@@ -24,6 +24,9 @@ const CharacterModel := preload("res://characters/character_model.gd")
 const RADIUS := 0.45
 const HEIGHT := 2.25
 const CROUCH_HEIGHT := 1.45
+const BOOST_MUL := 1.5           # speed boost pickup: half as fast again for 10 s (Pete, 26 Nov)
+const BOOST_T := 10.0
+const AUTO_ADS_HOLD := 0.35
 const RUN := 8.5               # Pete, 24 Nov: players and bots were far too fast (was 11.25 x 1.125 = 12.7 m/s)
 const FISTS_MUL := 1.2
 const CROUCH_MUL := 0.5
@@ -128,6 +131,12 @@ var has_bat := true               # everyone carries a bat (Pete, 26 Nov: no fis
 var bat_color := Color(0.75, 0.1, 0.13)   # picked at random when the fighter is made
 var swap_offer: Node = null       # a gun pickup you're standing on and could swap your gun for (interact)
 var swap_offer_t := 0.0
+var has_mine := false             # gadgets (Pete, 26 Nov; gadgets/gadgets.gd): one proximity mine and one stun grenade at most
+var has_stun := false
+var boost_t := 0.0                # speed boost left (seconds)
+var daze_t := 0.0                 # stunned: a quarter speed, can't attack
+var flash_a := 0.0                # the white flash of a stun grenade on your own screen (the player)
+var _fire_ads_t := 0.0            # firing aims for you (Pete, 26 Nov): you stay aimed this long after letting go
 var slot := "melee"              # "melee" (fists or bat) or "gun"
 var fire_t := 0.0
 var swap_t := 0.0
@@ -379,6 +388,10 @@ func _unhandled_input(e: InputEvent) -> void:
 		select_slot("gun" if slot == "melee" else "melee")
 	elif e.is_action_pressed("interact") and swap_offer and swap_offer_t > 0.0:
 		swap_offer.swap(self)
+	elif e.is_action_pressed("use_mine"):
+		use_mine()
+	elif e.is_action_pressed("use_stun"):
+		use_stun()
 	elif e.is_action_pressed("weapon_fists"):
 		select_slot("melee")
 
@@ -540,6 +553,10 @@ func _die(src: Node) -> void:
 	respawn_t = RESPAWN
 	gun_id = ""
 	ammo = 0
+	has_mine = false   # gadgets are lost with the gun
+	has_stun = false
+	boost_t = 0.0
+	daze_t = 0.0
 	slot = "melee"
 	ads = false
 	_set_pose_standing()
@@ -589,7 +606,21 @@ func _set_pose_downed() -> void:
 # ---------------------------------------------------------------- attacking
 
 func can_attack() -> bool:
-	return alive and not downed and not on_ladder and swap_t <= 0.0
+	return alive and not downed and not on_ladder and swap_t <= 0.0 and daze_t <= 0.0
+
+## gadgets: lay your mine / throw your stun grenade (gadgets/gadgets.gd), and what happens when one gets you
+func use_mine() -> bool:
+	return game != null and game.fighting() and game.gadgets.lay_mine(self)
+
+func use_stun() -> bool:
+	return game != null and game.fighting() and game.gadgets.throw_stun(self)
+
+func stun(secs: float, strength: float) -> void:
+	daze_t = maxf(daze_t, secs)
+	ads = false
+	ads_k = 0.0
+	if is_player:
+		flash_a = maxf(flash_a, clampf(0.55 + 0.45 * strength, 0.0, 1.0))
 
 func _attack() -> void:
 	var id := current_weapon()
@@ -772,7 +803,14 @@ func _physics_process(dt: float) -> void:
 	bloom = maxf(0.0, bloom - dt * (1.0 if in_fire else 3.0))
 	var id := current_weapon()
 	var melee := Weapons.is_melee(id)
-	ads = in_aim and not melee and not downed
+	# firing a gun aims down the sights by itself (Pete, 26 Nov), and stays aimed a moment after you let go
+	if in_fire and not melee:
+		_fire_ads_t = AUTO_ADS_HOLD
+	_fire_ads_t -= dt
+	ads = (in_aim or _fire_ads_t > 0.0) and not melee and not downed and daze_t <= 0.0
+	boost_t = maxf(0.0, boost_t - dt)
+	daze_t = maxf(0.0, daze_t - dt)
+	flash_a = maxf(0.0, flash_a - dt * 1.2)
 	ads_k = move_toward(ads_k, 1.0 if ads else 0.0, dt / Weapons.ADS_TIME)
 	if in_fire and fire_t <= 0.0 and can_attack():
 		_attack()
@@ -815,6 +853,10 @@ func _physics_process(dt: float) -> void:
 		speed = CRAWL
 	if wading and global_position.y < 0.25:
 		speed *= 0.8
+	if boost_t > 0.0:
+		speed *= BOOST_MUL
+	if daze_t > 0.0:
+		speed *= 0.25
 	var target := wish * speed
 	var acc := ACC_GROUND if grounded else ACC_AIR
 	var hv := Vector3(velocity.x, 0, velocity.z)

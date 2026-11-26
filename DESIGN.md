@@ -46,6 +46,13 @@ Units: metres, seconds. Y is up.
 - Feed text: "You picked up a Vector (20 bullets)" / "picked up a bat".
 - The bat is slot 1, a gun slot 2. Bots always hold a found gun when they have one.
 
+### Gadgets **(Pete, 26 Nov)**
+Six more pickups, placed and coming back like the guns: 2 proximity mines, 2 stun grenades, 2 speed boosts. You carry at most one mine and one stun grenade (you can't take another while you hold one); they're lost when you die. Numbers are the web game's lethals.
+- **Proximity mine** (Q, or D-pad left; rebindable "Lay mine"): laid on the floor 1.1 m in front of you (at your feet if that's blocked), armed after 1 s (its red light blinks fast, then once every 2 s), goes off when anyone else comes within 1.7 m (1.1 m up or down): 60 damage at the middle down to 40% at the edge of 3.4 m, nothing through walls. A blast sets off other mines in reach. Fire, a flash and grey smoke.
+- **Stun grenade** (G, or D-pad right; "Throw stun"): thrown along your aim, bursts 0.6 s after it lands (1.6 s at most): everyone within 6.5 m who can see it is stunned for 1 s (a quarter speed, can't attack, aim knocked out) and gets a white flash on screen; caught in your own, 0.5 s.
+- **Speed boost**: taken at once, half as fast again for 10 s.
+- The HUD's weapon card shows what you carry and the boost left ("Q  MINE   G  STUN   BOOST 7"). Bots throw a stun into a fight at 5–15 m and leave a mine behind as they move through the house.
+
 ### Weapon stats
 dmg = damage per hit (100 HP players); rate = seconds between shots; fall = full damage up to the first distance, falling off by the second.
 
@@ -61,7 +68,7 @@ dmg = damage per hit (100 HP players); rate = seconds between shots; fall = full
 | Sting | 8 | 1.5 | 0.036 | 6–18 | machine pistol, quickest swap |
 | Dual Pistols | 30 | 1.8 | 0.16 | 10–28 | alternate fire |
 
-SMGs: iron sights only, aim-down-sights in 0.07 s. With the bat out you run 20% faster. Aiming with the bat does nothing.
+SMGs: iron sights only, aim-down-sights in 0.07 s. Firing a gun aims down the sights by itself (and stays aimed 0.35 s after you let go) **(Pete, 26 Nov)**; the aim button still aims without firing. With the bat out you run 20% faster. Aiming with the bat does nothing.
 
 ## 5. Players
 - 100 HP; regen after 3 s without being hit, 10 HP/s.
@@ -172,7 +179,7 @@ CollectionGame is **not** an autoload: it is a node (`collection/game/collection
 | Godot project skeleton | done (phase 1) |
 | The Mansion | grey-box from `mansion_layout.json`, ladders, shop placeholder (phase 1); the web Mansion's own look in `level/mansion.glb` (every room's finishes, furniture, lamps, signs, ladders, the shop kiosk) over the same colliders; sunk indoor pool; fireman's pole, 2 lifts, gym trampolines (launch one up to the trophy room), 2 portal pairs, wading and springboard, ball pit, ballroom dance floor / disco ball / moving beams / music; bots use the lifts, pole, launch trampoline and portals (phase 6, first part); smooth stairs, windows you can jump through or climb over, each room's own lights (phase 6, second part); all the web's furniture, and 247 smashable pieces (furniture, crates, hedges, lamps) that grow back after 40 s (phase 6, third part); hot tub jets, splashes and wading; small things have a draw distance and a floor's furniture hides when you can't see that floor (phase 6, last part); tidied for flow: slower running, 4.4 m doorways, no glass walls, bigger windows, mirror maze gone, furniture against the walls (24 Nov) |
 | Fighter / player movement | movement, jump, crouch, ladders, third/first-person camera (phase 1) |
-| Weapons + pickups | fists, bat, 6 SMGs + Dual Pistols with the web stats; 20-bullet pickups (8 guns since 26 Nov; everyone carries a bat in a random colour; swap a gun for a different one with E); first-person hands and iron-sight aiming (phase 2) |
+| Weapons + pickups | fists, bat, 6 SMGs + Dual Pistols with the web stats; 20-bullet pickups (8 guns since 26 Nov; everyone carries a bat in a random colour; swap a gun for a different one with E); first-person hands and iron-sight aiming (phase 2); gadgets: mines, stun grenades, speed boosts, and auto-aim on firing (26 Nov) |
 | Health, down, death, respawn | 100 HP + regen, downed (30 HP, crawl, up after 5 s), finished = dead, respawn 3 s furthest from others, 4 s spawn shield (phase 2; doubled 26 Nov) |
 | Effects + sound | red spray + mist on hits, muzzle flash, thin tracers, dust, dark-red downed wisps (phase 2); glass breaks into shards that bounce and settle (pooled, 360 max); sounds on Weapons / SFX / Music / Voice buses, muffled through walls (duller behind one wall, more behind two or a floor), room echo (hall rings, ground floor some, upstairs soft, outside dry), footsteps and landings from 1v1, menu and match-end music from 1v1 (phase 5) |
 | Look | AgX tonemapping, sun shadows, colour grading; Medium adds bounce light (SDFGI), ambient occlusion, glow; High adds indirect light (SSIL), screen-space reflections, a reflection probe per room, light shafts / haze (volumetric fog); Low is plain and fast (phase 5); surface detail and roughness on the Mansion's 36 patterns (wood, tile, marble, brick, carpet, fabric, plaster, metal, grass), clear pool and hot-tub water with moving light on the pool floor, a sky with soft clouds, skirting boards (AAA phase 3, first part) |
@@ -206,6 +213,7 @@ Agreed with Pete in the rebuild plan ([`docs/collection/plan.md`](docs/collectio
 - Publishing method for the Windows PC build: not decided (platform decided 25 Nov: Windows PC first).
 
 ## Decision log
+- 2026-11-26 — Pete: auto-aim with the fire button; proximity mines (only 1), stuns (1) and a 10 s speed boost. Choices: the web game's lethal numbers (mine 60 damage, 3.4 m, triggers at 1.7 m; stun 6.5 m, 1 s); 2 of each on the map; Q and G (D-pad left and right); the boost is half as fast again; gadgets are lost on death; the web's explosion and stun sounds; shooting a mine doesn't set it off (only blasts do).
 - 2026-11-26 — Pete: garage shelf at the foot of the stairs out, every staircase easy to get onto (the kitchen back stairs also had a drum and a crate at the foot and a wardrobe narrowing the top: out too); terrace hot tub into the corner and bigger, loungers out (the parasol stood where the tub now goes: out too); Hall of Fame pictures of rock singers and guitarists in glittery frames; space room stars on the ceiling and a telescope that spins when you walk up to it. These are made as the level is built (level/mansion_edits.gd: things are found by where they stand), not by re-exporting the web Mansion. The pictures are gig-poster art of an instrument (a guitar, or a vintage mic for a singer) with the name in gold: no photos or likenesses of real people (tools/hall_of_fame/make_posters.py). The telescope moved 1.2 m out from the wall so it can turn.
 - 2026-11-26 — Pete: bodies sank into the floor when lying dead (her big head and chunky clothes go through it in clips made on a slimmer body): lying dead or downed, the model is now lifted until every part clears the floor. Spawn shield doubled to 4 s. The bat is a little longer (1.0 m, was 0.82) so hits read clearly, and the bat or gun is hidden while climbing a ladder.
 - 2026-11-26 — Pete: four shops, one in each lawn corner pushed against the hedges, one open at a time. It moves every minute, when someone starting a cash-in there gets shot, and when stars from a kill are picked up near it. Choices: 15 m counts as near; the minute timer waits while someone is cashing in; the web kiosk is lifted out of the dressing and copied to each corner.

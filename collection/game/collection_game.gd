@@ -30,6 +30,7 @@ const Effects := preload("res://weapons/effects.gd")
 const Sfx := preload("res://audio/sfx.gd")
 const Pickup := preload("res://pickups/pickup.gd")
 const Star := preload("res://stars/star.gd")
+const Gadgets := preload("res://gadgets/gadgets.gd")
 
 const STARS := 10             # to win
 const LOSE := 2               # lost when you go down
@@ -51,6 +52,7 @@ const SHOP_NEAR := 15.0       # stars from a fallen player picked up this close 
 const COUNTDOWN := 3.0
 const GUN_PICKS := 8   # (Pete, 26 Nov: everyone carries a bat, so the two bat pickups became guns)
 const BAT_PICKS := 0
+const GADGET_PICKS := {"mine": 2, "stun": 2, "boost": 2}   # (Pete, 26 Nov)
 const PICK_GAP := 6.0
 const INDOOR_SHARE := 0.8
 
@@ -71,6 +73,7 @@ var cash_t := {}                     # fighter → seconds stood at the shop
 var shop_i := 0                      # which of level.shop_spots is open
 var shop_t := SHOP_MOVE              # seconds until it moves on its own
 var _pad: MeshInstance3D
+var gadgets: Node3D                  # mines and stun grenades in play (gadgets/gadgets.gd)
 var _beam: MeshInstance3D
 var nav_region: NavigationRegion3D
 var ladder_links := 0
@@ -98,6 +101,10 @@ func start(begin := true) -> void:
 	await _bake_nav()
 	_make_pad()
 	_open_shop(randi() % level.shop_spots.size())
+	gadgets = Gadgets.new()
+	gadgets.name = "Gadgets"
+	gadgets.game = self
+	add_child(gadgets)
 	for i in ON_MAP:
 		var s := Star.new()
 		add_child(s)
@@ -115,6 +122,14 @@ func start(begin := true) -> void:
 		add_child(p)
 		pickups.append(p)
 		place_pickup(p)
+	for k in GADGET_PICKS:
+		for i in int(GADGET_PICKS[k]):
+			var p := Pickup.new()
+			p.game = self
+			p.kind = k
+			add_child(p)
+			pickups.append(p)
+			place_pickup(p)
 	ready_done = true
 	_add_room_echo()
 	if begin:
@@ -124,6 +139,8 @@ func start(begin := true) -> void:
 
 func begin_countdown() -> void:
 	reset_props()
+	if gadgets:
+		gadgets.clear_all()
 	countdown = COUNTDOWN
 	_set_state("countdown")
 	center_msg.emit("COLLECTION · 8 PLAYERS · THE MANSION", "Start with a bat · find 10 hidden stars · cash them in at the shop outside · first to cash in wins", COUNTDOWN)
@@ -597,6 +614,10 @@ func forget_pickup(p: Node) -> void:
 
 func feed_pickup(f: Node, p: Node) -> void:
 	var what := "a bat" if p.kind == "bat" else "a %s (%d bullets)" % [Weapons.stat(p.id).name, p.ammo]
+	match String(p.kind):
+		"mine": what = "a proximity mine"
+		"stun": what = "a stun grenade"
+		"boost": what = "a speed boost (10 s)"
 	_feed(f, "picked up " + what)
 
 func feed_out_of_ammo(f: Node) -> void:

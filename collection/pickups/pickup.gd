@@ -4,17 +4,21 @@ extends Node3D
 ## you can swap (interact): yours drops here with the bullets it has left and you take this one. Taken pickups come
 ## back somewhere new after 15 s (the match picks where); a swapped-out gun is temporary: it lies there for 20 s.
 ## (Bat pickups are still supported but no longer placed: everyone carries a bat.)
+## Gadget pickups (Pete, 26 Nov) work the same way: a proximity mine or a stun grenade (you carry one of each at most, so
+## you can't take another while you hold one) or a speed boost (taken at once: half as fast again for 10 s).
 
 const Weapons := preload("res://weapons/weapons.gd")
 const WeaponModel := preload("res://weapons/weapon_model.gd")
 const Sfx := preload("res://audio/sfx.gd")
+const GadgetModel := preload("res://gadgets/gadget_model.gd")
+const GADGETS := ["mine", "stun", "boost"]
 
 const TAKE_R := 1.2
 const TAKE_H := 1.6
 const PICK_BACK := 15.0
 
 var game: Node = null
-var kind := "gun"           # "gun" or "bat"
+var kind := "gun"           # "gun", "bat", or a gadget: "mine", "stun", "boost"
 var id := ""                # which gun
 var ammo := Weapons.AMMO    # bullets in it (a swapped-out gun keeps what it had left)
 var active := false
@@ -51,8 +55,12 @@ func show_at(p: Vector3, new_id: String) -> void:
 	id = new_id
 	if _model:
 		_model.queue_free()
-	_model = WeaponModel.make("bat" if kind == "bat" else id)
-	_model.scale = Vector3.ONE * 1.5
+	if kind in GADGETS:
+		_model = GadgetModel.make(kind)
+		_model.scale = Vector3.ONE * (2.4 if kind == "mine" else 2.2)
+	else:
+		_model = WeaponModel.make("bat" if kind == "bat" else id)
+		_model.scale = Vector3.ONE * 1.5
 	if kind == "bat":
 		_model.rotation.x = 1.05   # stand the bat up
 	_spin.add_child(_model)
@@ -95,7 +103,20 @@ func _physics_process(dt: float) -> void:
 				f.swap_offer_t = 0.15
 
 func _take(f: Node) -> bool:
-	if kind == "bat":
+	if kind in GADGETS:
+		match kind:
+			"mine":
+				if f.has_mine:
+					return false
+				f.has_mine = true
+			"stun":
+				if f.has_stun:
+					return false
+				f.has_stun = true
+			"boost":
+				f.boost_t = f.BOOST_T
+		Sfx.play(game, "bing", global_position, -4.0, 1.2, 10.0)
+	elif kind == "bat":
 		if not f.can_take_bat():
 			return false
 		f.give_bat()
