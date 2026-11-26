@@ -675,15 +675,15 @@ func restart() -> void:
 ## a bone's position in the world
 ## how far she has to be lifted for every part (LIE_BALLS) to clear the floor she's lying on
 func _floor_clear(f: Node) -> float:
-	var k: float = skel.global_transform.basis.get_scale().y
+	var ks: float = skel.global_transform.basis.get_scale().y
 	var floor_y: float = (f.global_position as Vector3).y
 	var need := 0.0
 	for ball in LIE_BALLS:
 		var at := bone_world(ball[0])
 		if String(ball[1]) != "":   # the head: its middle is out past the bone, away from the neck
 			var from := bone_world(ball[1])
-			at += (from - at).normalized() * float(ball[2]) * k
-		need = maxf(need, float(ball[3]) * k - (at.y - _lift - floor_y))
+			at += (from - at).normalized() * float(ball[2]) * ks
+		need = maxf(need, float(ball[3]) * ks - (at.y - _lift - floor_y))
 	return clampf(need, 0.0, 0.6)
 
 func bone_world(bname: String) -> Vector3:
