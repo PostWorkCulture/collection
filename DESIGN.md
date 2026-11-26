@@ -7,7 +7,7 @@ The single source of truth for what gets built. Code follows this file; if they 
 Units: metres, seconds. Y is up.
 
 ## 1. Pitch
-8 players in a big two-floor mansion. Everyone spawns outside on the lawns with only their fists. Gold stars are hidden around the inside of the house, and guns (20 bullets, no reload) and bats are lying about. Find 10 stars, then get back outside to the shop on the front lawn and stand at it to cash in. The first player to cash in wins. Getting knocked down costs you 2 stars, and dying loses all of them. Anyone holding 8 or more stars glows through walls and shows on everyone's minimap, so the leader is hunted.
+8 players in a big two-floor mansion. Everyone spawns outside on the lawns with only a bat **(Pete, 26 Nov)**. Gold stars are hidden around the inside of the house, and guns (20 bullets, no reload) are lying about. Find 10 stars, then get back outside to the shop on the front lawn and stand at it to cash in. The first player to cash in wins. Getting knocked down costs you 2 stars, and dying loses all of them. Anyone holding 8 or more stars glows through walls and shows on everyone's minimap, so the leader is hunted.
 
 ## 2. Rules
 | Rule | Value |
@@ -15,14 +15,14 @@ Units: metres, seconds. Y is up.
 | Players | 8, always (you plus 7 bots; online later) **(Pete)** |
 | Map | The Mansion only **(Pete)** |
 | Start | First spawn of the match is on the front and back lawns, spread out, facing the house **(Pete)** |
-| Starting kit | Fists only: no loadout, no lethals/grenades, no build walls, no armour plates **(Pete)** |
+| Starting kit | A bat, painted a random colour per player (Pete, 26 Nov: no fists); no loadout, no lethals/grenades, no build walls, no armour plates **(Pete)** |
 | Stars to win | 10 stars held, then cash in at the shop outside; first to cash in wins **(Pete, final: 10 replaced an earlier 5)** |
 | Going down (knocked) | Lose 2 stars immediately |
 | Dying (bled out or finished) | Lose all stars |
 | Revealed | 8+ stars: outlined through walls (x-ray) for everyone, plus a gold star on every minimap, pinned to the rim when out of range **(Pete, final: 8 replaced an earlier 4)** |
 | Bot targeting | Bots lean slightly towards whoever has the most stars; anyone close still comes first **(Pete)** |
 | Time limit | None: the clock counts up |
-| Respawn | 3 s after death, anywhere on the map (like free for all), fists only again |
+| Respawn | 3 s after death, anywhere on the map (like free for all), with just the bat again |
 | Ladders | Climb at 3 m/s **(Pete, 26 Nov: was the web's 6)**. On the rungs you're locked on: held in the middle of the ladder, facing it and upright, going straight up or down; moving sideways does nothing and a jump pushes you off (no grabbing it again until you land); climbing on at the top steps you over onto the floor **(Pete, 26 Nov)** |
 | Effects | No particle bursts or confetti on pickups (studio rule) **(Pete)** |
 
@@ -36,22 +36,22 @@ Units: metres, seconds. Y is up.
 - Sound: "bing" pitched ×1.25, audible ~14 m.
 
 ## 4. Weapon pickups
-- 8 pickups: 6 guns + 2 bats (`GUN_PICKS = 6`, `BAT_PICKS = 2`).
+- 8 pickups, all guns (`GUN_PICKS = 8`, `BAT_PICKS = 0`; the two bat pickups became guns when everyone got a bat, 26 Nov).
 - Gun pool (random each time): MP5, Uzi, Vector, P90, UMP, Sting (SMGs) and Dual Pistols.
-- 20 bullets, no reloading. Empty → automatically back to fists ("out of bullets: back to fists").
-- Can't grab a new gun while the current one has 10+ bullets. Can't take a bat if you already have one.
+- 20 bullets, no reloading. Empty → automatically back to the bat ("out of bullets: back to the bat").
+- Walking over a gun takes it if you have no gun or yours has under 10 bullets. If yours still has 10+ and the one on the floor is a different gun, you can swap **(Pete, 26 Nov)**: the screen shows "E  Swap your MP5 (14) for the UMP (20)" (E, or X on a controller; rebindable as "Swap gun"); yours drops there with the bullets it had left and lies 20 s for anyone, like the dropped stars. Bots don't swap yet.
 - Placement: 80% inside the house, 20% on the lawns, at least 6 m from other stars, pickups and players.
 - Respawn: 15 s after being taken, somewhere new (`PICK_BACK = 15`).
 - Look: weapon model floating, turning slowly, over a thin white ring (torus r 0.62 m) whose opacity pulses.
 - Feed text: "You picked up a Vector (20 bullets)" / "picked up a bat".
-- Bats go in the fists slot (a gun stays in the gun slot). Bots always hold a found gun when they have one.
+- The bat is slot 1, a gun slot 2. Bots always hold a found gun when they have one.
 
 ### Weapon stats
 dmg = damage per hit (100 HP players); rate = seconds between shots; fall = full damage up to the first distance, falling off by the second.
 
 | Weapon | dmg | head × | rate (s) | fall (m) | Notes |
 |---|---|---|---|---|---|
-| Fists | 34 | 1 | 0.36 | reach 2.7 | 3 punches to down; small lunge (3) |
+| Fists | 34 | 1 | 0.36 | reach 2.7 | not used since 26 Nov (everyone has a bat); kept in the code |
 | Bat | 50 | 1 | 0.55 | reach 3.0 | 2 hits to down; big knockback (lunge 5) |
 | MP5 | 16 | 1.6 | 0.055 | 8–26 | shreds up close |
 | Uzi | 18 | 1.7 | 0.07 | 10–30 | punchy close range |
@@ -61,14 +61,14 @@ dmg = damage per hit (100 HP players); rate = seconds between shots; fall = full
 | Sting | 8 | 1.5 | 0.036 | 6–18 | machine pistol, quickest swap |
 | Dual Pistols | 30 | 1.8 | 0.16 | 10–28 | alternate fire |
 
-SMGs: iron sights only, aim-down-sights in 0.07 s. With fists or a bat out you run 20% faster. Aiming with fists or a bat does nothing.
+SMGs: iron sights only, aim-down-sights in 0.07 s. With the bat out you run 20% faster. Aiming with the bat does nothing.
 
 ## 5. Players
 - 100 HP; regen after 3 s without being hit, 10 HP/s.
 - Run 8.5 m/s **(Pete, 24 Nov: far too fast at the web's 12.7)**, ground acceleration 55, air 22; jump 12 m/s **(Pete)**; gravity 36; double jump. Players and bots share one speed. Weapon weight: SMGs +3–6%, Dual Pistols +8%.
 - Downed: at 0 HP you go down instead of dying. Crawl slowly with 30 downed HP; enemies can shoot you to death or finish you. Otherwise you get up on your own after 5 s **(Pete)** with the downed HP you had left. 15 s bleed-out timer exists only as a backstop. Downed players give off faint dark-red smoke, never green. A downed player must never visibly pass through walls.
 - Finishers on a downed enemy (**not in the first build (Pete)**; a downed player is finished by shooting or hitting them): random, 25% each: Pancake, Heartbreaker, Roast, Combat. Can't be interrupted. "Eliminated" shows at the top as soon as one starts.
-- Boxing gloves in each character's colours when fists are out.
+- Each player's bat is painted one of 12 colours at random when the match starts (red, blue, black, white, green, yellow, purple, orange, pink, teal, natural wood, silver).
 - Characters **(Pete, 24 Nov: the same cast as imok 1v1)**: Wednesday, Lil Pink, North West, Johnny Rotten, Emo Bunny, Glitch, Kitty, Puffa, Raven, Toxic — the 10 playable characters in 1v1's `CHARS` (main, commit `879f706`), each with its colour from there. Tripo models (same blocky style and six-part rig) are in the 1v1 repo's `chars/` and come in with the art pass, one at a time: each is joined into one body, rigged and moved with motion capture (§12, `characters/`). Wednesday is done and is your character until character select exists (she's left out of the bots); the others are grey capsules with a band and gloves in their character's colour until theirs are rigged. Each match the 7 bots are drawn at random from the 10. The dev-only Shadow (roboid) isn't in the cast.
 
 ## 6. Shop / cash-in point
@@ -92,8 +92,8 @@ SMGs: iron sights only, aim-down-sights in 0.07 s. With fists or a bat out you r
 
 ## 8. HUD and menus
 - Standalone game: Collection is the whole game (no mode picker). Hidden: player count, map picker, teams, loadout, match length.
-- Menu blurb: "Fists, then whatever you find. 8 players in The Mansion: everyone starts on the lawns with just fists. SMGs and pistols (20 bullets each, no reloads) and bats lie around the house. Find 10 of the gold stars hidden inside, then get outside to the shop on the front lawn to cash them in: first to cash in wins. Go down and you lose 2 stars; die and you lose them all. Anyone holding 8 or more glows through walls and shows on every minimap."
-- Loading card: "Collection · 8 players · The Mansion" / "Start with fists · find 10 hidden stars · cash them in at the shop outside · first to cash in wins".
+- Menu blurb: "A bat, then whatever you find. 8 players in The Mansion: everyone starts on the lawns with just a bat. SMGs and pistols (20 bullets each, no reloads) lie around the house. Find 10 of the gold stars hidden inside, then get outside to the shop on the front lawn to cash them in: first to cash in wins. Go down and you lose 2 stars; die and you lose them all. Anyone holding 8 or more glows through walls and shows on every minimap."
+- Loading card: "Collection · 8 players · The Mansion" / "Start with a bat · find 10 hidden stars · cash them in at the shop outside · first to cash in wins".
 - Goal text: "Cash in 10 stars".
 - Star counter: centred under the scoreboard: gold ★, "n / 10"; panel gets a gold border at 10.
 - Leaderboard: all 8 sorted by stars, then kills. Columns: Players · ★ · K · D. You in blue, others red; dead players dimmed.
@@ -170,7 +170,7 @@ CollectionGame is **not** an autoload: it is a node (`collection/game/collection
 | Godot project skeleton | done (phase 1) |
 | The Mansion | grey-box from `mansion_layout.json`, ladders, shop placeholder (phase 1); the web Mansion's own look in `level/mansion.glb` (every room's finishes, furniture, lamps, signs, ladders, the shop kiosk) over the same colliders; sunk indoor pool; fireman's pole, 2 lifts, gym trampolines (launch one up to the trophy room), 2 portal pairs, wading and springboard, ball pit, ballroom dance floor / disco ball / moving beams / music; bots use the lifts, pole, launch trampoline and portals (phase 6, first part); smooth stairs, windows you can jump through or climb over, each room's own lights (phase 6, second part); all the web's furniture, and 247 smashable pieces (furniture, crates, hedges, lamps) that grow back after 40 s (phase 6, third part); hot tub jets, splashes and wading; small things have a draw distance and a floor's furniture hides when you can't see that floor (phase 6, last part); tidied for flow: slower running, 4.4 m doorways, no glass walls, bigger windows, mirror maze gone, furniture against the walls (24 Nov) |
 | Fighter / player movement | movement, jump, crouch, ladders, third/first-person camera (phase 1) |
-| Weapons + pickups | fists, bat, 6 SMGs + Dual Pistols with the web stats; 20-bullet pickups (6 guns + 2 bats); first-person hands and iron-sight aiming (phase 2) |
+| Weapons + pickups | fists, bat, 6 SMGs + Dual Pistols with the web stats; 20-bullet pickups (8 guns since 26 Nov; everyone carries a bat in a random colour; swap a gun for a different one with E); first-person hands and iron-sight aiming (phase 2) |
 | Health, down, death, respawn | 100 HP + regen, downed (30 HP, crawl, up after 5 s), finished = dead, respawn 3 s furthest from others, 2 s spawn shield (phase 2) |
 | Effects + sound | red spray + mist on hits, muzzle flash, thin tracers, dust, dark-red downed wisps (phase 2); glass breaks into shards that bounce and settle (pooled, 360 max); sounds on Weapons / SFX / Music / Voice buses, muffled through walls (duller behind one wall, more behind two or a floor), room echo (hall rings, ground floor some, upstairs soft, outside dry), footsteps and landings from 1v1, menu and match-end music from 1v1 (phase 5) |
 | Look | AgX tonemapping, sun shadows, colour grading; Medium adds bounce light (SDFGI), ambient occlusion, glow; High adds indirect light (SSIL), screen-space reflections, a reflection probe per room, light shafts / haze (volumetric fog); Low is plain and fast (phase 5); surface detail and roughness on the Mansion's 36 patterns (wood, tile, marble, brick, carpet, fabric, plaster, metal, grass), clear pool and hot-tub water with moving light on the pool floor, a sky with soft clouds, skirting boards (AAA phase 3, first part) |
@@ -204,6 +204,7 @@ Agreed with Pete in the rebuild plan ([`docs/collection/plan.md`](docs/collectio
 - Publishing method for the Windows PC build: not decided (platform decided 25 Nov: Windows PC first).
 
 ## Decision log
+- 2026-11-26 — Pete: no fists; everyone starts (and respawns) with a bat painted a random colour, and guns stay the pickups (the two bat pickups are now guns, so 8 guns). A downed player keeps their bat. Pete: with a gun, walking over a different one offers a swap (E / X): yours drops with its bullets for 20 s.
 - 2026-11-26 — Pete: ladders were wrong (facing the wrong way, not the right action). The Mixamo climb faces backwards, so the build now turns it round (`turn` flag in tools/characters/retarget.py); the character faces the ladder and hangs off the rungs, and the clip plays at the speed she climbs. Pete: 3 m/s (was the web's 6). Pete: locked on and straight while climbing, unless jumping off: held in the middle of the ladder, sideways input ignored, a jump pushes off, the top steps you over. The layout's ladder nx/nz point into the wall (the way you climb over), so the game turns them round for "out from the wall". A carried bat or gun goes across the back while climbing. The build's in-place step had a bug (it changed the first frame before using it to take out the travel), which left the climb, Flex and Cheer drifting up to 1.4 m sideways; fixed.
 - 2026-11-25 — AAA phase 1, first part: Wednesday, waiting for Pete. The 1v1 model's six parts are joined into one body and rigged in Blender (Mixamo's auto-rigger failed on it twice), with arms put into a T-pose; Mixamo motion capture is moved onto that skeleton by `tools/characters/retarget.py` (rotations copied bone by bone, hips height scaled, clips with both hands on a weapon get the hands put back together with IK, since her arms are shorter and her shoulders wider than the mocap actor's). In the game (`characters/character_model.gd`): an animation tree picks the way of moving — unarmed she turns and runs where she's going and only her chest and head turn back towards the aim; fighting with fists or the bat she faces the aim and side-steps or backpedals (the strafe clips run turned about 60°, so the body is turned back by that much); with a gun the rifle 8-way set — and plays each clip at the speed that keeps her feet on the ground. Choices made while building, all easy to change: a quick walk plays the walk faster rather than blending half into the run; standing in the fight stance she's bladed (lead shoulder to the target); punches are thrown by the top half over that stance, a standing bat swing is the whole body (Mixamo "Baseball Strike"); the gun is carried at the low ready in front of the chest with both hands put on it, and raised to the shoulder when aiming or firing; dual pistols one per hand, elbows soft; light hits are a small jolt of the chest and head, heavy hits (40+ damage or a headshot) the full flinch; death is the hit, the knees going and a fall forward flat; the lawn no longer bounces green light (its grass was colouring her skin through the bounce light). Pete chose all 20 celebrations, dances and poses offered (25 Nov); the winner cheers then dances on the spot through the results; the poses wait for the start screen and character select. Each clip a fresh reviewer agent checked over 13 rounds; still being polished: the bat follow-through (passes close to her head), the crouch arms and the size of the hit flinch.
 Newest first. Date — decision — why.

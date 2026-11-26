@@ -21,7 +21,7 @@ const GOLD := Color("#ffc83a")
 const ACTIONS := [
 	["move_forward", "Forward"], ["move_back", "Back"], ["move_left", "Left"], ["move_right", "Right"],
 	["jump", "Jump"], ["crouch", "Crouch"], ["fire", "Attack"], ["aim", "Aim"],
-	["weapon_melee", "Fists / bat"], ["weapon_gun", "Gun"], ["camera_toggle", "Camera"],
+	["weapon_melee", "Bat"], ["weapon_gun", "Gun"], ["interact", "Swap gun"], ["camera_toggle", "Camera"],
 ]
 
 var defaults := {}        # action -> its first keyboard/mouse event as set up by main.gd (for RESET)
@@ -161,7 +161,7 @@ func show_start() -> void:
 	_clear()
 	_label("COLLECTION", 46, WHITE)
 	_label("8 players · The Mansion", 15, GREY)
-	_label("Start with fists, find 10 hidden stars, cash them in at the shop outside. First to cash in wins.", 14, GREY)
+	_label("Start with a bat, find 10 hidden stars, cash them in at the shop outside. First to cash in wins.", 14, GREY)
 	_box.add_child(HSeparator.new())
 	_button("PLAY", func(): hide_menu(); play.emit())
 	var bots := _cycle(["easy", "normal", "hard"], Settings.bots, func(v):

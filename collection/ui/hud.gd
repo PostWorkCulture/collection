@@ -49,6 +49,8 @@ var _wpn_slots: Label
 var _feed: VBoxContainer
 var _center: Label
 var _center_sub: Label
+var _swap_card: PanelContainer   # "E  Swap your MP5 (14) for the UMP (20)", under the crosshair
+var _swap_text: Label
 var _hurt: ColorRect
 var _cross: Control
 var _hit_t := 0.0
@@ -180,6 +182,14 @@ func _ready() -> void:
 	_center_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_center_sub.custom_minimum_size = Vector2(600, 0)
 	add_child(_center_sub)
+	_swap_card = _card()
+	_swap_card.custom_minimum_size = Vector2(460, 0)
+	_pin(_swap_card, Control.PRESET_CENTER, -230, 70, false, false)
+	_swap_text = _label(17, WHITE)
+	_swap_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_swap_card.add_child(_swap_text)
+	_swap_card.visible = false
+	add_child(_swap_card)
 	if player:
 		player.dealt_hit.connect(_on_dealt_hit)
 		player.hurt.connect(_on_hurt)
@@ -295,7 +305,7 @@ func _build_phase3() -> void:
 	l1.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lv.add_child(l1)
 	var l2 := _label(14, GREY)
-	l2.text = "Start with fists · find 10 hidden stars · cash them in at the shop outside · first to cash in wins"
+	l2.text = "Start with a bat · find 10 hidden stars · cash them in at the shop outside · first to cash in wins"
 	l2.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lv.add_child(l2)
 	_load_bots = _label(13, GREY)
@@ -470,7 +480,7 @@ func _process(dt: float) -> void:
 	else:
 		_wpn_ammo.text = "%d / %d" % [player.ammo, Weapons.AMMO]
 	_wpn_ammo.add_theme_color_override("font_color", RED if not Weapons.is_melee(id) and player.ammo <= 5 else WHITE)
-	var melee_name := "BAT" if player.has_bat else "FISTS"
+	var melee_name := "BAT" if player.has_bat else "FISTS"   # (everyone carries a bat now)
 	var gun_name := String(Weapons.stat(player.gun_id).name).to_upper() if player.gun_id != "" else "—"
 	_wpn_slots.text = "1  %s     2  %s" % [melee_name, gun_name]
 	# centre messages
@@ -483,11 +493,24 @@ func _process(dt: float) -> void:
 	else:
 		_center.text = ""
 		_center_sub.text = ""
+	var offer: Node = player.swap_offer
+	_swap_card.visible = player.alive and not player.downed and offer != null and is_instance_valid(offer)
+	if _swap_card.visible:   # standing on a different gun with 10+ bullets left in yours
+		_swap_text.text = "%s   Swap your %s (%d) for the %s (%d)" % [_key_of("interact"),
+			Weapons.stat(player.gun_id).name, player.ammo, Weapons.stat(offer.id).name, offer.ammo]
 	_shield.visible = player.alive and player.shield_t > 0.0
 	_perf_tick(dt)
-	_help.text = "imok Collection · Godot · WASD move · Space jump · C crouch · V camera · LMB attack · RMB aim · 1 fists/bat · 2 gun · F3 bot view · Esc pause · %d fps" % Engine.get_frames_per_second()
+	_help.text = "imok Collection · Godot · WASD move · Space jump · C crouch · V camera · LMB attack · RMB aim · 1 bat · 2 gun · E swap gun · F3 bot view · Esc pause · %d fps" % Engine.get_frames_per_second()
 	_process_phase3(dt)
 	_cross.queue_redraw()
+
+## the first key (or mouse button) bound to an action, as text
+func _key_of(action: String) -> String:
+	for ev in InputMap.action_get_events(action):
+		if ev is InputEventKey:
+			var k: InputEventKey = ev
+			return OS.get_keycode_string(k.physical_keycode if k.physical_keycode != 0 else k.keycode)
+	return "Interact"
 
 func _process_phase3(dt: float) -> void:
 	if game == null:

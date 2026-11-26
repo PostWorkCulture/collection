@@ -9,7 +9,8 @@ extends Node3D
 ## Going down costs 2 stars, dying costs the rest; lost stars lie where you fell for 20 s (approved improvement).
 ## 8+ stars and you're marked: outlined through walls and pinned on every minimap. Cashing in takes 2 s standing
 ## still at the shop (approved improvement; getting hurt or moving away starts it again). First to cash in wins.
-## Weapons (phase 2): 6 gun + 2 bat pickups, 80% indoors, 6 m apart, back somewhere new 15 s after being taken.
+## Weapons: everyone carries a bat (a random colour); 8 gun pickups, 80% indoors, 6 m apart, back somewhere new 15 s
+## after being taken. Standing on a different gun offers a swap (interact): yours drops there with its bullets for 20 s.
 ## Respawn 3 s after dying at the spawn point furthest from everyone, leaving out the 3 roof spawns (test dummies go
 ## back to their own spot).
 
@@ -42,8 +43,8 @@ const DROP_LIFE := 20.0       # lost stars and dropped bats lie there this long
 const CASH_TIME := 2.0
 const CASH_R := 2.2
 const COUNTDOWN := 3.0
-const GUN_PICKS := 6
-const BAT_PICKS := 2
+const GUN_PICKS := 8   # (Pete, 26 Nov: everyone carries a bat, so the two bat pickups became guns)
+const BAT_PICKS := 0
 const PICK_GAP := 6.0
 const INDOOR_SHARE := 0.8
 
@@ -115,7 +116,7 @@ func begin_countdown() -> void:
 	reset_props()
 	countdown = COUNTDOWN
 	_set_state("countdown")
-	center_msg.emit("COLLECTION · 8 PLAYERS · THE MANSION", "Start with fists · find 10 hidden stars · cash them in at the shop outside · first to cash in wins", COUNTDOWN)
+	center_msg.emit("COLLECTION · 8 PLAYERS · THE MANSION", "Start with a bat · find 10 hidden stars · cash them in at the shop outside · first to cash in wins", COUNTDOWN)
 
 func _set_state(s: String) -> void:
 	state = s
@@ -503,29 +504,30 @@ func place_pickup(p: Node) -> void:
 		id = Weapons.CO_GUNS[randi() % Weapons.CO_GUNS.size()]
 	p.show_at(spot, id)
 
-## a downed player's bat, lying where they fell for 20 s
-func drop_bat(pos: Vector3) -> void:
+## a gun swapped for another, lying where it was dropped for 20 s with the bullets it had left
+func drop_gun(pos: Vector3, id: String, bullets: int) -> void:
 	var p := Pickup.new()
 	p.game = self
-	p.kind = "bat"
+	p.kind = "gun"
+	p.ammo = bullets
 	p.temporary = true
 	add_child(p)
 	pickups.append(p)
 	var space := get_world_3d().direct_space_state
 	var hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(pos + Vector3.UP * 0.5, pos + Vector3.DOWN * 3.0, 1))
-	p.show_at(hit.position if hit else pos, "")
+	p.show_at(hit.position if hit else pos, id)
 	p.life = DROP_LIFE
 
 func forget_pickup(p: Node) -> void:
 	pickups.erase(p)
 
 func feed_pickup(f: Node, p: Node) -> void:
-	var what := "a bat" if p.kind == "bat" else "a %s (%d bullets)" % [Weapons.stat(p.id).name, Weapons.AMMO]
+	var what := "a bat" if p.kind == "bat" else "a %s (%d bullets)" % [Weapons.stat(p.id).name, p.ammo]
 	_feed(f, "picked up " + what)
 
 func feed_out_of_ammo(f: Node) -> void:
 	if f.is_player:
-		feed_msg.emit("Out of bullets: back to fists", true)
+		feed_msg.emit("Out of bullets: back to the bat", true)
 
 # ---------------------------------------------------------------- health events
 

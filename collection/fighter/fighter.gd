@@ -124,7 +124,10 @@ var deaths := 0
 # weapons
 var gun_id := ""                 # "" = no gun
 var ammo := 0
-var has_bat := false
+var has_bat := true               # everyone carries a bat (Pete, 26 Nov: no fists)
+var bat_color := Color(0.75, 0.1, 0.13)   # picked at random when the fighter is made
+var swap_offer: Node = null       # a gun pickup you're standing on and could swap your gun for (interact)
+var swap_offer_t := 0.0
 var slot := "melee"              # "melee" (fists or bat) or "gun"
 var fire_t := 0.0
 var swap_t := 0.0
@@ -161,6 +164,7 @@ var _air_t := 0.0
 var _pad_used := false
 
 func _ready() -> void:
+	bat_color = WeaponModel.BAT_COLORS.pick_random()
 	collision_layer = LAYER_BODY
 	collision_mask = LAYER_WORLD | LAYER_BODY
 	_shape = CapsuleShape3D.new()
@@ -309,9 +313,9 @@ func _refresh_weapon_models() -> void:
 		_held_model.queue_free()
 	if _view_model:
 		_view_model.queue_free()
-	_held_model = WeaponModel.make(id)
+	_held_model = WeaponModel.make(id, bat_color)
 	_held.add_child(_held_model)
-	_view_model = WeaponModel.make(id)
+	_view_model = WeaponModel.make(id, bat_color)
 	_view.add_child(_view_model)
 	for i in _gloves.size():   # gloves show with fists; the right glove also holds a bat; guns hide them
 		_gloves[i].visible = id == "fists" or (id == "bat" and i == 1)
@@ -373,6 +377,8 @@ func _unhandled_input(e: InputEvent) -> void:
 		select_slot("gun")
 	elif e.is_action_pressed("weapon_next"):
 		select_slot("gun" if slot == "melee" else "melee")
+	elif e.is_action_pressed("interact") and swap_offer and swap_offer_t > 0.0:
+		swap_offer.swap(self)
 	elif e.is_action_pressed("weapon_fists"):
 		select_slot("melee")
 
@@ -454,9 +460,9 @@ func can_take_gun() -> bool:
 func can_take_bat() -> bool:
 	return alive and not downed and not has_bat
 
-func give_gun(id: String) -> void:
+func give_gun(id: String, bullets := Weapons.AMMO) -> void:
 	gun_id = id
-	ammo = Weapons.AMMO
+	ammo = bullets
 	slot = "gun"
 	swap_t = float(Weapons.stat(id).get("swap", SWAP))
 	_refresh_weapon_models()
@@ -504,10 +510,6 @@ func _go_down(src: Node) -> void:
 	velocity.z = 0.0
 	collision_layer = LAYER_DOWNED
 	collision_mask = LAYER_WORLD
-	if has_bat:   # the bat drops where you fell
-		has_bat = false
-		if game:
-			game.drop_bat(global_position)
 	slot = "gun" if slot == "gun" and gun_id != "" else "melee"
 	_refresh_weapon_models()
 	Effects.hit_spray(get_parent(), global_position + Vector3.UP * 1.0, Vector3.ZERO, true)
@@ -538,7 +540,6 @@ func _die(src: Node) -> void:
 	respawn_t = RESPAWN
 	gun_id = ""
 	ammo = 0
-	has_bat = false
 	slot = "melee"
 	ads = false
 	_set_pose_standing()
@@ -548,7 +549,7 @@ func _die(src: Node) -> void:
 	apply_camera_mode()
 	died.emit(src)
 
-## back in the game at a new spot, fists only, with a 2 s spawn shield
+## back in the game at a new spot with just the bat, and a 2 s spawn shield
 func respawn_at(p: Vector3, y: float) -> void:
 	alive = true
 	downed = false
@@ -743,7 +744,10 @@ func _set_crouch(on: bool) -> void:
 # ---------------------------------------------------------------- every physics tick
 
 func _physics_process(dt: float) -> void:
+	swap_offer_t -= dt
 	ladder_off_t -= dt
+	if swap_offer_t <= 0.0:
+		swap_offer = null
 	if is_player and not autopilot:
 		_read_player_input(dt)
 	if game and not game.fighting():   # countdown and after the win: nobody moves or attacks

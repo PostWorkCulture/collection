@@ -247,7 +247,7 @@ func _inputs() -> void:
 		"move_forward": [KEY_W, KEY_UP], "move_back": [KEY_S, KEY_DOWN], "move_left": [KEY_A, KEY_LEFT], "move_right": [KEY_D, KEY_RIGHT],
 		"jump": [KEY_SPACE], "crouch": [KEY_C], "camera_toggle": [KEY_V], "pause": [KEY_ESCAPE, KEY_P],
 		"weapon_melee": [KEY_1], "weapon_gun": [KEY_2],
-		"fire": [], "aim": [], "weapon_next": [], "weapon_fists": [],
+		"fire": [], "aim": [], "weapon_next": [], "weapon_fists": [], "interact": [KEY_E],
 		"look_left": [], "look_right": [], "look_up": [], "look_down": [],
 	}
 	for a in keys:
@@ -257,12 +257,13 @@ func _inputs() -> void:
 			var ev := InputEventKey.new()
 			ev.physical_keycode = k
 			InputMap.action_add_event(a, ev)
-	# mouse: left attacks, right aims, wheel up swaps weapon, wheel down goes to fists (as on the web)
+	# mouse: left attacks, right aims, wheel up swaps weapon, wheel down goes to the bat (as on the web)
 	for pair in [["fire", MOUSE_BUTTON_LEFT], ["aim", MOUSE_BUTTON_RIGHT], ["weapon_next", MOUSE_BUTTON_WHEEL_UP], ["weapon_fists", MOUSE_BUTTON_WHEEL_DOWN]]:
 		var mb := InputEventMouseButton.new()
 		mb.button_index = pair[1]
 		InputMap.action_add_event(pair[0], mb)
-	# controller: left stick moves, right stick looks, RT attacks, LT aims, RB swaps, A jumps, B crouches, Back camera
+	# controller: left stick moves, right stick looks, RT attacks, LT aims, RB swaps, A jumps, B crouches, X swaps guns
+	# on a pickup, Back camera
 	var pad := {"move_left": [JOY_AXIS_LEFT_X, -1.0], "move_right": [JOY_AXIS_LEFT_X, 1.0], "move_forward": [JOY_AXIS_LEFT_Y, -1.0], "move_back": [JOY_AXIS_LEFT_Y, 1.0],
 		"look_left": [JOY_AXIS_RIGHT_X, -1.0], "look_right": [JOY_AXIS_RIGHT_X, 1.0], "look_up": [JOY_AXIS_RIGHT_Y, -1.0], "look_down": [JOY_AXIS_RIGHT_Y, 1.0],
 		"fire": [JOY_AXIS_TRIGGER_RIGHT, 1.0], "aim": [JOY_AXIS_TRIGGER_LEFT, 1.0]}
@@ -271,7 +272,7 @@ func _inputs() -> void:
 		m.axis = pad[a][0]
 		m.axis_value = pad[a][1]
 		InputMap.action_add_event(a, m)
-	for pair in [["jump", JOY_BUTTON_A], ["crouch", JOY_BUTTON_B], ["camera_toggle", JOY_BUTTON_BACK], ["pause", JOY_BUTTON_START], ["weapon_next", JOY_BUTTON_RIGHT_SHOULDER]]:
+	for pair in [["jump", JOY_BUTTON_A], ["crouch", JOY_BUTTON_B], ["camera_toggle", JOY_BUTTON_BACK], ["pause", JOY_BUTTON_START], ["weapon_next", JOY_BUTTON_RIGHT_SHOULDER], ["interact", JOY_BUTTON_X]]:
 		var b := InputEventJoypadButton.new()
 		b.button_index = pair[1]
 		InputMap.action_add_event(pair[0], b)
@@ -773,7 +774,7 @@ func _character_preview(cfg: Dictionary) -> void:
 		p.in_jump = false
 		p._set_crouch(false)
 		p.gun_id = ""
-		p.has_bat = false
+		p.has_bat = act != "punch"   # the punches are kept for later; everyone carries a bat now
 		p.slot = "melee"
 		p._refresh_weapon_models()
 		await _wait(0.4)
@@ -893,7 +894,7 @@ func _combat_checks() -> void:
 		_log("AUTOTEST pickup %s %s at %v" % [pk.kind, pk.id, pk.global_position])
 	for d in dummies:
 		_log("AUTOTEST dummy %s at %v floor=%s" % [d.display_name, d.global_position, d.is_on_floor()])
-	# fists: three punches put someone down
+	# the bat: two hits put someone down
 	Settings.camera_mode = "third"
 	player.apply_camera_mode()
 	var dum: Node = dummies[0]
@@ -901,7 +902,7 @@ func _combat_checks() -> void:
 	await _wait(0.5)
 	hits[0] = 0
 	await _attack_until(dum, func(): return dum.downed, 3.0, 1, "p2_01_punch_third.png")
-	_log("AUTOTEST fists: down after %d punches (downed=%s dhp=%d)" % [hits[0], dum.downed, dum.dhp])
+	_log("AUTOTEST bat: down after %d hits (downed=%s dhp=%d)" % [hits[0], dum.downed, dum.dhp])
 	await _wait(0.8)
 	await _snap("p2_02_downed_third.png")
 	# left alone, a downed player gets back up after 5 s with the downed HP they had left
@@ -909,7 +910,7 @@ func _combat_checks() -> void:
 	while dum.downed and Time.get_ticks_msec() - t_down < 7000:
 		await get_tree().physics_frame
 	_log("AUTOTEST get up: after %.1f s, hp %d, downed=%s" % [(Time.get_ticks_msec() - t_down) / 1000.0, dum.hp, dum.downed])
-	# down again (30 HP: one punch) and finish them (one more)
+	# down again (30 HP: one hit) and finish them
 	await _attack_until(dum, func(): return not dum.alive, 4.0)
 	_log("AUTOTEST finish: alive=%s deaths=%d player kills=%d" % [dum.alive, dum.deaths, player.kills])
 	await _wait(3.4)
@@ -940,7 +941,7 @@ func _combat_checks() -> void:
 	hits[0] = 0
 	await _attack_until(hall, func(): return player.ammo <= 12, 3.0, 2, "p2_05_duals_third.png")
 	_log("AUTOTEST duals: 8 shots, %d hits at ~7 m on a strafing target" % hits[0])
-	# every gun fires its 20 and drops back to fists
+	# every gun fires its 20 and drops back to the bat
 	for id in Weapons.CO_GUNS:
 		player.give_gun(id)
 		var t1 := Time.get_ticks_msec()
@@ -991,6 +992,31 @@ func _combat_checks() -> void:
 		player.place(ppos + Vector3(0, 0.05, 0), 0.0)
 		await _wait(0.3)
 		_log("AUTOTEST pickup: took %s -> holding %s with %d bullets; pickup active=%s" % [pid, player.gun_id, player.ammo, pk.active])
+		# swap: a full gun of another kind is offered on the next pickup, and E swaps (yours drops with its bullets)
+		var other: Node = null
+		for p in game.pickups:
+			if p.active and p.kind == "gun" and p.id != player.gun_id:
+				other = p
+				break
+		if other:
+			player.ammo = 14
+			var had: String = player.gun_id
+			var opos: Vector3 = other.global_position
+			player.place(opos + Vector3(0, 0.05, 0), 0.0)
+			await _wait(0.3)
+			var offered: bool = player.swap_offer == other
+			await _snap("p2_06b_swap_offer_first.png")
+			var ke := InputEventKey.new()
+			ke.physical_keycode = KEY_E
+			ke.keycode = KEY_E
+			ke.pressed = true
+			Input.parse_input_event(ke)
+			await _wait(0.3)
+			var dropped := 0
+			for p in game.pickups:
+				if p.active and p.temporary and p.id == had and p.ammo == 14:
+					dropped += 1
+			_log("AUTOTEST swap: offered=%s, %s (14) -> holding %s with %d bullets, old gun dropped=%d" % [offered, had, player.gun_id, player.ammo, dropped])
 	else:
 		_log("AUTOTEST pickup: no gun pickup placed!")
 	# a pane of upright glass breaks in one hit

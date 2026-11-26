@@ -50,7 +50,13 @@ static func _muzzle(parent: Node3D, pos: Vector3, nm := "Muzzle") -> void:
 	m.position = pos
 	parent.add_child(m)
 
-static func make(id: String) -> Node3D:
+## the paint finishes a fighter's bat is given at random
+const BAT_COLORS := [Color(0.75, 0.1, 0.13), Color(0.1, 0.28, 0.72), Color(0.08, 0.08, 0.09), Color(0.92, 0.91, 0.88),
+		Color(0.1, 0.45, 0.22), Color(0.95, 0.72, 0.1), Color(0.42, 0.18, 0.6), Color(0.95, 0.42, 0.08),
+		Color(0.93, 0.45, 0.65), Color(0.05, 0.55, 0.55), Color(0.62, 0.42, 0.24), Color(0.7, 0.72, 0.75)]
+
+## tint: the bat's paint (default red)
+static func make(id: String, tint := Color(0.75, 0.1, 0.13)) -> Node3D:
 	var root := Node3D.new()
 	root.name = "Weapon_" + id
 	var black := _mat(Color(0.07, 0.07, 0.08), 0.5, 0.45)
@@ -61,7 +67,7 @@ static func make(id: String) -> Node3D:
 		"fists", "":
 			pass
 		"bat":
-			# a long tapered bat, red with a dark grip, angled up from the hand
+			# a long tapered bat, painted (tint) with a dark grip, angled up from the hand
 			var bat := Node3D.new()
 			bat.rotation.x = -1.05
 			root.add_child(bat)
@@ -72,7 +78,7 @@ static func make(id: String) -> Node3D:
 			cm.height = 0.82
 			shaft.mesh = cm
 			shaft.position = Vector3(0, 0.41, 0)
-			shaft.material_override = _mat(Color(0.75, 0.1, 0.13), 0.1, 0.5)
+			shaft.material_override = _mat(tint, 0.1, 0.45)
 			bat.add_child(shaft)
 			var grip := MeshInstance3D.new()
 			var gm := CylinderMesh.new()

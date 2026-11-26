@@ -1,8 +1,9 @@
 extends Node3D
-## A weapon pickup: the gun or bat floats and turns slowly over a thin white ring whose brightness pulses.
-## Walk within 1.2 m (and 1.6 m up or down) to take it. Guns: not while your current gun still has 10+ bullets.
-## Bats: not if you already have one. Taken pickups come back somewhere new after 15 s (the match picks where);
-## a bat dropped by a downed player is temporary: it lies there for 20 s and never comes back.
+## A gun pickup: the gun floats and turns slowly over a thin white ring whose brightness pulses. Walk within 1.2 m
+## (and 1.6 m up or down) to take it, unless your current gun still has 10+ bullets: then, if it's a different gun,
+## you can swap (interact): yours drops here with the bullets it has left and you take this one. Taken pickups come
+## back somewhere new after 15 s (the match picks where); a swapped-out gun is temporary: it lies there for 20 s.
+## (Bat pickups are still supported but no longer placed: everyone carries a bat.)
 
 const Weapons := preload("res://weapons/weapons.gd")
 const WeaponModel := preload("res://weapons/weapon_model.gd")
@@ -15,6 +16,7 @@ const PICK_BACK := 15.0
 var game: Node = null
 var kind := "gun"           # "gun" or "bat"
 var id := ""                # which gun
+var ammo := Weapons.AMMO    # bullets in it (a swapped-out gun keeps what it had left)
 var active := false
 var temporary := false
 var life := 0.0
@@ -85,8 +87,12 @@ func _physics_process(dt: float) -> void:
 		if not f.alive or f.downed:
 			continue
 		var d: Vector3 = f.global_position - global_position
-		if Vector2(d.x, d.z).length() < TAKE_R and absf(d.y) < TAKE_H and _take(f):
-			return
+		if Vector2(d.x, d.z).length() < TAKE_R and absf(d.y) < TAKE_H:
+			if _take(f):
+				return
+			if kind == "gun" and f.gun_id != "" and f.gun_id != id:   # could swap: offer it while they stand here
+				f.swap_offer = self
+				f.swap_offer_t = 0.15
 
 func _take(f: Node) -> bool:
 	if kind == "bat":
@@ -97,7 +103,7 @@ func _take(f: Node) -> bool:
 	else:
 		if not f.can_take_gun():
 			return false
-		f.give_gun(id)
+		f.give_gun(id, ammo)
 		Sfx.play(game, "bing", global_position, -4.0, 1.0, 10.0)
 	game.feed_pickup(f, self)
 	if temporary:
@@ -105,6 +111,23 @@ func _take(f: Node) -> bool:
 	else:
 		wait(PICK_BACK)
 	return true
+
+## swap: the fighter's gun drops here (20 s, with its bullets) and they take this one
+func swap(f: Node) -> void:
+	if not active or kind != "gun" or f.gun_id == "" or f.gun_id == id or not f.alive or f.downed:
+		return
+	var old_id: String = f.gun_id
+	var old_ammo: int = f.ammo
+	f.give_gun(id, ammo)
+	f.swap_offer = null
+	Sfx.play(game, "bing", global_position, -4.0, 1.0, 10.0)
+	game.feed_pickup(f, self)
+	game.drop_gun(f.global_position, old_id, old_ammo)
+	if temporary:
+		_remove()
+	else:
+		wait(PICK_BACK)
+	ammo = Weapons.AMMO
 
 func _remove() -> void:
 	active = false
