@@ -21,6 +21,7 @@ var game: Node = null
 var kind := "gun"           # "gun", "bat", or a gadget: "mine", "stun", "boost"
 var id := ""                # which gun
 var ammo := Weapons.AMMO    # bullets in it (a swapped-out gun keeps what it had left)
+var skin := "classic"       # its skin (WeaponModel.SKINS): random each time it's placed, kept when it changes hands
 var active := false
 var temporary := false
 var life := 0.0
@@ -59,7 +60,7 @@ func show_at(p: Vector3, new_id: String) -> void:
 		_model = GadgetModel.make(kind)
 		_model.scale = Vector3.ONE * (2.4 if kind == "mine" else 2.2)
 	else:
-		_model = WeaponModel.make("bat" if kind == "bat" else id)
+		_model = WeaponModel.make("bat" if kind == "bat" else id, skin)
 		_model.scale = Vector3.ONE * 1.5
 	if kind == "bat":
 		_model.rotation.x = 1.05   # stand the bat up
@@ -124,7 +125,7 @@ func _take(f: Node) -> bool:
 	else:
 		if not f.can_take_gun():
 			return false
-		f.give_gun(id, ammo)
+		f.give_gun(id, ammo, skin)
 		Sfx.play(game, "bing", global_position, -4.0, 1.0, 10.0)
 	game.feed_pickup(f, self)
 	if temporary:
@@ -139,11 +140,12 @@ func swap(f: Node) -> void:
 		return
 	var old_id: String = f.gun_id
 	var old_ammo: int = f.ammo
-	f.give_gun(id, ammo)
+	var old_skin: String = f.gun_skin
+	f.give_gun(id, ammo, skin)
 	f.swap_offer = null
 	Sfx.play(game, "bing", global_position, -4.0, 1.0, 10.0)
 	game.feed_pickup(f, self)
-	game.drop_gun(f.global_position, old_id, old_ammo)
+	game.drop_gun(f.global_position, old_id, old_ammo, old_skin)
 	if temporary:
 		_remove()
 	else:

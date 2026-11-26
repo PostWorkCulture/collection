@@ -925,7 +925,25 @@ func _combat_checks() -> void:
 	var hits := [0, 0]
 	var count := func(_t, _a, head, _f): hits[0] += 1; hits[1] += 1 if head else 0
 	player.dealt_hit.connect(count)
-	_log("AUTOTEST spots inside=%d lawn=%d pickups=%d" % [game.cand_in.size(), game.cand_out.size(), game.pickups.size()])
+	_log("AUTOTEST spots inside=%d lawn=%d roof=%d pickups=%d" % [game.cand_in.size(), game.cand_out.size(), game.cand_roof.size(), game.pickups.size()])
+	# collectables spread out (Pete, 26 Nov): the closest two of all the active pickups and stars on one floor
+	var things: Array[Vector3] = []
+	for p in game.pickups:
+		if p.active:
+			things.append(p.global_position)
+	for st in game.stars:
+		if st.active:
+			things.append(st.global_position)
+	var closest := 1e9
+	var where := {"inside": 0, "roof": 0, "lawn": 0}
+	for i in things.size():
+		var q: Vector3 = things[i]
+		where["roof" if q.y > 10.0 else ("inside" if absf(q.x) < 40.0 and absf(q.z) < 27.0 else "lawn")] += 1
+		for j in range(i + 1, things.size()):
+			var o: Vector3 = things[j]
+			if absf(o.y - q.y) < 3.0:
+				closest = minf(closest, Vector2(o.x - q.x, o.z - q.z).length())
+	_log("AUTOTEST collectables: %d out, closest pair on a floor %.1f m, %s" % [things.size(), closest, where])
 	for pk in game.pickups:
 		_log("AUTOTEST pickup %s %s at %v" % [pk.kind, pk.id, pk.global_position])
 	for d in dummies:
@@ -1151,6 +1169,43 @@ func _gadget_checks() -> void:
 	await _hold("move_forward", 1.0)
 	_log("AUTOTEST boost: 1 s run %.2f m, boosted %.2f m, %.0f s left" % [plain, player.global_position.distance_to(a0), player.boost_t])
 	player.boost_t = 0.0
+	# the six skins on a bat and an SMG each (Pete, 26 Nov), for the preview
+	var WM := preload("res://weapons/weapon_model.gd")
+	var shelf := Node3D.new()
+	add_child(shelf)
+	shelf.global_position = Vector3(-20, 1.0, -41)
+	var i := 0
+	for sk in WM.SKINS:
+		var bat: Node3D = WM.make("bat", sk)
+		shelf.add_child(bat)
+		bat.position = Vector3(-1.5 + i * 0.6, -0.55, 0)
+		bat.rotation = Vector3(0, 0, 0)
+		var gun: Node3D = WM.make(["mp5", "vector", "ump", "p90", "uzi", "sting"][i], sk)
+		shelf.add_child(gun)
+		gun.scale = Vector3.ONE * 1.6
+		gun.position = Vector3(-1.5 + i * 0.6, 0.75, 0)
+		gun.rotation.y = PI * 0.5
+		i += 1
+	var cam := Camera3D.new()
+	add_child(cam)
+	cam.global_position = shelf.global_position + Vector3(0, 0.35, -2.7)
+	cam.look_at(shelf.global_position + Vector3(0, 0.15, 0), Vector3.UP)
+	cam.current = true
+	await _wait(0.6)
+	await _snap("p2_10_skins.png")
+	player.cam.current = true
+	cam.queue_free()
+	shelf.queue_free()
+	player.bat_skin = "gold"
+	var dg: Node = dummies[6]
+	dg.shield_t = 0.0
+	player.place(dg.global_position + Vector3(0, 0, -2.2), 0.0)
+	_face(player, dg.global_position + Vector3.UP)
+	player.select_slot("melee")
+	await _wait(0.3)
+	var hp_g: int = dg.hp
+	await _attack_until(dg, func(): return dg.downed or dg.hp < hp_g, 3.0)
+	_log("AUTOTEST gold bat: one hit took %d (a bat hit is %d)" % [hp_g - dg.hp if not dg.downed else hp_g, int(Weapons.stat("bat").dmg)])
 
 # ---------------- phase 3 Collection rules checks ----------------
 func _active_stars() -> Array:

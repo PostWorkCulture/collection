@@ -26,6 +26,7 @@ const HEIGHT := 2.25
 const CROUCH_HEIGHT := 1.45
 const BOOST_MUL := 1.5           # speed boost pickup: half as fast again for 10 s (Pete, 26 Nov)
 const BOOST_T := 10.0
+const GOLD_BAT := 2.0            # the gold bat hits twice as hard (Pete, 26 Nov)
 const AUTO_ADS_HOLD := 0.35
 const RUN := 8.5               # Pete, 24 Nov: players and bots were far too fast (was 11.25 x 1.125 = 12.7 m/s)
 const FISTS_MUL := 1.2
@@ -128,7 +129,8 @@ var deaths := 0
 var gun_id := ""                 # "" = no gun
 var ammo := 0
 var has_bat := true               # everyone carries a bat (Pete, 26 Nov: no fists)
-var bat_color := Color(0.75, 0.1, 0.13)   # picked at random when the fighter is made
+var bat_skin := "classic"        # the bat's skin (WeaponModel.SKINS), picked at random every spawn; gold hits twice as hard
+var gun_skin := "classic"        # the gun's, from the pickup
 var swap_offer: Node = null       # a gun pickup you're standing on and could swap your gun for (interact)
 var swap_offer_t := 0.0
 var has_mine := false             # gadgets (Pete, 26 Nov; gadgets/gadgets.gd): one proximity mine and one stun grenade at most
@@ -173,7 +175,7 @@ var _air_t := 0.0
 var _pad_used := false
 
 func _ready() -> void:
-	bat_color = WeaponModel.BAT_COLORS.pick_random()
+	bat_skin = WeaponModel.SKINS.pick_random()
 	collision_layer = LAYER_BODY
 	collision_mask = LAYER_WORLD | LAYER_BODY
 	_shape = CapsuleShape3D.new()
@@ -315,16 +317,17 @@ func current_weapon() -> String:
 
 func _refresh_weapon_models() -> void:
 	var id := current_weapon()
-	if id == _shown_weapon:
+	var shown := "%s:%s" % [id, bat_skin if id == "bat" else gun_skin]
+	if shown == _shown_weapon:
 		return
-	_shown_weapon = id
+	_shown_weapon = shown
 	if _held_model:
 		_held_model.queue_free()
 	if _view_model:
 		_view_model.queue_free()
-	_held_model = WeaponModel.make(id, bat_color)
+	_held_model = WeaponModel.make(id, bat_skin if id == "bat" else gun_skin)
 	_held.add_child(_held_model)
-	_view_model = WeaponModel.make(id, bat_color)
+	_view_model = WeaponModel.make(id, bat_skin if id == "bat" else gun_skin)
 	_view.add_child(_view_model)
 	for i in _gloves.size():   # gloves show with fists; the right glove also holds a bat; guns hide them
 		_gloves[i].visible = id == "fists" or (id == "bat" and i == 1)
@@ -473,8 +476,9 @@ func can_take_gun() -> bool:
 func can_take_bat() -> bool:
 	return alive and not downed and not has_bat
 
-func give_gun(id: String, bullets := Weapons.AMMO) -> void:
+func give_gun(id: String, bullets := Weapons.AMMO, skin := "classic") -> void:
 	gun_id = id
+	gun_skin = skin
 	ammo = bullets
 	slot = "gun"
 	swap_t = float(Weapons.stat(id).get("swap", SWAP))
@@ -570,6 +574,7 @@ func _die(src: Node) -> void:
 func respawn_at(p: Vector3, y: float) -> void:
 	alive = true
 	downed = false
+	bat_skin = WeaponModel.SKINS.pick_random()   # a new bat skin every spawn (as on the web)
 	hp = HP_MAX
 	stamina = STAM_MAX
 	shield_t = SHIELD
@@ -663,7 +668,7 @@ func _melee(id: String, g: Dictionary) -> void:
 		var q := PhysicsRayQueryParameters3D.create(eye, chest, LAYER_WORLD, [get_rid()])
 		if get_world_3d().direct_space_state.intersect_ray(q):
 			continue   # a wall in the way
-		var dmg: float = float(g.dmg) * dmg_mul
+		var dmg: float = float(g.dmg) * dmg_mul * (GOLD_BAT if id == "bat" and bat_skin == "gold" else 1.0)
 		var hd := Vector3(d.x, 0, d.z).normalized()
 		var knock: float = g.knock
 		foe.velocity.x += hd.x * knock

@@ -31,12 +31,13 @@ const Sfx := preload("res://audio/sfx.gd")
 const Pickup := preload("res://pickups/pickup.gd")
 const Star := preload("res://stars/star.gd")
 const Gadgets := preload("res://gadgets/gadgets.gd")
+const WeaponModel := preload("res://weapons/weapon_model.gd")
 
 const STARS := 10             # to win
 const LOSE := 2               # lost when you go down
 const MARK := 8               # marked from here
 const ON_MAP := 6             # Pete, 24 Nov: fewer stars out (was 14)
-const STAR_GAP := 7.0         # never this close to a player, pickup or another star
+const STAR_GAP := 10.0        # never this close to a player, pickup or another star (Pete, 26 Nov: spread out; was 7)
 const STAR_FAR := 25.0        # a replacement appears at least this far from the star just taken (was 12)
 const STAR_WAIT := Vector2(8.0, 14.0)   # and only after this many seconds (was at once); spread out in place and time
 const STAR_TRIES := 40        # candidate spots weighed for each star: the one furthest from the other stars wins
@@ -53,8 +54,10 @@ const COUNTDOWN := 3.0
 const GUN_PICKS := 8   # (Pete, 26 Nov: everyone carries a bat, so the two bat pickups became guns)
 const BAT_PICKS := 0
 const GADGET_PICKS := {"mine": 2, "stun": 2, "boost": 2}   # (Pete, 26 Nov)
-const PICK_GAP := 6.0
-const INDOOR_SHARE := 0.8
+const PICK_GAP := 10.0        # (Pete, 26 Nov: collectables never grouped; was 6)
+const INDOOR_SHARE := 0.7     # pickups: 70% inside, 20% on the roof, 10% on the lawns (Pete, 26 Nov: mostly inside
+const ROOF_SHARE := 0.2       # or on the roof; was 80% inside, 20% lawns)
+const STAR_ROOF := 0.15       # and 15% of stars on the roof (they were never on it)
 
 var level: Node3D
 var fighters: Array = []
@@ -63,6 +66,7 @@ var stars: Array = []                # map stars (always 6 nodes, some waiting t
 var drops: Array = []                # stars dropped by players
 var cand_in: Array[Vector3] = []     # walkable floor spots inside the house (both floors, never the roof)
 var cand_out: Array[Vector3] = []    # walkable spots on the front and back lawns
+var cand_roof: Array[Vector3] = []   # walkable spots on the roof (over 10 m up)
 var ready_done := false
 var state := "loading"               # loading → countdown → fight → won
 var clock := 0.0                     # counts up from the start of the fight
@@ -213,7 +217,7 @@ func _star_spot(s: Node, far_from := Vector3.INF, far_d := 0.0) -> Variant:
 	var best: Variant = null
 	var best_d := -1.0
 	for i in STAR_TRIES:
-		var p: Variant = pick_spot(cand_in, avoid, STAR_GAP, far_from, far_d)
+		var p: Variant = pick_spot(cand_roof if randf() < STAR_ROOF and not cand_roof.is_empty() else cand_in, avoid, STAR_GAP, far_from, far_d)
 		if p == null:
 			break
 		var d := 999.0
@@ -530,6 +534,12 @@ func _find_spots() -> void:
 			var inside := absf(x) < hx - 0.5 and absf(z) < hz - 0.5
 			var lawn := absf(z) > hz + 1.0   # only the front and back lawns are open; the sides are walled off
 			if inside:
+				var r := space.intersect_ray(PhysicsRayQueryParameters3D.create(Vector3(x, 16.0, z), Vector3(x, 9.0, z), 1))
+				if r and r.normal.y > 0.8 and r.position.y > 10.5 and not (r.collider as Node).has_meta("glass"):   # (not on a skylight)
+					var rp: Vector3 = r.position
+					sq.transform = Transform3D(Basis(), rp + Vector3.UP * 1.05)
+					if space.intersect_shape(sq, 1).is_empty():
+						cand_roof.append(rp)
 				# from just under the roof slab (y 11) down to the first floor, then from under that slab to the ground
 				for top in [10.9, 5.4]:
 					var hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(Vector3(x, top, z), Vector3(x, -1.0, z), 1))
@@ -585,22 +595,29 @@ func _avoid_for_star(s: Node) -> Array[Vector3]:
 # ---------------------------------------------------------------- weapon pickups
 
 func place_pickup(p: Node) -> void:
-	var use_out := randf() > INDOOR_SHARE and not cand_out.is_empty()
-	var spot: Variant = pick_spot(cand_out if use_out else cand_in, _avoid_list(p), PICK_GAP)
+	var r := randf()
+	var list: Array[Vector3] = cand_in
+	if r > INDOOR_SHARE + ROOF_SHARE and not cand_out.is_empty():
+		list = cand_out
+	elif r > INDOOR_SHARE and not cand_roof.is_empty():
+		list = cand_roof
+	var spot: Variant = pick_spot(list, _avoid_list(p), PICK_GAP)
 	if spot == null:
 		p.wait(3.0)   # nowhere free right now: try again shortly
 		return
 	var id := ""
 	if p.kind == "gun":
 		id = Weapons.CO_GUNS[randi() % Weapons.CO_GUNS.size()]
+		p.skin = WeaponModel.SKINS.pick_random()   # (Pete, 26 Nov: every gun has a random skin)
 	p.show_at(spot, id)
 
 ## a gun swapped for another, lying where it was dropped for 20 s with the bullets it had left
-func drop_gun(pos: Vector3, id: String, bullets: int) -> void:
+func drop_gun(pos: Vector3, id: String, bullets: int, skin := "classic") -> void:
 	var p := Pickup.new()
 	p.game = self
 	p.kind = "gun"
 	p.ammo = bullets
+	p.skin = skin
 	p.temporary = true
 	add_child(p)
 	pickups.append(p)
@@ -613,7 +630,8 @@ func forget_pickup(p: Node) -> void:
 	pickups.erase(p)
 
 func feed_pickup(f: Node, p: Node) -> void:
-	var what := "a bat" if p.kind == "bat" else "a %s (%d bullets)" % [Weapons.stat(p.id).name, p.ammo]
+	var sk: String = WeaponModel.SKIN_NAMES.get(p.skin, "")
+	var what := "a bat" if p.kind == "bat" else "a %s%s (%d bullets)" % [(sk + " ") if sk != "" else "", Weapons.stat(p.id).name, p.ammo]
 	match String(p.kind):
 		"mine": what = "a proximity mine"
 		"stun": what = "a stun grenade"

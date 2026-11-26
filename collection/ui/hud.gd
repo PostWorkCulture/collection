@@ -9,6 +9,7 @@ extends CanvasLayer
 
 const Weapons := preload("res://weapons/weapons.gd")
 const Minimap := preload("res://ui/minimap.gd")
+const WeaponModel := preload("res://weapons/weapon_model.gd")
 const Sfx := preload("res://audio/sfx.gd")
 
 const WHITE := Color(1, 1, 1)
@@ -484,7 +485,10 @@ func _process(dt: float) -> void:
 		_hp_bar.size.x = 230.0 * clampf(player.hp / 100.0, 0.0, 1.0) if player.alive else 0.0
 	_st_bar.size.x = 230.0 * clampf(player.stamina / 100.0, 0.0, 1.0)
 	# weapon
-	_wpn_name.text = String(g.name).to_upper()
+	var skin: String = player.bat_skin if id == "bat" else player.gun_skin
+	var sk: String = String(WeaponModel.SKIN_NAMES.get(skin, "")) if id != "fists" else ""
+	_wpn_name.text = ((sk + " ") if sk != "" else "").to_upper() + String(g.name).to_upper()
+	_wpn_name.add_theme_color_override("font_color", GOLD if skin == "gold" and sk != "" else WHITE)   # the gold bat glows gold
 	if Weapons.is_melee(id):
 		_wpn_ammo.text = "—"
 	else:
