@@ -10,6 +10,7 @@ var head_up := 0.0  # radians added to where the head looks (lifts the head when
 var head_max := 0.6 # the most the head is turned to get there
 var arm_drop := 0.0 # radians: both upper arms lowered at the shoulder (a guard or pistols held below the eyes)
 var arm_in := 0.0   # radians: both upper arms brought in towards the body
+var bank := 0.0     # radians: the back leans over towards her left (+) or right, into a turn
 
 const BONES := ["Spine1", "Spine2", "Neck"]
 const SHARE := [0.4, 0.35, 0.25]      # a turn of the chest, then the neck: the head stays level, it doesn't tip
@@ -39,7 +40,7 @@ func _process_modification() -> void:
 		if b < 0:
 			continue
 		var g := pg * sk.get_bone_pose(b)
-		var r := Basis(Vector3.UP, yaw * SHARE[i]) * Basis(Vector3.LEFT, pitch * SHARE[i])
+		var r := Basis(Vector3.UP, yaw * SHARE[i]) * Basis(Vector3.LEFT, pitch * SHARE[i]) * Basis(Vector3.BACK, -bank * SHARE[i])
 		var g2 := Transform3D(r * g.basis, g.origin)
 		sk.set_bone_pose_rotation(b, (pg.affine_inverse() * g2).basis.get_rotation_quaternion())
 		pg = g2

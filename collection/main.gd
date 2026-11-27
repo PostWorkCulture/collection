@@ -978,6 +978,21 @@ func _character_preview(cfg: Dictionary) -> void:
 	var start := Vector3(-34, 0.05, -33)   # the front lawn between the hedges and the house: every action moves east along it
 	var acts: Array = cfg.get("character_actions", ["idle", "run", "strafe_right", "strafe_left", "run_back", "diagonal",
 			"walk", "crouch_walk", "jump", "punch", "bat", "smg_run", "smg_aim", "duals", "hit", "downed", "death", "victory", "ladder"])
+	var nframes: int = int(cfg.get("character_frames", 10))
+	var cids: Array = cfg.get("character_ids", [p.character])
+	for cid in cids:
+		if String(cid) != p.character:
+			p.switch_character(String(cid))
+		await _preview_one(p, pc, start, acts, nframes)
+	p.in_move = Vector2.ZERO
+	p.autopilot = false
+	p.invulnerable = false
+	p.cam.current = true
+	pc.queue_free()
+	p.respawn_at(start, 0.0)
+
+## one character doing each action, filmed (shots/char_<id>_<action>_<view>_<n>.png)
+func _preview_one(p: Node, pc: Camera3D, start: Vector3, acts: Array, nframes: int) -> void:
 	for act in acts:
 		p.respawn_at(start, PI * 0.5)
 		p.shield_t = 0.0
@@ -1025,29 +1040,71 @@ func _character_preview(cfg: Dictionary) -> void:
 				p._go_down(null)
 				p.invulnerable = true
 				mv = Vector2(0, 1)
-		if mv.length() > 0.01 and act != "ladder":   # face so that the movement goes east, whichever way it is relative to the body
+			"bat_strafe":   # fighting with the bat, side-stepping at full speed (the rifle legs, 27 Nov)
+				p.give_bat()
+				mv = Vector2(1, 0)
+			"bat_back":
+				p.give_bat()
+				mv = Vector2(0, -1)
+			"stairs", "stairs_stand":   # up the grand staircase: feet on the steps (27 Nov); or stopping on them
+				p.respawn_at(Vector3(0, 0.05, -3.5), 0.0)
+				await _wait(0.3)
+				mv = Vector2(0, 0.35)
+			"death_run":   # killed at a sprint: the body carries on as it falls
+				mv = Vector2(0, 1)
+			"turn":   # standing and turning: small steps round (27 Nov)
+				pass
+			"blink":   # face on, close: the lids (27 Nov)
+				p.yaw = -PI * 0.5
+		p.shield_t = 0.0   # no spawn bubble over the shots (the ladder and the stairs respawn above)
+		if mv.length() > 0.01 and act not in ["ladder", "stairs", "stairs_stand"]:   # face so that the movement goes east, whichever way it is relative to the body
 			p.yaw = PI * 0.5 + atan2(mv.x, mv.y)
 		p.in_move = mv
-		if act in ["strafe_left", "strafe_right", "run_back"]:   # squared up to fight (just swung): the strafe set
+		if act in ["strafe_left", "strafe_right", "run_back", "bat_strafe", "bat_back"]:   # squared up to fight (just swung): the strafe set
 			p.model._combat = 99.0
-		await _wait(0.7 if act != "jump" else 0.5)
+		await _wait(1.6 if act in ["stairs", "stairs_stand"] else (0.7 if act != "jump" else 0.5))
+		if act == "stairs_stand":   # stop part way up and stand there
+			p.in_move = Vector2.ZERO
+			await _wait(0.8)
 		if act == "jump":
 			p.in_jump = true
-		if act == "death":
+		if act in ["death", "death_run", "death_side"]:
+			p._last_dmg = 60
 			p._die(null)
+			if act == "death_side":   # shot from her right: thrown to her left
+				p.model.set_push(-p.right(), 7.4, p.velocity)
 		if act == "victory":   # the win: a celebration into a dance
 			p.model.emote("cel_cheer", "dance_raise_roof")
-		var shots := 10
+		var shots := nframes
 		for i in shots:
 			if act in ["punch", "bat"]:
 				p.in_fire = i % 3 == 0
 			if act == "hit" and i % 3 == 0:
 				p.model.hurt()
+			if act == "turn":
+				p.yaw += 0.35
+			if act == "blink" and i == 1:
+				p.model._blink_t = 0.0   # starts now: shut in the next frame (this one is already drawn)
 			if act == "jump" and i == 1:
 				p.in_jump = false
 			for view in (["side", "front", "tp"] if i % 3 == 0 else ["side"]):
 				var c: Vector3 = p.global_position + Vector3.UP * 1.1
-				if act == "ladder" and view != "tp":   # side on from the east, and from behind over the lawn
+				if act.begins_with("death") and p.model.rag != null and p.model.rag.on and p.model.rag.bodies.has("Hips"):   # follow the body down
+					var hb: Vector3 = (p.model.rag.bodies["Hips"] as Node3D).global_position
+					c = Vector3(hb.x, maxf(hb.y + 0.3, p.global_position.y + 0.5), hb.z)
+				var eyes: Array = p.model.eye_points() if act == "blink" else []
+				if act == "blink" and not eyes.is_empty():   # square on to the face, between the eyes
+					var mid: Vector3 = ((eyes[0] as Vector3) + (eyes[eyes.size() - 1] as Vector3)) * 0.5
+					var hb: Vector3 = p.model.bone_world("Head")
+					var fwd: Vector3 = Vector3(mid.x - hb.x, 0.0, mid.z - hb.z).normalized()
+					pc.global_position = mid + fwd * 1.5
+					pc.look_at(mid, Vector3.UP)
+					pc.current = true
+				elif act in ["stairs", "stairs_stand"] and view != "tp":
+					pc.global_position = c + Vector3(4.6, -0.2, -0.6)   # side on, at step height: the feet on the treads
+					pc.look_at(c + Vector3.DOWN * 0.5, Vector3.UP)
+					pc.current = true
+				elif act == "ladder" and view != "tp":   # side on from the east, and from behind over the lawn
 					pc.global_position = c + (Vector3(4.4, 0.2, -0.9) if view == "side" else Vector3(2.2, 0.6, -3.8))
 					pc.look_at(c, Vector3.UP)
 					pc.current = true
@@ -1063,17 +1120,11 @@ func _character_preview(cfg: Dictionary) -> void:
 					p.cam.current = true
 				if DisplayServer.get_name() != "headless":
 					await RenderingServer.frame_post_draw
-					get_viewport().get_texture().get_image().save_png(ProjectSettings.globalize_path("res://shots/char_%s_%s_%d.png" % [act, view, i]))
+					get_viewport().get_texture().get_image().save_png(ProjectSettings.globalize_path("res://shots/char_%s_%s_%s_%d.png" % [p.character, act, view, i]))
 				else:
 					await get_tree().process_frame
-			await _wait(0.07)
-		_log("AUTOTEST character %s: state %s, speed %.1f, body turn %.0f deg, at %v, wall %s" % [act, p.model._state, Vector2(p.velocity.x, p.velocity.z).length(), rad_to_deg(wrapf(p.model.body_yaw - p.yaw, -PI, PI)), p.global_position, p.is_on_wall()])
-	p.in_move = Vector2.ZERO
-	p.autopilot = false
-	p.invulnerable = false
-	p.cam.current = true
-	pc.queue_free()
-	p.respawn_at(start, 0.0)
+			await _wait(0.3 if act.begins_with("death") else 0.07)   # the limp fall takes a second or so
+		_log("AUTOTEST character %s %s: state %s, speed %.1f, body turn %.0f deg, at %v, wall %s" % [p.character, act, p.model._state, Vector2(p.velocity.x, p.velocity.z).length(), rad_to_deg(wrapf(p.model.body_yaw - p.yaw, -PI, PI)), p.global_position, p.is_on_wall()])
 
 ## nothing solid here (a small sphere test)
 func _clear_at(p: Vector3) -> bool:
@@ -1155,6 +1206,13 @@ func _combat_checks() -> void:
 	# down again (30 HP: one hit) and finish them
 	await _attack_until(dum, func(): return not dum.alive, 4.0)
 	_log("AUTOTEST finish: alive=%s deaths=%d player kills=%d" % [dum.alive, dum.deaths, player.kills])
+	# the body goes limp and is shoved by the hit (a ragdoll, 27 Nov)
+	await _wait(1.2)
+	var rg: Node = dum.model.rag if dum.model else null
+	var hb: Node3D = rg.bodies.get("Hips") if rg and rg.on else null
+	var hp3: Vector3 = hb.global_position if hb else dum.global_position
+	_log("AUTOTEST ragdoll: limp=%s, bodies %d, hips %.2f m off the floor, %.2f m from where it died" % [rg != null and rg.on, rg.bodies.size() if rg else 0, hp3.y - dum.global_position.y, Vector2(hp3.x - dum.global_position.x, hp3.z - dum.global_position.z).length()])
+	await _snap("p2_04b_ragdoll_third.png")
 	await _wait(3.4)
 	_log("AUTOTEST respawn: alive=%s hp=%d at %v shield=%.1f" % [dum.alive, dum.hp, dum.global_position, dum.shield_t])
 	# MP5 in first person, aiming down sights, at 10 m
@@ -1634,7 +1692,7 @@ func _bots_match(cfg: Dictionary) -> void:
 					_log("AUTOTEST   still: %s %s at %v goal %v ladder=%s floor=%s target=%s" % [f.display_name, b.state if b else "-", f.global_position, b.goal if b else Vector3.ZERO, f.on_ladder, f.is_on_floor(), b.target.display_name if b and b.target else "-"])
 				last_pos[f] = f.global_position
 				parts.append("%s %d★ %dk/%dd %s y%.0f" % [f.display_name, f.stars, f.kills, f.deaths, b.state if b else "-", f.global_position.y])
-			_log("AUTOTEST t=%ds stars out %d | %s" % [int(t), _active_stars().size(), " | ".join(parts)])
+			_log("AUTOTEST t=%ds %d fps stars out %d | %s" % [int(t), Engine.get_frames_per_second(), _active_stars().size(), " | ".join(parts)])
 		if shot_i < shots.size() and t >= float(shots[shot_i].get("at", 0.0)):
 			var sh: Dictionary = shots[shot_i]
 			shot_i += 1

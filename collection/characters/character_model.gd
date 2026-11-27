@@ -6,8 +6,8 @@ extends Node3D
 ## How it moves:
 ## - free running (fists or bat, not fighting): she turns and runs the way she's going, like a person would, and only
 ##   her head and chest turn back towards the aim (up to 25 degrees); idle, walk, run and sprint by speed
-## - fighting with fists or the bat (just attacked, or aiming): she faces the aim and the legs use the strafe and
-##   backward-run set, turning up to 40 degrees towards where she's going
+## - fighting with fists or the bat (just attacked, or aiming): she faces the aim; forward she runs (legs turning up to
+##   40 degrees towards where she's going), backwards and sideways the legs use the rifle set's runs (27 Nov)
 ## - with a gun: she faces the aim and runs with the rifle 8-way set (forward, back, sideways, diagonals); the gun is
 ##   raised to the shoulder when aiming or firing; dual pistols are held out in both hands
 ## - every clip plays at the speed that keeps the feet with the ground
@@ -18,13 +18,15 @@ extends Node3D
 
 const SpineTwist := preload("res://characters/spine_twist.gd")
 const HandIK := preload("res://characters/hand_ik.gd")
+const FootIK := preload("res://characters/foot_ik.gd")
+const Ragdoll := preload("res://characters/ragdoll.gd")
+const Sway := preload("res://characters/sway.gd")
 
 const GAME_HEIGHT := 2.2          # the model is scaled so the top of the head is here (the fighter's capsule is 2.25)
 const FREE_TWIST := deg_to_rad(25.0)
 const FIGHT_TURN := deg_to_rad(40.0)
 const COMBAT_HOLD := 1.4          # seconds after an attack that she keeps facing the aim
 const STANCE_FISTS := 0.5         # radians the body turns back to the left in the boxing stance
-const STRAFE_TURN := deg_to_rad(62.0)
 const AIR_TURN := deg_to_rad(-20.0)
 const ARMS := ["LeftShoulder", "LeftArm", "LeftForeArm", "LeftHand", "RightShoulder", "RightArm", "RightForeArm", "RightHand"]
 const UPPER := ["Spine1", "Spine2", "Neck", "Head", "LeftShoulder", "LeftArm", "LeftForeArm", "LeftHand",
@@ -53,6 +55,11 @@ var player: AnimationPlayer
 var tree: AnimationTree
 var twist: Node                    # SpineTwist modifier
 var hik: Node                      # HandIK modifier (after the twist): the fighter sets its targets each frame
+var feet: Node                     # FootIK modifier (before the twist): feet on stairs and slopes
+var sway: Node                     # Sway modifier: springy hair and chains
+var rag: Node = null               # Ragdoll modifier (characters/ragdoll.gd), made the first time she dies
+var _push := Vector3.ZERO          # the shove of the killing hit, for the ragdoll
+var _carry := Vector3.ZERO         # how fast she was moving when she died (the ragdoll keeps it)
 var meta := {}
 var k := 1.0                       # model units -> game metres
 var meshes: Array[MeshInstance3D] = []
@@ -91,6 +98,12 @@ var _emote := ""                   # playing a celebration, dance or pose ("" = 
 var _emote_t := 0.0
 var _emote_next := ""              # after a one-off celebration ends, this plays (a dance)
 var _stance := 0.0
+var _lid_mat: ShaderMaterial = null # the blink, drawn over the face (characters/blink.gdshader)
+var _eyes_rest: Array[Vector3] = [] # the eyes in the rest pose (skeleton space)
+var _blink_t := 3.0
+var _prev_hv := Vector2.ZERO
+var _lean := 0.0                   # radians forward (into a start), back into a stop
+var _bank := 0.0                   # radians towards her left (into a turn)
 
 static func path_for(cid: String) -> String:
 	return "res://characters/%s/%s.glb" % [cid, cid]
@@ -144,13 +157,19 @@ func setup(cid: String) -> void:
 				c.rim = 0.5
 				c.rim_tint = 0.6
 				c.roughness = 0.62
+				c.cull_mode = BaseMaterial3D.CULL_DISABLED   # the 1v1 models are drawn two-sided: thin cloth (Puffa's jacket) shows no holes
 				mi.set_surface_override_material(s, c)
 				_mats.append(c)
 	_build_tree()
+	_setup_lids()
+	feet = FootIK.new()   # first after the animation: the legs onto the ground, then the chest and the hands
+	skel.add_child(feet)
 	twist = SpineTwist.new()
 	skel.add_child(twist)
 	hik = HandIK.new()
 	skel.add_child(hik)
+	sway = Sway.new()   # after the hands: hair and chains swing with how the body is thrown about
+	skel.add_child(sway)
 
 func _speed(clip: String) -> float:
 	return float(meta.get(clip, {}).get("speed", 0.0)) * k
@@ -208,10 +227,13 @@ func _build_tree() -> void:
 		fb.add_blend_point(_anim(fclips[i]), _free_pts[i][0], -1, "p%d" % i)
 	bt.add_node("free", fb)
 	_rings["free"] = _speed("sprint")
-	bt.add_node("fight", _space2({"walk2": Vector2(0, 1), "run": Vector2(0, 1), "sprint": Vector2(0, 1), "run_back": Vector2(0, -1),
-			"strafe_right": Vector2(1, 0), "strafe_left": Vector2(-1, 0), "strafe_walk_right": Vector2(1, 0),
+	# fighting with fists or the bat: forward is the run, but backwards and sideways use the rifle set's legs (Pete,
+	# 27 Nov: the fight backpedal and strafes were made at 3.4-3.6 m/s, so at 8.5 m/s the feet slid; the rifle runs
+	# cover 7.3 m/s and keep the chest square); slow side-steps keep the walking strafes
+	bt.add_node("fight", _space2({"walk2": Vector2(0, 1), "run": Vector2(0, 1), "sprint": Vector2(0, 1), "r_sprint_back": Vector2(0, -1),
+			"r_sprint_right": Vector2(1, 0), "r_sprint_left": Vector2(-1, 0), "strafe_walk_right": Vector2(1, 0),
 			"strafe_walk_left": Vector2(-1, 0)}, "box_guard"))   # standing: the boxing stance (lead foot forward)
-	_rings["fight"] = {"f": _speed("sprint"), "b": _speed("run_back"), "r": _speed("strafe_right"), "l": _speed("strafe_left")}
+	_rings["fight"] = {"f": _speed("sprint"), "b": _speed("r_sprint_back"), "r": _speed("r_sprint_right"), "l": _speed("r_sprint_left")}
 	bt.add_node("gun", _space2({"r_sprint_fwd": Vector2(0, 1), "r_sprint_back": Vector2(0, -1), "r_sprint_left": Vector2(-1, 0),
 			"r_sprint_right": Vector2(1, 0), "r_sprint_fwd_left": Vector2(-1, 1), "r_sprint_fwd_right": Vector2(1, 1)}, "r_idle"))
 	_rings["gun"] = _speed("r_sprint_fwd")
@@ -250,7 +272,7 @@ func _build_tree() -> void:
 	bt.add_node("ladder", _anim("ladder_climb"))
 	bt.add_node("ladder_ts", AnimationNodeTimeScale.new())
 	bt.connect_node("ladder_ts", 0, "ladder")
-	bt.add_node("crawl", _anim("crawl2"))
+	bt.add_node("crawl", _anim("downed_crawl"))   # hands and knees: 0.54 m/s of travel, so 1.2 m/s plays it at 2.2x (crawl2 needed 3.9x)
 	bt.add_node("crawl_ts", AnimationNodeTimeScale.new())
 	bt.connect_node("crawl_ts", 0, "crawl")
 	# death: the jolt of the hit, then the collapse (the clip's long stagger between the two is cut out)
@@ -451,21 +473,18 @@ func tick(dt: float, f) -> void:
 		hang = f.ladder_n * clampf(LADDER_GAP - d, -0.7, 0.7)
 	# lying down (dead or downed) she never sinks into the floor: the clips were made on a slimmer body, and her big
 	# head and chunky clothes would go through it, so the whole model is lifted until every part clears the floor
-	_lift = move_toward(_lift, _floor_clear(f) if (not alive or f.downed) else 0.0, dt * (3.0 if not alive or f.downed else 6.0))
+	var limp: bool = rag != null and rag.on
+	_lift = 0.0 if limp else move_toward(_lift, _floor_clear(f) if (not alive or f.downed) else 0.0, dt * (3.0 if not alive or f.downed else 6.0))
 	hang.y += _lift
 	position = position.lerp(hang, minf(1.0, dt * 10.0))
 	# a fighter stands bladed (lead shoulder to the target): the boxing clips turn the hips about 40 degrees to the
 	# right, so standing in the fight stance the whole body is turned back partway to the left
-	# the strafe clips run with the body turned about 65 degrees towards where she's going; turned back by that much,
-	# the chest stays on the aim and the legs side-step under it
+	# (the rifle runs used for fighting side-steps and the backpedal keep the chest square, so no turn there)
 	var st := 0.0
 	if alive and _kind == "fight" and speed < 1.2 and w == "fists":
 		st = STANCE_FISTS
 	elif alive and _state in ["jump", "fall"]:
 		st = AIR_TURN   # the jump clip's hips are turned about 20 degrees left: square her up to where she's going
-	elif alive and _kind == "fight" and speed >= 1.2:
-		var lr := wrapf(atan2(v.x, v.z) - body_yaw, -PI, PI)   # + = to her left
-		st = -STRAFE_TURN * sin(lr) * clampf((speed - 1.2) / 2.0, 0.0, 1.0)
 	_stance = move_toward(_stance, st, dt * 3.0)
 	rotation = Vector3(0, body_yaw + _stance, 0)
 	var fwd := Vector2(sin(body_yaw), cos(body_yaw))
@@ -487,12 +506,12 @@ func tick(dt: float, f) -> void:
 			tree.set("parameters/death/scale", 1.4)
 		_go("dead")
 		_dead_t += dt
-		if _dead_t > 0.24 and _dead_t - dt <= 0.24:
-			tree.set("parameters/death_kind/transition_request", "down")
-			tree.set("parameters/death/scale", 1.9)   # down and settled flat in about 1.2 s
+		# the jolt of the hit, then limp (Pete, 27 Nov: a ragdoll shoved by the killing hit, as in 1v1)
+		if _dead_t > 0.1 and _dead_t - dt <= 0.1:
+			_go_limp()
 	elif f.downed:
 		_go("downed")
-		tree.set("parameters/crawl_ts/scale", clampf(speed / maxf(0.1, _speed("crawl2")), 0.0, 3.0) if speed > 0.2 else 0.0)
+		tree.set("parameters/crawl_ts/scale", clampf(speed / maxf(0.1, _speed("downed_crawl")), 0.0, 3.0) if speed > 0.2 else 0.0)
 	elif f.on_ladder and not ground:
 		_go("ladder")
 		# the climb covers 0.66 m a second: play it at the speed she's going up or down (paused when she hangs still)
@@ -553,6 +572,22 @@ func tick(dt: float, f) -> void:
 	_air_t = 0.0 if ground else _air_t + dt
 	_fall_t = 0.0 if ground else (_fall_t + dt if v.y < 0.0 else _fall_t)
 	_was_ground = ground
+	# feet on stairs and slopes (FootIK): on the ground, alive, not on a ladder
+	var feet_on := alive and ground and not climbing and _state in ["ground", "emote"]
+	feet.weight = move_toward(float(feet.weight), 1.0 if feet_on else 0.0, dt * 6.0)
+	# standing still the feet are planted and step round as the body turns over them (FootIK; 27 Nov review)
+	feet.plant = feet_on and _state == "ground" and speed < 0.4
+	feet.floor_y = (f.global_position as Vector3).y
+	if feet.exclude.is_empty():
+		feet.exclude.append(f.get_rid())
+	# a lean into starts and stops and into the turn (Pete, 27 Nov; 1v1 does the same): from the change in speed
+	var acc := (hv - _prev_hv) / maxf(dt, 0.001)
+	_prev_hv = hv
+	var acc_f := acc.dot(fwd)
+	var acc_l := -acc.dot(rgt)   # + = towards her left
+	var on := alive and ground and _state == "ground" and not climbing
+	_lean = lerpf(_lean, clampf(acc_f * 0.0035, -0.14, 0.16) if on else 0.0, minf(1.0, dt * 6.0))
+	_bank = lerpf(_bank, clampf(acc_l * 0.003, -0.12, 0.12) if on else 0.0, minf(1.0, dt * 6.0))
 	# arms over the top
 	var arms_on := 0.0
 	if alive and not (f.on_ladder and not ground):
@@ -568,6 +603,9 @@ func tick(dt: float, f) -> void:
 		elif w == "fists" and f.crouching:   # sneaking: forearms up at the waist, elbows bent
 			tree.set("parameters/arms_kind/transition_request", "guard")
 			arms_on = 0.4
+		elif w == "bat" and _kind == "fight" and speed > 1.5:   # the rifle legs' arms hold a gun: the bat arms hang
+			tree.set("parameters/arms_kind/transition_request", "relax")   # from standing instead
+			arms_on = clampf((speed - 1.5) / 2.0, 0.0, 1.0)
 		elif w == "fists" and _kind == "free" and speed > 0.3:   # walking: half the arms from standing, so they
 			tree.set("parameters/arms_kind/transition_request", "relax")   # swing closer to the body
 			arms_on = 0.45 * clampf((5.0 - speed) / 2.5, 0.0, 1.0)
@@ -600,11 +638,14 @@ func tick(dt: float, f) -> void:
 		if _hit_t > span:
 			_hit_t = -1.0
 	tree.set("parameters/hit/blend_amount", amt if alive else 0.0)
+	_blink(dt, not f.alive)
 	# spine and head: free running looks back towards the aim; fighting keeps the chest on the aim
 	var to_aim := wrapf(yaw - body_yaw, -PI, PI)
 	twist.yaw = clampf(to_aim, -FREE_TWIST, FREE_TWIST) if alive and not _climbing else 0.0
 	twist.pitch = clampf(f.pitch, -0.9, 0.9) * (0.7 if alive and fighting else 0.25 if alive else 0.0) + 0.35 * amt \
 			- (0.22 if alive and f.crouching and not fighting else 0.0)   # + the flinch rocks the chest back; sneaking leans in
+	twist.pitch -= _lean
+	twist.bank = _bank
 	if _climbing:
 		twist.pitch = 0.0
 	twist.steady = (1.0 if fighting else 0.9) if alive else (0.8 if f.downed and f.alive else 0.0)
@@ -660,7 +701,94 @@ func stop_emote() -> void:
 func is_emoting() -> bool:
 	return _emote != ""
 
+## blinking (Pete, 27 Nov; 1v1 blinks; reworked after the 27 Nov review): every few seconds a lid comes down over
+## each eye and goes back up, drawn on the face itself by characters/blink.gdshader as the body's overlay (only while
+## blinking, and on a dead body, whose eyes stay shut). The eyes were found on each face by tools/characters/find_eyes.py,
+## in the texture's own coordinates ("uv_eyes"), so the lid is lit like the face and the hair stays in front of it.
+const BlinkShader := preload("res://characters/blink.gdshader")
+func _setup_lids() -> void:
+	var ed: Dictionary = meta.get("_eyes", {})
+	var ue: Array = ed.get("uv_eyes", [])
+	if ue.is_empty() or meshes.is_empty() or _mats.is_empty():
+		return
+	var sm := ShaderMaterial.new()
+	sm.shader = BlinkShader
+	sm.set_shader_parameter("albedo_tex", _mats[0].albedo_texture)
+	sm.set_shader_parameter("skin_uv", Vector2(float(ed.uv[0]), float(ed.uv[1])))
+	sm.set_shader_parameter("roughness_v", _mats[0].roughness)
+	sm.set_shader_parameter("metallic_v", _mats[0].metallic)
+	sm.set_shader_parameter("rim_v", _mats[0].rim)
+	sm.set_shader_parameter("rim_tint_v", _mats[0].rim_tint)
+	var cs := PackedVector2Array()
+	var rs := PackedVector2Array()
+	var us := PackedVector2Array()
+	for e in ue.slice(0, 2):
+		cs.append(Vector2(float(e.c[0]), float(e.c[1])))
+		rs.append(Vector2(float(e.r[0]), float(e.r[1])))
+		us.append(Vector2(float(e.u[0]), float(e.u[1])))
+	while cs.size() < 2:
+		cs.append(Vector2(-9, -9))
+		rs.append(Vector2(1, 0))
+		us.append(Vector2(0, 1))
+	sm.set_shader_parameter("eye_count", mini(ue.size(), 2))
+	sm.set_shader_parameter("eye_c", cs)
+	sm.set_shader_parameter("eye_r", rs)
+	sm.set_shader_parameter("eye_u", us)
+	_lid_mat = sm
+	for e in ed.get("eyes", []):
+		_eyes_rest.append(Vector3(float(e.pos[0]), float(e.pos[1]), float(e.pos[2])))
+	_blink_t = randf_range(1.0, 4.0)
+
+## where the eyes are now (world), for close-up shots
+func eye_points() -> Array[Vector3]:
+	var out: Array[Vector3] = []
+	if head < 0:
+		return out
+	var hp := skel.global_transform * skel.get_bone_global_pose(head) * skel.get_bone_global_rest(head).affine_inverse()
+	for e in _eyes_rest:
+		out.append(hp * e)
+	return out
+
+func _blink(dt: float, dead: bool) -> void:
+	if _lid_mat == null:
+		return
+	var shut := 0.0
+	if dead:
+		shut = 1.0
+	else:
+		_blink_t -= dt
+		if _blink_t <= 0.0:
+			var t := -_blink_t   # 0.06 s down, 0.04 s shut, 0.08 s up
+			shut = clampf(t / 0.06, 0.0, 1.0) if t < 0.06 else (1.0 if t < 0.1 else clampf(1.0 - (t - 0.1) / 0.08, 0.0, 1.0))
+			if t > 0.18:
+				_blink_t = randf_range(1.8, 5.5) if randf() > 0.15 else 0.25   # now and then a double blink
+	var on := shut > 0.01
+	var mi: MeshInstance3D = meshes[0]
+	if on != (mi.material_overlay != null):
+		mi.material_overlay = _lid_mat if on else null
+	if on:
+		_lid_mat.set_shader_parameter("shut", shut)
+
+## the body goes limp and is shoved the way the killing hit was going
+func _go_limp() -> void:
+	if rag == null:
+		rag = Ragdoll.new()
+		rag.name = "Ragdoll"
+		skel.add_child(rag)
+		skel.move_child(rag, skel.get_child_count() - 1)   # last: after the feet, the twist and the hands
+	rag.start(_push + Vector3.UP * 0.3, _carry, Vector3(sin(body_yaw), 0.0, cos(body_yaw)))
+
+## the killing hit: which way (world) and how hard (m/s it shoves the body)
+func set_push(dir: Vector3, speed: float, carry := Vector3.ZERO) -> void:
+	var h := Vector3(dir.x, 0.0, dir.z)
+	_push = (h.normalized() * speed) if h.length() > 0.01 else Vector3.ZERO
+	_carry = carry   # the speed she was moving at: the body keeps it as it falls
+
 func restart() -> void:
+	if rag:
+		rag.stop()
+	_push = Vector3.ZERO
+	_carry = Vector3.ZERO
 	stop_emote()
 	_state = ""
 	_kind = ""

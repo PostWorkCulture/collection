@@ -137,6 +137,7 @@ var swap_offer_t := 0.0
 var has_mine := false             # gadgets (Pete, 26 Nov; gadgets/gadgets.gd): one proximity mine and one stun grenade at most
 var has_stun := false
 var last_item := ""               # "mine" or "stun": the one picked up last, which right click uses first (Pete, 27 Nov)
+var _last_dmg := 0                # the last hit's damage (how hard a killing hit shoves the body)
 var _aim_eaten := false           # this press of aim (right click) used an item, so it doesn't aim too
 var _aim_on := false              # Settings → aim toggle: aiming until you press aim again
 var boost_t := 0.0                # speed boost left (seconds)
@@ -306,6 +307,18 @@ func _make_model() -> void:
 	for c in _body_mesh.get_children():
 		if c != _shell and c != _held:
 			c.queue_free()
+
+## put a different rigged character on this fighter (the checks and, later, character select)
+func switch_character(cid: String) -> void:
+	if model:
+		model.queue_free()
+		remove_child(model)
+		model = null
+	character = cid
+	_make_model()
+	if model:
+		model.restart()
+		apply_camera_mode()
 
 func apply_camera_mode() -> void:
 	var fp := Settings.camera_mode == "first" and not downed and is_player
@@ -525,6 +538,7 @@ func take_damage(amount: float, src: Node, head := false, _gun := "") -> bool:
 	if not alive or shield_t > 0.0 or invulnerable:
 		return false
 	var dmg := maxi(1, roundi(amount))
+	_last_dmg = dmg
 	last_hurt = _now()
 	last_by = src
 	hurt.emit(dmg, src, head)
@@ -576,6 +590,9 @@ func _get_up() -> void:
 	got_up.emit()
 
 func _die(src: Node) -> void:
+	if model:   # the body is shoved the way the killing hit was going: harder for a bigger hit (a ragdoll, 27 Nov)
+		var from: Vector3 = (src as Node3D).global_position if src is Node3D and src != self else global_position - forward()
+		model.set_push(global_position - from, clampf(2.0 + _last_dmg * 0.09, 2.5, 8.0), velocity)
 	alive = false
 	downed = false
 	deaths += 1
@@ -853,6 +870,16 @@ func _physics_process(dt: float) -> void:
 		respawn_t -= dt
 		if model:   # the death fall plays out until the respawn
 			model.tick(dt, self)
+			# the camera follows the limp body (it can tumble a few metres from where she died)
+			if model.rag != null and model.rag.on and model.rag.bodies.has("Hips"):
+				var hp: Vector3 = to_local((model.rag.bodies["Hips"] as Node3D).global_position)
+				var k := minf(1.0, dt * 6.0)
+				_pivot.position.x = lerpf(_pivot.position.x, hp.x, k)
+				_pivot.position.z = lerpf(_pivot.position.z, hp.z, k)
+				_pivot.position.y = lerpf(_pivot.position.y, hp.y + 0.3, k)   # aimed at the body, not over it
+				_pivot.rotation.x = lerpf(_pivot.rotation.x, -0.7, k)         # looking down at about 40 degrees
+				if is_player and not first_person():
+					_arm.position = _arm.position.lerp(Vector3.ZERO, k)        # centred, not over the shoulder
 		if respawn_t <= 0.0 and game:
 			game.respawn(self)
 		return
@@ -1106,7 +1133,7 @@ func _update_view(dt: float) -> void:
 	var g := Weapons.stat(current_weapon())
 	_eye = lerp(_eye, EYE_DOWN if downed else (EYE_CROUCH if crouching else EYE), min(1.0, dt * 12.0))
 	_step_dy = move_toward(_step_dy, 0.0, dt * 2.0) * maxf(0.0, 1.0 - dt * 9.0)
-	_pivot.position.y = _eye + _step_dy
+	_pivot.position = Vector3(0.0, _eye + _step_dy, 0.0)
 	_pivot.rotation = Vector3(pitch, yaw + PI, 0)
 	if not downed:
 		_body_mesh.rotation.y = yaw
@@ -1203,20 +1230,26 @@ func _hold_in_hand() -> void:
 	var lw: Vector3 = model.hand_transform(false).origin   # are turned differently, so they don't)
 	var aim := aim_forward()
 	var raised: bool = ads or kick_t > 0.0 or model._fire_t > 0.0
-	_held.visible = not model._climbing and not zip_ride   # both hands on the rungs or the handle: put away (Pete, 26 Nov)
+	_held.visible = not model._climbing and not zip_ride and not downed   # both hands on the rungs or the handle, or on the
+	                                                                       # ground crawling: put away (Pete, 26 Nov; 27 Nov review)
 	if zip_ride and zip_handle != Vector3.INF:   # both hands up on the zipline's bar
 		var sd := right()
 		model.hik.targets = [zip_handle + Vector3.DOWN * 0.32 + sd * 0.16, zip_handle + Vector3.DOWN * 0.32 - sd * 0.16]
 		model.hik.weights = [1.0, 1.0]
 		return
-	if model._climbing:
+	if model._climbing or downed:
 		return
 	if w == "bat":
 		var g: Array = model.grip_axes()
 		var dir: Vector3 = g[0]
 		var at := r
 		if swing_t <= 0.0 and model._combat <= 0.0:
-			dir = (dir * 0.35 + Vector3.DOWN + forward() * 0.25).normalized()   # carried, tip down and a little forward
+			# carried (27 Nov review: the 1.3 m bat hung straight down went into the floor): standing, tip ahead and out
+			# off the ground; moving, trailing back at about 60 degrees from upright, clear of the legs and the floor
+			var mv := clampf((Vector2(velocity.x, velocity.z).length() - 1.0) / 3.0, 0.0, 1.0)
+			var stand := (Vector3.DOWN * 0.35 + forward() * 0.9 + right() * 0.25).normalized()
+			var run := (Vector3.DOWN * 0.5 - forward() * 0.8 + right() * 0.3).normalized()
+			dir = stand.lerp(run, mv).normalized()
 		else:   # swinging: the bat leaves the right fist; the left hand is put on the handle below it (IK), always
 			dir = model.fist_dir(true)
 			if rw.distance_to(lw) < 0.32:   # hands together in the clip: both fists agree on the line
