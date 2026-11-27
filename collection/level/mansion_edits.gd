@@ -8,6 +8,9 @@ extends RefCounted
 ##   stay clear) and is 25% bigger; the sun loungers and the palm that stood in that corner are taken out.
 ## - Hall of Fame (the trophy room): rock singers and guitarists in glittery gold frames.
 ## - Observatory (the space room): a ceiling of twinkling stars, and the telescope spins round when you walk up to it.
+## - Hot tubs (27 Nov): you walk in and out without jumping. The web's rim was 0.55 m above the deck, exactly the most a
+##   step can climb, so it always needed a jump. Now a low stone step runs round the outside and a seat round the inside,
+##   both 0.28 m, and the rim's collider matches the white stone you see.
 ## Things are found by where they stand (centre within 0.3 m), not by box number, so a re-export doesn't break this.
 
 const UF := 5.8
@@ -30,6 +33,13 @@ const TUB_AREA := AABB(Vector3(26.4, 5.7, 19.4), Vector3(7.2, 2.2, 7.2))
 ## the telescope: moved 1.2 m out from the wall so its tube clears the wall as it spins
 const SCOPE_FROM := Vector3(25.36, UF, -21.0)
 const SCOPE_TO := Vector3(26.56, UF, -21.0)
+## the hot tubs: centre and how much bigger than the spa's; the deck is 0.3 m, the white stone surround runs from
+## 1.5 m to 2.1 m out and stands 0.56 m above the deck (all × the tub's scale across)
+const TUBS := [[Vector3(-16, UF, 4), 1.0], [TUB_TO, TUB_SCALE]]
+const TUB_DECK := 0.3
+const TUB_RIM := [1.5, 2.1, 0.56]
+const TUB_STEP := [2.1, 2.55, 0.28]     # outside: from, to, height above the deck
+const TUB_SEAT := [1.15, 1.5, 0.28]     # inside, under the water
 
 static func box_centre(b: Dictionary) -> Vector3:
 	var a: Array = b.b
@@ -73,6 +83,7 @@ static func move_scope_box(b: Dictionary) -> Dictionary:
 ## the look: tub moved and scaled, telescope on a pivot (CollectionGame-free: level only)
 static func apply(level: Node3D) -> Dictionary:
 	var out := {"scope": null, "hidden": 0, "tub_meshes": 0}
+	_tub_steps(level)
 	if not level.dressed:
 		return out
 	var meshes: Array = level.dressing.find_children("*", "MeshInstance3D", true, false)
@@ -105,3 +116,60 @@ static func apply(level: Node3D) -> Dictionary:
 			out.scope = pivot
 			break
 	return out
+
+## the tubs' step, rim and seat (see the top): the web's rim blocks stop colliding and three rings take over
+static func _tub_steps(level: Node3D) -> void:
+	for t in TUBS:
+		var c: Vector3 = t[0]
+		var sc: float = t[1]
+		for i in level.bodies:
+			var body: CollisionObject3D = level.bodies[i]
+			var p := body.global_position
+			if absf(p.y - (c.y + TUB_DECK + 0.275)) < 0.05 and Vector2(p.x - c.x, p.z - c.z).length() < 2.0 * sc:
+				body.collision_layer = 0   # a rim block
+		var holder := StaticBody3D.new()
+		holder.name = "TubSteps"
+		level.add_child(holder)
+		holder.global_position = c + Vector3.UP * TUB_DECK
+		var stone := StandardMaterial3D.new()
+		stone.albedo_color = Color(0.93, 0.93, 0.94)
+		stone.roughness = 0.55
+		stone.cull_mode = BaseMaterial3D.CULL_DISABLED
+		var tile := StandardMaterial3D.new()
+		tile.albedo_color = Color(0.31, 0.7, 0.78)
+		tile.roughness = 0.3
+		tile.cull_mode = BaseMaterial3D.CULL_DISABLED
+		for ring in [[TUB_STEP, stone], [TUB_SEAT, tile], [TUB_RIM, null]]:
+			var r: Array = ring[0]
+			var mesh := _annulus(float(r[0]) * sc, float(r[1]) * sc, float(r[2]), 48)
+			var cs := CollisionShape3D.new()
+			var shape := mesh.create_trimesh_shape()
+			shape.backface_collision = true
+			cs.shape = shape
+			holder.add_child(cs)
+			if ring[1] != null:   # (the rim is already drawn by the Mansion)
+				var mi := MeshInstance3D.new()
+				mi.mesh = mesh
+				mi.material_override = ring[1]
+				holder.add_child(mi)
+
+## a flat ring from r0 to r1, h tall, standing on y = 0: its top and both upright faces
+static func _annulus(r0: float, r1: float, h: float, n: int) -> ArrayMesh:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var up := Vector3.UP * h
+	for i in n:
+		var a0 := float(i) / n * TAU
+		var a1 := float(i + 1) / n * TAU
+		var d0 := Vector3(cos(a0), 0, sin(a0))
+		var d1 := Vector3(cos(a1), 0, sin(a1))
+		st.set_normal(Vector3.UP)   # top
+		for v in [d0 * r0 + up, d1 * r1 + up, d0 * r1 + up, d0 * r0 + up, d1 * r0 + up, d1 * r1 + up]:
+			st.add_vertex(v)
+		for v in [d0 * r1, d0 * r1 + up, d1 * r1 + up, d0 * r1, d1 * r1 + up, d1 * r1]:   # outside face
+			st.set_normal(Vector3(v.x, 0, v.z).normalized())
+			st.add_vertex(v)
+		for v in [d0 * r0, d1 * r0 + up, d0 * r0 + up, d0 * r0, d1 * r0, d1 * r0 + up]:   # inside face
+			st.set_normal(-Vector3(v.x, 0, v.z).normalized())
+			st.add_vertex(v)
+	return st.commit()

@@ -717,6 +717,28 @@ func _mansion_checks() -> void:
 	await get_tree().create_timer(1.0).timeout
 	_log("AUTOTEST terrace tub: at (%.1f, %.1f) radius %.2f, in it=%s at y %.2f, water found=%s" % [tub2.c.x, tub2.c.y, tub2.r, tub2.inside.get(player.get_instance_id(), false), player.global_position.y, tub2.water != null])
 	await _snap("p6_10_terrace_tub_third.png")
+	# walk into each tub and back out without jumping, from six sides (Pete, 27 Nov)
+	for tb in [tub, tub2]:
+		var sc: float = float(tb.r) / 1.5
+		var ctr := Vector3(tb.c.x, 5.85, tb.c.y)
+		var ins := 0
+		var outs := 0
+		var worst := ""
+		for k in 6:
+			var a := float(k) / 6.0 * TAU
+			var dv := Vector3(sin(a), 0, cos(a))
+			player.place(ctr + dv * (3.9 if tb == tub else 3.0 * sc), a + PI)
+			await _wait(0.3)
+			var got_in := await _walk_until(func(): return Vector2(player.global_position.x - ctr.x, player.global_position.z - ctr.z).length() < 0.4 and player.global_position.y < 6.3, 2.0)
+			if got_in and k == 0 and tb == tub2:
+				await _snap("p6_10b_terrace_tub_walked_in_third.png")
+			player.yaw = a
+			var got_out := await _walk_until(func(): return Vector2(player.global_position.x - ctr.x, player.global_position.z - ctr.z).length() > 2.7 * sc and player.global_position.y < 6.2, 2.0)
+			ins += int(got_in)
+			outs += int(got_out)
+			if not (got_in and got_out):
+				worst += " %d deg: in=%s out=%s at %v;" % [roundi(rad_to_deg(a)), got_in, got_out, player.global_position]
+		_log("AUTOTEST tub walk-in (%.1f, %.1f): walked in %d/6, walked out %d/6, no jumping%s" % [ctr.x, ctr.z, ins, outs, worst])
 	# the telescope spins when you walk up to it; the Hall of Fame and the star ceiling are there
 	var scope: Node3D = features._scope
 	if scope:
@@ -829,6 +851,21 @@ func _mansion_checks() -> void:
 	player.invulnerable = false
 
 # ---------------- phase 2 combat checks ----------------
+## hold forward (never jump) until done() or the time runs out; true if done() came true
+func _walk_until(done: Callable, secs: float) -> bool:
+	Input.action_press("move_forward")
+	var t := 0.0
+	var ok := false
+	while t < secs:
+		await get_tree().physics_frame
+		t += get_physics_process_delta_time()
+		if done.call():
+			ok = true
+			break
+	Input.action_release("move_forward")
+	await _wait(0.2)
+	return ok
+
 ## one trigger pull: hold fire until a shot goes off (or a second passes), then let go
 func _pull_once() -> void:
 	var a0: int = player.ammo
