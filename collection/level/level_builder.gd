@@ -448,6 +448,7 @@ func _add_ramp(st: Dictionary) -> void:
 	cs.shape = sh
 	body.add_child(cs)
 	body.set_meta("ramp", true)
+	body.add_to_group("stair_ramp")   # the feet stand on the steps under it, not on it (characters/foot_ik.gd)
 	add_child(body)
 
 func _ground_box(r: Rect2, y0: float, y1: float) -> void:

@@ -1,11 +1,12 @@
 extends SkeletonModifier3D
 ## Springy hair and trouser chains (Pete, 27 Nov; 1v1's springs as the model): the rig has a Hair bone (what hangs
-## off the head, and anything sticking up off the top at half) and, where a character has one, a chain bone on the
+## off the head at the sides and back) and, where a character has one, a chain bone on the
 ## front of a thigh (tools/characters/rig_wednesday.py). After the animation each of those bones lags behind the way
 ## its tip is being thrown about: a damped spring on the tip's acceleration (stiffness, damping, how hard it's
 ## thrown, the most it moves), so hair bounces when she lands, swings when she turns and settles when she stops.
-## Hair also hangs: when the head tips (lying down, crawling, a ragdoll) it falls back most of the way towards how
-## it hangs from an upright head, so long tails droop instead of sticking out (27 Nov review). Hats and hoods aren't
+## Hair also hangs: when the head tips (lying down, crawling, a ragdoll) it falls back towards how
+## it hangs from an upright head, so long tails droop instead of sticking out (27 Nov review); it runs after the
+## ragdoll, so a limp body's hair hangs too. Hats and hoods aren't
 ## in the Hair bone (the rig leaves the top of the head out).
 
 const SPRINGS := {
@@ -66,7 +67,7 @@ func _process_modification() -> void:
 			var tilt := hu.angle_to(Vector3.UP)
 			if tilt > 0.05:
 				var ax := hu.cross(Vector3.UP).normalized()
-				hang = Basis(ax, minf(tilt * 0.85, deg_to_rad(110.0))) * dir_w
+				hang = Basis(ax, minf(tilt, deg_to_rad(175.0))) * dir_w   # all the way: hair hangs as from an upright head
 		if p.length() < 0.001 and hang.is_equal_approx(dir_w):
 			continue
 		# turn the bone so its tip moves by p (and hangs)

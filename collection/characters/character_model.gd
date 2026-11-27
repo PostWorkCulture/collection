@@ -580,6 +580,9 @@ func tick(dt: float, f) -> void:
 	feet.floor_y = (f.global_position as Vector3).y
 	if feet.exclude.is_empty():
 		feet.exclude.append(f.get_rid())
+		# the invisible ramps over the stairs (smooth walking): the feet look through them to the steps themselves
+		for r in get_tree().get_nodes_in_group("stair_ramp"):
+			feet.exclude.append((r as CollisionObject3D).get_rid())
 	# a lean into starts and stops and into the turn (Pete, 27 Nov; 1v1 does the same): from the change in speed
 	var acc := (hv - _prev_hv) / maxf(dt, 0.001)
 	_prev_hv = hv
@@ -775,7 +778,8 @@ func _go_limp() -> void:
 		rag = Ragdoll.new()
 		rag.name = "Ragdoll"
 		skel.add_child(rag)
-		skel.move_child(rag, skel.get_child_count() - 1)   # last: after the feet, the twist and the hands
+		skel.move_child(rag, skel.get_child_count() - 1)   # after the feet, the twist and the hands
+		skel.move_child(sway, skel.get_child_count() - 1)  # and the hair after the limp body, so it hangs from where the head fell
 	rag.start(_push + Vector3.UP * 0.3, _carry, Vector3(sin(body_yaw), 0.0, cos(body_yaw)))
 
 ## the killing hit: which way (world) and how hard (m/s it shoves the body)

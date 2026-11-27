@@ -48,11 +48,13 @@ void fragment() {
 			edge_line = max(across, arc);
 		}
 	}
-	if (lid < 0.01) {
+	// opaque, so it gets the same ambient occlusion and bounce light as the face round it (the transparent pass
+	// doesn't): the soft rim is a fine dither instead of a blend
+	float n = fract(sin(dot(floor(FRAGCOORD.xy), vec2(12.9898, 78.233))) * 43758.5453);
+	if (lid <= n * 0.999) {
 		discard;
 	}
 	ALBEDO = mix(skin, vec3(0.045, 0.04, 0.045), edge_line);
-	ALPHA = lid;
 	ROUGHNESS = roughness_v;
 	METALLIC = metallic_v;
 	RIM = rim_v;

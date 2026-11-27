@@ -872,11 +872,11 @@ func _physics_process(dt: float) -> void:
 			model.tick(dt, self)
 			# the camera follows the limp body (it can tumble a few metres from where she died)
 			if model.rag != null and model.rag.on and model.rag.bodies.has("Hips"):
-				var hp: Vector3 = to_local((model.rag.bodies["Hips"] as Node3D).global_position)
+				var hip: Vector3 = to_local((model.rag.bodies["Hips"] as Node3D).global_position)
 				var k := minf(1.0, dt * 6.0)
-				_pivot.position.x = lerpf(_pivot.position.x, hp.x, k)
-				_pivot.position.z = lerpf(_pivot.position.z, hp.z, k)
-				_pivot.position.y = lerpf(_pivot.position.y, hp.y + 0.3, k)   # aimed at the body, not over it
+				_pivot.position.x = lerpf(_pivot.position.x, hip.x, k)
+				_pivot.position.z = lerpf(_pivot.position.z, hip.z, k)
+				_pivot.position.y = lerpf(_pivot.position.y, hip.y + 0.3, k)   # aimed at the body, not over it
 				_pivot.rotation.x = lerpf(_pivot.rotation.x, -0.7, k)         # looking down at about 40 degrees
 				if is_player and not first_person():
 					_arm.position = _arm.position.lerp(Vector3.ZERO, k)        # centred, not over the shoulder

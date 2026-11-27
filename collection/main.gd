@@ -1046,7 +1046,7 @@ func _preview_one(p: Node, pc: Camera3D, start: Vector3, acts: Array, nframes: i
 			"bat_back":
 				p.give_bat()
 				mv = Vector2(0, -1)
-			"stairs", "stairs_stand":   # up the grand staircase: feet on the steps (27 Nov); or stopping on them
+			"stairs", "stairs_stand", "stairs_across":   # up the grand staircase: feet on the steps (27 Nov); or stopping on them
 				p.respawn_at(Vector3(0, 0.05, -3.5), 0.0)
 				await _wait(0.3)
 				mv = Vector2(0, 0.35)
@@ -1057,15 +1057,18 @@ func _preview_one(p: Node, pc: Camera3D, start: Vector3, acts: Array, nframes: i
 			"blink":   # face on, close: the lids (27 Nov)
 				p.yaw = -PI * 0.5
 		p.shield_t = 0.0   # no spawn bubble over the shots (the ladder and the stairs respawn above)
-		if mv.length() > 0.01 and act not in ["ladder", "stairs", "stairs_stand"]:   # face so that the movement goes east, whichever way it is relative to the body
+		if mv.length() > 0.01 and act not in ["ladder", "stairs", "stairs_stand", "stairs_across"]:   # face so that the movement goes east, whichever way it is relative to the body
 			p.yaw = PI * 0.5 + atan2(mv.x, mv.y)
 		p.in_move = mv
 		if act in ["strafe_left", "strafe_right", "run_back", "bat_strafe", "bat_back"]:   # squared up to fight (just swung): the strafe set
 			p.model._combat = 99.0
-		await _wait(1.6 if act in ["stairs", "stairs_stand"] else (0.7 if act != "jump" else 0.5))
-		if act == "stairs_stand":   # stop part way up and stand there
+		await _wait(1.6 if act in ["stairs", "stairs_stand", "stairs_across"] else (0.7 if act != "jump" else 0.5))
+		if act in ["stairs_stand", "stairs_across"]:   # stop part way up and stand there
 			p.in_move = Vector2.ZERO
 			await _wait(0.8)
+		if act == "stairs_across":   # then turn side on to the stairs: one foot on each of two steps
+			p.yaw += PI * 0.5
+			await _wait(1.2)
 		if act == "jump":
 			p.in_jump = true
 		if act in ["death", "death_run", "death_side"]:
@@ -1099,6 +1102,11 @@ func _preview_one(p: Node, pc: Camera3D, start: Vector3, acts: Array, nframes: i
 					var fwd: Vector3 = Vector3(mid.x - hb.x, 0.0, mid.z - hb.z).normalized()
 					pc.global_position = mid + fwd * 1.5
 					pc.look_at(mid, Vector3.UP)
+					pc.current = true
+				elif act == "stairs_across" and view != "tp":   # face on, at step height: a foot on each step
+					var fw: Vector3 = p.forward()
+					pc.global_position = c + fw * 3.4 + Vector3.DOWN * 0.45 + (Vector3.UP * 0.6 if view == "front" else Vector3.ZERO)
+					pc.look_at(c + Vector3.DOWN * 0.75, Vector3.UP)
 					pc.current = true
 				elif act in ["stairs", "stairs_stand"] and view != "tp":
 					pc.global_position = c + Vector3(4.6, -0.2, -0.6)   # side on, at step height: the feet on the treads
