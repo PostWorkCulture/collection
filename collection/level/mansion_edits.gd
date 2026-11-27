@@ -134,11 +134,9 @@ static func _tub_steps(level: Node3D) -> void:
 		var stone := StandardMaterial3D.new()
 		stone.albedo_color = Color(0.93, 0.93, 0.94)
 		stone.roughness = 0.55
-		stone.cull_mode = BaseMaterial3D.CULL_DISABLED
 		var tile := StandardMaterial3D.new()
 		tile.albedo_color = Color(0.31, 0.7, 0.78)
 		tile.roughness = 0.3
-		tile.cull_mode = BaseMaterial3D.CULL_DISABLED
 		for ring in [[TUB_STEP, stone], [TUB_SEAT, tile], [TUB_RIM, null]]:
 			var r: Array = ring[0]
 			var mesh := _annulus(float(r[0]) * sc, float(r[1]) * sc, float(r[2]), 48)
@@ -164,12 +162,12 @@ static func _annulus(r0: float, r1: float, h: float, n: int) -> ArrayMesh:
 		var d0 := Vector3(cos(a0), 0, sin(a0))
 		var d1 := Vector3(cos(a1), 0, sin(a1))
 		st.set_normal(Vector3.UP)   # top
-		for v in [d0 * r0 + up, d1 * r1 + up, d0 * r1 + up, d0 * r0 + up, d1 * r0 + up, d1 * r1 + up]:
+		for v in [d0 * r0 + up, d0 * r1 + up, d1 * r1 + up, d0 * r0 + up, d1 * r1 + up, d1 * r0 + up]:
 			st.add_vertex(v)
-		for v in [d0 * r1, d0 * r1 + up, d1 * r1 + up, d0 * r1, d1 * r1 + up, d1 * r1]:   # outside face
+		for v in [d0 * r1, d1 * r1 + up, d0 * r1 + up, d0 * r1, d1 * r1, d1 * r1 + up]:   # outside face
 			st.set_normal(Vector3(v.x, 0, v.z).normalized())
 			st.add_vertex(v)
-		for v in [d0 * r0, d1 * r0 + up, d0 * r0 + up, d0 * r0, d1 * r0, d1 * r0 + up]:   # inside face
+		for v in [d0 * r0, d0 * r0 + up, d1 * r0 + up, d0 * r0, d1 * r0 + up, d1 * r0]:   # inside face
 			st.set_normal(-Vector3(v.x, 0, v.z).normalized())
 			st.add_vertex(v)
 	return st.commit()
