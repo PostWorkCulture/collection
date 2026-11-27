@@ -293,6 +293,27 @@ for s, n in legs.items():
     w[s + 'Foot'] = w[s + 'Foot'] * (1 - toe)
     add(w, m)
 
+# shoulders (27 Nov review: Puffa's jacket opened at the shoulder): the sleeve (arm part) and the jacket (torso part)
+# are separate shells that met only at the T-pose. Round each shoulder joint the torso takes some of the arm's turn
+# and the top of the sleeve some of the chest's, so lowering the arms bends the seam instead of opening it.
+for s, n in arms.items():
+    ja = np.array(J[s + 'Arm'][:])
+    d = np.linalg.norm(co - ja, axis=1)
+    sx = arm_info[s]['sx']
+    m = (part_of == 'torso') & (co[:, 0] * sx > 0.2)
+    f = ss((0.34 - d) / 0.26) * m
+    for k in list(W.keys()):
+        W[k] = W[k] * (1 - 0.75 * f)
+    W.setdefault(s + 'Arm', np.zeros(nv)); W.setdefault(s + 'Shoulder', np.zeros(nv))
+    W[s + 'Arm'] += 0.5 * f
+    W[s + 'Shoulder'] += 0.25 * f
+    m = part_of == n
+    g = ss((0.22 - d) / 0.2) * m
+    for k in list(W.keys()):
+        W[k] = W[k] * (1 - 0.55 * g)
+    W['Spine2'] += 0.35 * g
+    W[s + 'Shoulder'] += 0.2 * g
+
 # hair: low and out at the sides and back, or up off the top
 m = part_of == 'head'
 u = np.abs(co[:, 0] - hcx) / max(0.01, (hx1 - hx0) * 0.5)
@@ -300,8 +321,8 @@ v = (co[:, 1] - hcy) / max(0.01, (hy1 - hy0) * 0.5)         # + = back
 hgt = (co[:, 2] - hz0) / max(0.01, hz1 - hz0)
 rho = np.maximum(u, np.abs(v))
 low_out = ss((0.6 - hgt) / 0.35) * ss((rho - 0.62) / 0.25) * np.where(v < -0.25, ss((u - 0.82) / 0.12), 1.0)
-up_top = ss((hgt - 0.86) / 0.1) * 0.5
-hw = np.clip(np.maximum(low_out * 0.85, up_top), 0.0, 0.85) * m
+# (27 Nov review: nothing on top of the head sways any more: hats, hoods and their ears stayed jelly-like)
+hw = np.clip(low_out * 0.85, 0.0, 0.85) * m
 W['Hair'] = W['Head'] * hw
 W['Head'] = W['Head'] * (1 - hw)
 # chains: the grey links on the front of the thigh

@@ -65,7 +65,8 @@ def blobs(min_skin):
         rp = O[ring]; skin = (rp.mean(1) > 0.45) & (rp.max(1) - rp.min(1) < 0.35)
         if skin.mean() < min_skin: continue
         cy, cx = (y0 + y1) / 2, (x0 + x1) / 2
-        found.append({'pos': [X0 + cx * st, Z0 - cy * st, float(-np.nanmin(Y[y0:y1 + 1, x0:x1 + 1])) + 0.006],
+        # depth: the face under the eye itself (not the box round it, where a fringe can stand well in front)
+        found.append({'pos': [X0 + cx * st, Z0 - cy * st, float(-np.nanmedian(Y[lab == k])) + 0.006],
                       'w': (w + 3) * st, 'h': (h + 3) * st})
     found.sort(key=lambda e: -e['pos'][1])
     found = found[:3]
@@ -75,7 +76,7 @@ if manual:
     eyes = []
     for m in manual:
         x, z = map(float, m.split(','))
-        d = -np.nanmin(Y[gz(z) - 3:gz(z) + 4, gx(x) - 3:gx(x) + 4])
+        d = -np.nanmedian(Y[gz(z) - 2:gz(z) + 3, gx(x) - 2:gx(x) + 3])
         eyes.append({'pos': [x, z, float(d) + 0.006], 'w': 0.047, 'h': 0.095})
 else:
     eyes = blobs(0.8) or blobs(0.5)
@@ -87,8 +88,44 @@ ys = gz(min(e['pos'][1] - e['h'] * 0.5 for e in eyes) - 0.02)
 box = O[ys:ys + 6, gx(-0.06):gx(0.06)].reshape(-1, 3); uvb = UV[ys:ys + 6, gx(-0.06):gx(0.06)].reshape(-1, 2)
 lum = box.mean(1); med = np.median(box[lum > np.percentile(lum, 40)], 0)
 uv = uvb[np.argmin(((box - med) ** 2).sum(1))]
+# each eye in texture space too: the game draws the blink on the face itself (a skin-coloured lid and the closed-eye
+# line painted over the eye in the texture's own coordinates), so the hair stays in front and the light is the face's.
+# The texture under an eye that hair covers is found by casting on through the hair to the face's depth.
+def uv_at(x, z, depth):
+    o = inv @ Vector((x, -8, z))
+    dirn = Vector((0, 1, 0))
+    for _ in range(6):
+        ok, loc, nor, fi = tmp.ray_cast(o, dirn)
+        if not ok: return None
+        if abs((tmp.matrix_world @ loc).y + depth) < 0.035:
+            for t in tris[fi]:
+                a, b, c = [me.vertices[v].co for v in t.vertices]
+                if intersect_point_tri(loc, a, b, c) or t is tris[fi][-1]:
+                    ua, ub, uc = [Vector((uvl[l].uv[0], uvl[l].uv[1], 0)) for l in t.loops]
+                    u = barycentric_transform(loc, a, b, c, ua, ub, uc)
+                    return np.array([u[0], 1.0 - u[1]])   # glTF flips v
+        o = loc + dirn * 0.002
+    return None
+uv_eyes = []
+for e in eyes:
+    x, z, dpt = e['pos'][0], e['pos'][1], e['pos'][2] - 0.006
+    hw, hh = e['w'] * 0.5, e['h'] * 0.5
+    c = uv_at(x, z, dpt)
+    if c is None:
+        continue
+    def grad(dx, dz):   # texture change per metre across the face, one-sided where a UV seam is near
+        de = 0.006
+        p, m = uv_at(x + dx * de, z + dz * de, dpt), uv_at(x - dx * de, z - dz * de, dpt)
+        g = [v for v in ((p - c) / de if p is not None else None, (c - m) / de if m is not None else None) if v is not None]
+        return min(g, key=lambda v: np.linalg.norm(v)) if g else None
+    gr, gu = grad(1, 0), grad(0, 1)
+    if gr is None or gu is None:
+        continue
+    uv_eyes.append({'c': [round(float(v), 5) for v in c], 'r': [round(float(v), 5) for v in gr * hw],
+                    'u': [round(float(v), 5) for v in gu * hh]})
 d = json.load(open(out_json))
 d['_eyes'] = {'eyes': [{'pos': [round(float(v), 4) for v in e['pos']], 'w': round(float(e['w']), 4), 'h': round(float(e['h']), 4)} for e in eyes],
-              'skin': [round(float(c), 3) for c in med], 'uv': [round(float(uv[0]), 5), round(float(1 - uv[1]), 5)]}   # glTF flips v
+              'skin': [round(float(c), 3) for c in med], 'uv': [round(float(uv[0]), 5), round(float(1 - uv[1]), 5)],   # glTF flips v
+              'uv_eyes': uv_eyes}
 json.dump(d, open(out_json, 'w'), indent=1)
 print('EYES', out_json, json.dumps(d['_eyes']))
