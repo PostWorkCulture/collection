@@ -498,10 +498,12 @@ func _process(dt: float) -> void:
 	var gun_name := String(Weapons.stat(player.gun_id).name).to_upper() if player.gun_id != "" else "—"
 	_wpn_slots.text = "1  %s     2  %s" % [melee_name, gun_name]
 	var gl: Array[String] = []
+	# right click uses the item picked up last (or the only one), so its key line says so
+	var rmb := "stun" if player.has_stun and (player.last_item == "stun" or not player.has_mine) else "mine"
 	if player.has_mine:
-		gl.append("%s  MINE" % _key_of("use_mine"))
+		gl.append("%s%s  MINE" % [_key_of("use_mine"), (" / " + _btn_of("aim")) if rmb == "mine" else ""])
 	if player.has_stun:
-		gl.append("%s  STUN" % _key_of("use_stun"))
+		gl.append("%s%s  STUN" % [_key_of("use_stun"), (" / " + _btn_of("aim")) if rmb == "stun" else ""])
 	if player.boost_t > 0.0:
 		gl.append("BOOST %d" % ceili(player.boost_t))
 	if player.daze_t > 0.0:
@@ -526,11 +528,25 @@ func _process(dt: float) -> void:
 			Weapons.stat(player.gun_id).name, player.ammo, Weapons.stat(offer.id).name, offer.ammo]
 	_shield.visible = player.alive and player.shield_t > 0.0
 	_perf_tick(dt)
-	_help.text = "imok Collection · Godot · WASD move · Space jump · C crouch · V camera · LMB attack · RMB aim · 1 bat · 2 gun · E swap gun · Q mine · G stun · F3 bot view · Esc pause · %d fps" % Engine.get_frames_per_second()
+	_help.text = "imok Collection · Godot · WASD move · Space jump · C crouch · V camera · LMB attack · RMB aim or item · 1 bat · 2 gun · E swap gun · Q mine · G stun · F3 bot view · Esc pause · %d fps" % Engine.get_frames_per_second()
 	_process_phase3(dt)
 	_cross.queue_redraw()
 
 ## the first key (or mouse button) bound to an action, as text
+## the first key or mouse button for an action, short: "RMB", "Q"
+func _btn_of(action: String) -> String:
+	for ev in InputMap.action_get_events(action):
+		if ev is InputEventMouseButton:
+			match (ev as InputEventMouseButton).button_index:
+				MOUSE_BUTTON_LEFT: return "LMB"
+				MOUSE_BUTTON_RIGHT: return "RMB"
+				MOUSE_BUTTON_MIDDLE: return "MMB"
+				_: return "Mouse %d" % (ev as InputEventMouseButton).button_index
+		if ev is InputEventKey:
+			var k: InputEventKey = ev
+			return OS.get_keycode_string(k.physical_keycode if k.physical_keycode != 0 else k.keycode)
+	return "Aim"
+
 func _key_of(action: String) -> String:
 	for ev in InputMap.action_get_events(action):
 		if ev is InputEventKey:

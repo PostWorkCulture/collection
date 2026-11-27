@@ -110,10 +110,12 @@ func _take(f: Node) -> bool:
 				if f.has_mine:
 					return false
 				f.has_mine = true
+				f.last_item = "mine"
 			"stun":
 				if f.has_stun:
 					return false
 				f.has_stun = true
+				f.last_item = "stun"
 			"boost":
 				f.boost_t = f.BOOST_T
 		Sfx.play(game, "bing", global_position, -4.0, 1.2, 10.0)

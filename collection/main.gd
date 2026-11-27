@@ -1309,6 +1309,31 @@ func _gadget_checks() -> void:
 		most = maxf(most, dm2.daze_t)
 		await get_tree().physics_frame
 	_log("AUTOTEST stun: thrown=%s, dummy stunned up to %.2f s, your flash %.2f" % [thrown, most, player.flash_a])
+	# right click uses your item (Pete, 27 Nov): the one picked up last, then the other, then it aims again
+	player.place(Vector3(-24, 0.05, -40), 0.0)
+	player.give_gun("mp5", 20)
+	player.has_mine = true
+	player.has_stun = true
+	player.last_item = "stun"
+	await _wait(0.5)
+	var seen: Array = []
+	for k in 3:
+		var ev := InputEventMouseButton.new()
+		ev.button_index = MOUSE_BUTTON_RIGHT
+		ev.pressed = true
+		Input.parse_input_event(ev)
+		for fr in 30:
+			await get_tree().physics_frame
+		seen.append("stun %s mine %s aiming %s" % [player.has_stun, player.has_mine, player.ads])
+		var up := InputEventMouseButton.new()
+		up.button_index = MOUSE_BUTTON_RIGHT
+		up.pressed = false
+		Input.parse_input_event(up)
+		await _wait(0.3)
+	_log("AUTOTEST right click items: 1st (%s), 2nd (%s), 3rd (%s)" % seen)
+	game.gadgets.clear_all()
+	player.gun_id = ""
+	player.select_slot("melee")
 	# a speed boost: half as fast again for 10 s
 	player.place(Vector3(-30, 0.05, -40), PI * 0.5)
 	await _wait(0.3)

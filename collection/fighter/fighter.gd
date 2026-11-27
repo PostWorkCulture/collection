@@ -136,6 +136,8 @@ var swap_offer: Node = null       # a gun pickup you're standing on and could sw
 var swap_offer_t := 0.0
 var has_mine := false             # gadgets (Pete, 26 Nov; gadgets/gadgets.gd): one proximity mine and one stun grenade at most
 var has_stun := false
+var last_item := ""               # "mine" or "stun": the one picked up last, which right click uses first (Pete, 27 Nov)
+var _aim_eaten := false           # this press of aim (right click) used an item, so it doesn't aim too
 var boost_t := 0.0                # speed boost left (seconds)
 var daze_t := 0.0                 # stunned: a quarter speed, can't attack
 var flash_a := 0.0                # the white flash of a stun grenade on your own screen (the player)
@@ -395,6 +397,9 @@ func _unhandled_input(e: InputEvent) -> void:
 		apply_camera_mode()
 	if e.is_action_pressed("crouch") and not downed:
 		_set_crouch(not crouching)
+	if e.is_action_pressed("aim") and (has_mine or has_stun) and not downed:
+		use_item()   # right click uses your item; with none, it aims (Pete, 27 Nov)
+		_aim_eaten = true
 	if e.is_action_pressed("weapon_melee"):
 		select_slot("melee")
 	elif e.is_action_pressed("weapon_gun"):
@@ -414,7 +419,9 @@ func _read_player_input(dt: float) -> void:
 	in_move = Input.get_vector("move_left", "move_right", "move_back", "move_forward")
 	in_jump = Input.is_action_pressed("jump")
 	in_fire = Input.is_action_pressed("fire") and (Input.mouse_mode == Input.MOUSE_MODE_CAPTURED or force_input)
-	in_aim = Input.is_action_pressed("aim")
+	if not Input.is_action_pressed("aim"):
+		_aim_eaten = false
+	in_aim = Input.is_action_pressed("aim") and not _aim_eaten
 	# controller right stick looks around
 	var look := Input.get_vector("look_left", "look_right", "look_up", "look_down")
 	if look.length() > 0.12:
@@ -632,6 +639,16 @@ func use_mine() -> bool:
 
 func use_stun() -> bool:
 	return game != null and game.fighting() and game.gadgets.throw_stun(self)
+
+## right click: the item you picked up last (a mine is laid, a stun thrown), or the other one if that's gone
+func use_item() -> bool:
+	var order := ["stun", "mine"] if last_item == "stun" else ["mine", "stun"]
+	for k in order:
+		if k == "mine" and has_mine:
+			return use_mine()
+		if k == "stun" and has_stun:
+			return use_stun()
+	return false
 
 func stun(secs: float, strength: float) -> void:
 	daze_t = maxf(daze_t, secs)
