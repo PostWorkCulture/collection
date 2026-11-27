@@ -58,6 +58,7 @@ var _key_defaults := {}
 
 var _t_start := 0
 var load_ms := 0
+var _test_no_pause := false   # set while the scripted checks run (after the menu checks)
 
 func _ready() -> void:
 	_t_start = Time.get_ticks_msec()
@@ -425,6 +426,9 @@ func _house_lights() -> void:
 func _unhandled_input(e: InputEvent) -> void:
 	if menu.visible:
 		return
+	if _test_no_pause and e.is_action_pressed("pause"):
+		return   # the checks are running: a key pressed on the PC mustn't freeze them
+
 	if e.is_action_pressed("pause"):
 		if game.state == "won":
 			_on_quit_to_menu()   # results: Esc goes back to the start screen
@@ -462,6 +466,7 @@ func _run_autotest(cfg: Dictionary) -> void:
 	await get_tree().create_timer(1.0).timeout
 	if cfg.get("menu", false):
 		await _menu_checks()
+	_test_no_pause = true
 	_log("AUTOTEST load: %d ms from start to playable" % load_ms)
 	_log("AUTOTEST boxes=%d ladders=%d lifts=%d spawns=%d dressed=%s, %d small things with a draw distance, floor furniture %d + %d" % [level.get_child_count(), level.ladders.size(), level.lifts.size(), level.spawns.size(), level.dressed, level.ranged, level.floor_things[0].size(), level.floor_things[1].size()])
 	while game.state != "fight":   # the 3 s countdown
@@ -725,6 +730,17 @@ func _mansion_checks() -> void:
 		var ins := 0
 		var outs := 0
 		var worst := ""
+		if tb == tub2:   # the step round the outside and the seat inside, from the deck
+			player.place(ctr + Vector3(-6.0, 0.05, -6.0), 0.0)
+			var tc := Camera3D.new()
+			add_child(tc)
+			tc.global_position = ctr + Vector3(-0.8 * sc, 1.9, -3.6 * sc)
+			tc.look_at(ctr + Vector3(0, 0.3, 0), Vector3.UP)
+			tc.current = true
+			await _wait(0.3)
+			await _snap("p6_10c_terrace_tub_steps.png")
+			player.cam.current = true
+			tc.queue_free()
 		for k in 6:
 			var a := float(k) / 6.0 * TAU
 			var dv := Vector3(sin(a), 0, cos(a))
@@ -841,11 +857,15 @@ func _mansion_checks() -> void:
 		var shoved: float = Vector2(rb.global_position.x - home.x, rb.global_position.z - home.z).length()
 		var tilt: float = rad_to_deg(acos(clampf(rb.global_basis.y.normalized().dot(Vector3.UP), -1.0, 1.0)))
 		_log("AUTOTEST loose: %d loose things; ran into one %.2f m tall (%.0f kg): moved %.2f m, tilted %.0f deg" % [level.loose.size(), float(lz.h), rb.mass, shoved, tilt])
-		player.place(rb.global_position + (from - home).normalized() * 3.5 + Vector3.UP * 0.2, atan2(dd.x, dd.z))
-		player.pitch = -0.25
-		await _wait(0.3)
-		await _snap("p6_14_loose_knocked_third.png")
-		player.pitch = 0.0
+		var lc := Camera3D.new()   # looking at it from where you ran in
+		add_child(lc)
+		lc.global_position = home + (from - home).normalized() * 2.2 + Vector3.UP * 1.3
+		lc.look_at(rb.global_position, Vector3.UP)
+		lc.current = true
+		await _wait(0.2)
+		await _snap("p6_14_loose_knocked.png")
+		player.cam.current = true
+		lc.queue_free()
 		game.reset_props()
 		await _wait(0.2)
 		_log("AUTOTEST loose: back home after reset=%s" % [rb.global_position.distance_to(home) < 0.05])
@@ -1122,10 +1142,11 @@ func _combat_checks() -> void:
 		Input.action_press("fire")
 		while player.gun_id != "" and Time.get_ticks_msec() - t1 < 6000:
 			await get_tree().physics_frame
-			if id == "crossbow":   # one bolt a pull: let go and pull again
+			if id == "crossbow":   # one bolt a pull: let go and pull again (for a few frames, so a slow frame still sees it)
 				Input.action_release("fire")
-				await get_tree().physics_frame
+				await _wait(0.05)
 				Input.action_press("fire")
+				await _wait(0.05)
 		Input.action_release("fire")
 		_log("AUTOTEST %s: emptied in %.2f s, back to %s" % [id, (Time.get_ticks_msec() - t1) / 1000.0, player.current_weapon()])
 		await _wait(0.4)
