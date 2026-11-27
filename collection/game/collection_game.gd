@@ -703,7 +703,9 @@ func respawn(f: Node) -> void:
 
 ## a bullet or punch hitting the level: upright glass and roof skylights break in one hit; everything else gets dust
 func hit_world(col: Object, pos: Vector3, normal: Vector3, dir: Vector3, dmg: float = 10.0) -> void:
-	if col is StaticBody3D and col.has_meta("prop"):
+	if col is RigidBody3D:
+		knock(col, dir * clampf(dmg, 5.0, 60.0) * 0.12, pos)
+	if col is CollisionObject3D and col.has_meta("prop"):
 		damage_prop(int(col.get_meta("prop")), dmg, pos, dir)
 		Effects.impact(self, pos, normal)
 		return
@@ -795,6 +797,7 @@ const CHUNK_POOL := 160
 var _chunks: Array[RigidBody3D] = []
 var _chunk_i := 0
 var props_broken := 0
+var _loose_t := 0.0
 
 func damage_prop(i: int, dmg: float, pos: Vector3, dir: Vector3) -> void:
 	if level == null or i < 0 or i >= level.props.size():
@@ -807,8 +810,12 @@ func damage_prop(i: int, dmg: float, pos: Vector3, dir: Vector3) -> void:
 		_break_prop(pr, pos, dir)
 
 func _break_prop(pr: Dictionary, pos: Vector3, dir: Vector3) -> void:
-	var body: StaticBody3D = pr.body
+	var body: CollisionObject3D = pr.body
 	body.collision_layer = 0
+	if body is RigidBody3D:   # a loose thing breaks where it is now, and waits there hidden
+		var rb := body as RigidBody3D
+		pr.box = AABB(rb.global_position - (pr.box as AABB).size * 0.5, (pr.box as AABB).size)
+		rb.freeze = true
 	pr.back = PROP_BACK
 	props_broken += 1
 	var col := Color(0.55, 0.45, 0.35)
@@ -876,6 +883,13 @@ func _first_mesh(n: Node) -> MeshInstance3D:
 func _tick_props(dt: float) -> void:
 	if level == null:
 		return
+	_loose_t -= dt
+	if _loose_t <= 0.0:   # anything knocked out of the world goes home
+		_loose_t = 1.0
+		for l in level.loose:
+			var rb: RigidBody3D = l.body
+			if rb.global_position.y < -3.0 or absf(rb.global_position.x) > 70.0 or absf(rb.global_position.z) > 60.0:
+				level.send_home(l)
 	for pr in level.props:
 		if pr.back <= 0.0:
 			if pr.has("grow") and float(pr.grow) < 1.0 and pr.node:
@@ -896,7 +910,7 @@ func _tick_props(dt: float) -> void:
 			continue
 		pr.back = 0.0
 		pr.hp = pr.hp0
-		(pr.body as StaticBody3D).collision_layer = 1
+		_unbreak_body(pr)
 		if pr.node:
 			var nd: Node3D = pr.node
 			if not pr.has("sc0"):
@@ -905,18 +919,38 @@ func _tick_props(dt: float) -> void:
 			nd.scale = pr.sc0 * 0.01
 			pr.grow = 0.0
 
+## a broken prop comes back solid; a loose one comes back home, standing
+func _unbreak_body(pr: Dictionary) -> void:
+	var body: CollisionObject3D = pr.body
+	body.collision_layer = 1
+	if body is RigidBody3D:
+		var rb := body as RigidBody3D
+		rb.freeze = false
+		var l: Dictionary = level.loose[int(rb.get_meta("loose"))]
+		level.send_home(l)
+		var home: Transform3D = l.home
+		pr.box = AABB(home.origin - (pr.box as AABB).size * 0.5, (pr.box as AABB).size)
+
+## knock a loose thing: an impulse at a world point (shots, swings, blasts, people running into it)
+func knock(rb: RigidBody3D, impulse: Vector3, at: Vector3) -> void:
+	if rb.freeze:
+		return
+	rb.sleeping = false
+	rb.apply_impulse(impulse, at - rb.global_position)
+
 func reset_props() -> void:
 	if level == null:
 		return
 	for pr in level.props:
 		pr.back = 0.0
 		pr.hp = pr.hp0
-		(pr.body as StaticBody3D).collision_layer = 1
+		_unbreak_body(pr)
 		if pr.node:
 			(pr.node as Node3D).visible = true
 			if pr.has("sc0"):
 				(pr.node as Node3D).scale = pr.sc0
 		pr.erase("grow")
+	level.reset_loose()
 
 # ---------------------------------------------------------------- leaderboard
 

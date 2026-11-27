@@ -128,7 +128,8 @@ Mansion rules **(Pete)**:
 - Stairs clear at top and bottom, with low guardrails.
 - No black poles in doorways.
 - Hot tubs: white stone surround, jets only, on a wooden deck, no ducks.
-- Ball pit balls fly everywhere when you walk or jump in.
+- Ball pit balls fly everywhere when you walk or jump in; wading through slowly, they roll out of your way **(Pete, 27 Nov)**.
+- Loose things move **(Pete, 27 Nov)**: the 72 small things standing on a floor (stools, bins, barrels, floor lamps, small crates and side tables: up to 1.2 m across, 1.8 m tall and 1.4 m³) are physics objects. Run into one and it's shoved the way you're going (lighter ones go faster, up to 90% of your speed) and tall ones topple; shots, bat swings and mine blasts knock them about. They go home at each countdown, a broken one grows back at home, and anything knocked out of the grounds goes home.
 - Must run smoothly with 8 players: only light the room you're in, cull rooms you can't see, batch static meshes.
 
 ## 10. Studio rules (apply to everything) (Pete)
@@ -214,6 +215,7 @@ Agreed with Pete in the rebuild plan ([`docs/collection/plan.md`](docs/collectio
 - Publishing method for the Windows PC build: not decided (platform decided 25 Nov: Windows PC first).
 
 ## Decision log
+- 2026-11-27 — Pete: "if you run into balls or other items they should move, fall over". The ball pit's balls already fly when you run or land in it; now walking slowly through it rolls them aside too (it used to ignore anything under 1.2 m/s). Items: the Mansion's small furniture standing on a floor (72 of them; picked by size and kind, so a re-export keeps working) are rigid bodies (5–40 kg by size) that people push as they run into them (high up, so tall things fall over), and hits and blasts knock. Bigger furniture stays put so rooms keep their shape. Smashing still works on the ones that are smashable.
 - 2026-11-27 — Pete: bring the SMGs and the crossbow over from 1v1. 1v1's SMGs now are the MP5, UMP and Vector (the Uzi, P90 and Sting are only in Collection, so they stay): their hip spread is halved as in 1v1 now (MP5 0.8°, UMP 0.75°, Vector 0.75°). The Crossbow joins the gun pool with 1v1's stats and model; choices: 10 bolts a pickup (the HUD and pickups show 10), 1.8 s between bolts (no reloads here), one bolt per trigger pull for the player; picking up a new gun starts it ready to fire rather than waiting out the old gun's gap.
 - 2026-11-26 — Pete: ziplines either side of the top of the main stairs, zipping up to the roof through a big glass pane each that rebuilds after 5 s. Choices: the pads are on the walkway either side of where the grand staircase arrives (x ±3, z 7.5); the panes are the hall's two front skylight panes; jump on the pad to grab; 11 m/s (about 1.4 s); you land on the roof just past the skylights; the handle slides back down for the next rider; bots don't use them yet.
 - 2026-11-26 — Pete: collectables spread out, never grouped, mostly inside or on the roof: pickups and stars keep 10 m apart (was 6 and 7); pickups 70% inside, 20% roof, 10% lawns; 15% of stars on the roof. Pete: the weapons and skins from 1v1, every gun and bat with a random skin, gold bat double damage: 1v1's barbed-wire bat and its six skins (its BAT_SKINS) on every bat and gun; the Gold Bat does 100 (double); 1v1 has no gun skins, so a gun's coloured body takes the same six. 1v1's guns are block models like ours, so the gun shapes stay; which more of 1v1's guns (rifles, snipers, shotguns, rockets) to add is asked of Pete.

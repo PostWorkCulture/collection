@@ -18,6 +18,7 @@ var dressed := false             # mansion.glb loaded
 var dressing: Node3D = null
 var parts := {}                  # name -> Array of the GLB's named moving parts
 var props: Array = []            # smashable furniture, crates, hedges and lamps: {body, kind, hp, hp0, node (its look), back}
+var loose: Array = []            # the small things that get knocked about: {body (RigidBody3D), home (Transform3D), h, prop (index or -1)}
 var box_nodes := {}              # box index -> the dressing node that draws it
 var bodies := {}                 # box index -> its collider
 var windows: Array = []          # the 40 big windows: {body, ax (pane runs along x), at, a, b, s0 (sill), s1 (top)}
@@ -65,6 +66,7 @@ func build() -> void:
 		windows.append({"body": body, "ax": bool(w.ax), "at": float(w.at), "a": float(w.a), "b": float(w.b), "s0": float(w.s0), "s1": float(w.s1)})
 	_add_shop()
 	edits = MansionEdits.apply(self)
+	_make_loose()
 	if dressed:
 		_add_skirting()
 
@@ -275,7 +277,8 @@ func _add_box(b: Dictionary, index: int = -1) -> void:
 	if size.x < 0.01 or size.y < 0.01 or size.z < 0.01:
 		return
 	var glass: bool = int(b.g) == 1 or b.p == "glass"
-	var body := StaticBody3D.new()
+	var is_loose := _is_loose(b, size)
+	var body: CollisionObject3D = RigidBody3D.new() if is_loose else StaticBody3D.new()
 	body.position = (p0 + p1) * 0.5
 	var cs := CollisionShape3D.new()
 	var shape := BoxShape3D.new()
@@ -294,6 +297,21 @@ func _add_box(b: Dictionary, index: int = -1) -> void:
 		props.append(pr)
 	if glass:
 		body.set_meta("glass", true)
+	if is_loose:
+		var rb := body as RigidBody3D
+		rb.mass = clampf(size.x * size.y * size.z * 30.0, 5.0, 40.0)
+		rb.linear_damp = 0.4
+		rb.angular_damp = 0.8
+		rb.can_sleep = true
+		rb.sleeping = true
+		rb.continuous_cd = rb.mass < 12.0
+		var pm := PhysicsMaterial.new()
+		pm.friction = 0.7
+		pm.bounce = 0.05
+		rb.physics_material_override = pm
+		body.set_meta("loose", loose.size())
+		body.set_meta("h", size.y)
+		loose.append({"body": rb, "home": Transform3D(Basis(), (p0 + p1) * 0.5), "h": size.y, "prop": int(body.get_meta("prop", -1)), "index": index})
 	if dressed and not glass:   # the dressing draws it
 		add_child(body)
 		return
@@ -311,6 +329,56 @@ func _add_box(b: Dictionary, index: int = -1) -> void:
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	body.add_child(mi)
 	add_child(body)
+
+## Loose things (Pete, 27 Nov: "if you run into balls or other items they should move, fall over"): stools, bins, barrels,
+## floor lamps, small crates and side tables standing on a floor are rigid bodies. People push them as they run into
+## them (fighter.gd), hits and blasts knock them, and they go home when they grow back and at each countdown.
+const LOOSE_KINDS := ["crate", "lamp", "fuel"]
+const LOOSE_MAX_W := 1.2       # across, metres
+const LOOSE_MAX_H := 1.8
+const LOOSE_MAX_VOL := 1.4     # cubic metres
+const FLOORS := [0.0, 5.8, 11.35, -0.8]
+
+func _is_loose(b: Dictionary, size: Vector3) -> bool:
+	if not String(b.get("p", "")) in LOOSE_KINDS or int(b.g) == 1:
+		return false
+	if float(b.get("hp", 0)) >= 1e6 or maxf(size.x, size.z) > LOOSE_MAX_W or size.y > LOOSE_MAX_H or size.x * size.y * size.z > LOOSE_MAX_VOL:
+		return false
+	if minf(size.x, size.z) < 0.25:
+		return false   # thin panels and shelves
+	var y0: float = b.b[1]
+	var on_floor := false
+	for fy in FLOORS:
+		if absf(y0 - float(fy)) < 0.06:
+			on_floor = true
+	if not on_floor:
+		return false
+	var c := MansionEdits.box_centre(b)
+	if Vector2(c.x - MansionEdits.SCOPE_TO.x, c.z - MansionEdits.SCOPE_TO.z).length() < 0.6:
+		return false   # the telescope turns on its own pivot
+	return true
+
+## each loose thing carries its look with it
+func _make_loose() -> void:
+	for l in loose:
+		var rb: RigidBody3D = l.body
+		var node: Node3D = box_nodes.get(int(l.index))
+		if node and node.get_parent() != _removed:
+			node.reparent(rb, true)
+			l.node = node
+
+## put every loose thing back where it started, still
+func reset_loose() -> void:
+	for l in loose:
+		send_home(l)
+
+func send_home(l: Dictionary) -> void:
+	var rb: RigidBody3D = l.body
+	rb.linear_velocity = Vector3.ZERO
+	rb.angular_velocity = Vector3.ZERO
+	rb.global_transform = l.home
+	PhysicsServer3D.body_set_state(rb.get_rid(), PhysicsServer3D.BODY_STATE_TRANSFORM, l.home)
+	rb.sleeping = true
 
 ## the indoor pool is sunk 0.8 m (x 11..21, z -5..5): the ground has a hole there and the pool floor sits below it
 const POOL := Rect2(11, -5, 10, 10)

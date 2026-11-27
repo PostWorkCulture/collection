@@ -772,15 +772,60 @@ func _mansion_checks() -> void:
 	if not target.is_empty():
 		var tb: AABB = target.box
 		var shots := 0
-		while (target.body as StaticBody3D).collision_layer != 0 and shots < 20:
+		while (target.body as CollisionObject3D).collision_layer != 0 and shots < 20:
 			game.hit_world(target.body, tb.get_center(), Vector3.UP, Vector3.FORWARD, 12.0)
 			shots += 1
 		await get_tree().create_timer(0.5).timeout
-		_log("AUTOTEST prop (%.0f hp): broke after %d hits of 12, look hidden=%s, solid=%s" % [target.hp0, shots, not (target.node as Node3D).visible, (target.body as StaticBody3D).collision_layer != 0])
+		_log("AUTOTEST prop (%.0f hp): broke after %d hits of 12, look hidden=%s, solid=%s" % [target.hp0, shots, not (target.node as Node3D).visible, (target.body as CollisionObject3D).collision_layer != 0])
 		target.back = 0.01
 		player.place(Vector3(0, 0.05, -40), 0.0)
 		await get_tree().create_timer(0.6).timeout
-		_log("AUTOTEST prop grew back: solid=%s visible=%s size %.2f" % [(target.body as StaticBody3D).collision_layer != 0, (target.node as Node3D).visible, float(target.get("grow", 1.0))])
+		_log("AUTOTEST prop grew back: solid=%s visible=%s size %.2f" % [(target.body as CollisionObject3D).collision_layer != 0, (target.node as Node3D).visible, float(target.get("grow", 1.0))])
+	# loose things (Pete, 27 Nov): run into one and it's shoved along or falls over; a bat hit knocks one too
+	var lz: Dictionary = {}
+	var from := Vector3.ZERO
+	var space := get_world_3d().direct_space_state
+	for l in level.loose:
+		if float(l.h) < 0.8 or (l.body as RigidBody3D).freeze:
+			continue
+		var hp: Vector3 = (l.home as Transform3D).origin
+		var fy: float = hp.y - float(l.h) * 0.5
+		for dv in [Vector3(1, 0, 0), Vector3(-1, 0, 0), Vector3(0, 0, 1), Vector3(0, 0, -1)]:
+			var st: Vector3 = Vector3(hp.x, fy + 0.05, hp.z) + dv * 3.0
+			var ok := not space.intersect_ray(PhysicsRayQueryParameters3D.create(st + Vector3.UP * 0.5, st + Vector3.DOWN * 0.3, 1)).is_empty()
+			for hy in [0.5, 1.2, 1.7]:
+				if not space.intersect_ray(PhysicsRayQueryParameters3D.create(st + Vector3.UP * hy, Vector3(hp.x, st.y + hy, hp.z) + dv * 0.7, 1)).is_empty():
+					ok = false
+			var beyond := PhysicsRayQueryParameters3D.create(Vector3(hp.x, fy + 0.5, hp.z), Vector3(hp.x, fy + 0.5, hp.z) - dv * 1.8, 1, [(l.body as RigidBody3D).get_rid()])
+			if not space.intersect_ray(beyond).is_empty():
+				ok = false   # room for it to go
+			if ok:
+				lz = l
+				from = st
+				break
+		if not lz.is_empty():
+			break
+	if lz.is_empty():
+		_log("AUTOTEST loose: none with a clear run-up found (%d loose)" % level.loose.size())
+	else:
+		var rb: RigidBody3D = lz.body
+		var home: Vector3 = (lz.home as Transform3D).origin
+		var dd: Vector3 = home - from
+		player.place(from, atan2(dd.x, dd.z))
+		await _wait(0.3)
+		await _hold("move_forward", 0.8)
+		await _wait(0.8)
+		var shoved: float = Vector2(rb.global_position.x - home.x, rb.global_position.z - home.z).length()
+		var tilt: float = rad_to_deg(acos(clampf(rb.global_basis.y.normalized().dot(Vector3.UP), -1.0, 1.0)))
+		_log("AUTOTEST loose: %d loose things; ran into one %.2f m tall (%.0f kg): moved %.2f m, tilted %.0f deg" % [level.loose.size(), float(lz.h), rb.mass, shoved, tilt])
+		player.place(rb.global_position + (from - home).normalized() * 3.5 + Vector3.UP * 0.2, atan2(dd.x, dd.z))
+		player.pitch = -0.25
+		await _wait(0.3)
+		await _snap("p6_14_loose_knocked_third.png")
+		player.pitch = 0.0
+		game.reset_props()
+		await _wait(0.2)
+		_log("AUTOTEST loose: back home after reset=%s" % [rb.global_position.distance_to(home) < 0.05])
 	player.invulnerable = false
 
 # ---------------- phase 2 combat checks ----------------

@@ -384,9 +384,10 @@ func _ball_pit(dt: float) -> void:
 			land = clampf(-float(s.vy) / 12.0, 0.4, 1.4)
 		s.air = air
 		s.vy = v.y
-		if land == 0.0 and hv < 1.2 and not (air and v.y < 0.0):
+		if land == 0.0 and hv < 0.3 and not (air and v.y < 0.0):
 			continue
-		var rr := 1.5 if land > 0.0 else 0.62
+		var gentle := land == 0.0 and hv < 1.2 and not air   # wading slowly: balls roll out of your way
+		var rr := 1.5 if land > 0.0 else (0.45 if gentle else 0.62)
 		var hits := 0
 		for i in _pos.size():
 			var b := _pos[i]
@@ -396,6 +397,11 @@ func _ball_pit(dt: float) -> void:
 			if d2 > rr * rr or b.y > p.y + 0.7 or b.y < p.y - 0.5 or _cd[i] > _t:
 				continue
 			var d := maxf(sqrt(d2), 0.01)
+			if gentle:
+				_vel[i] = Vector3(dx / d * (1.0 + hv), randf_range(0.3, 0.9), dz / d * (1.0 + hv))
+				_awake[i] = 1
+				_cd[i] = _t + 0.12
+				continue
 			var sp := (2.2 + hv * 0.9) * randf_range(0.6, 1.25) + land * randf_range(3, 7)
 			_vel[i] = Vector3(dx / d * sp + v.x * 0.45 + randf_range(-0.6, 0.6), randf_range(2, 4.2) + hv * 0.45 + land * randf_range(4, 9),
 					dz / d * sp + v.z * 0.45 + randf_range(-0.6, 0.6))

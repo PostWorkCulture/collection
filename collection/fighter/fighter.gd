@@ -935,8 +935,10 @@ func _physics_process(dt: float) -> void:
 	if stam_rest > STAM_DELAY:
 		stamina = min(STAM_MAX, stamina + STAM_REGEN * dt)
 	var before := global_position
+	var pre_v := velocity
 	move_and_slide()
 	if not downed:
+		_push_loose(pre_v)
 		_step_up(before, hv * dt, grounded)
 	_footsteps(dt, grounded)
 	if downed:
@@ -1208,6 +1210,32 @@ func _aim_basis(dir: Vector3, up: Vector3) -> Basis:
 	return Basis.looking_at(dir, u.normalized())
 
 ## stairs and kerbs up to 0.55 m: if we ran into something low while walking, try the same move from 0.55 m higher
+## people shove the loose things they run into (Pete, 27 Nov): it goes the way you were going, slower the heavier
+## it is, pushed about three quarters of the way up so tall things topple over
+func _push_loose(v: Vector3) -> void:
+	if game == null:
+		return
+	for i in get_slide_collision_count():
+		var c := get_slide_collision(i)
+		var rb := c.get_collider() as RigidBody3D
+		if rb == null or rb.freeze:
+			continue
+		var n := c.get_normal()
+		if n.y > 0.6:
+			continue   # standing on it
+		var dir := Vector3(-n.x, 0, -n.z).normalized()
+		var sp := maxf(v.x * dir.x + v.z * dir.z, 0.0)
+		if sp < 0.3:
+			continue
+		var target := sp * clampf(20.0 / rb.mass, 0.4, 0.9)
+		var have := rb.linear_velocity.dot(dir)
+		if have >= target:
+			continue
+		var h: float = rb.get_meta("h", 1.0)
+		var at := c.get_position()
+		at.y = minf(global_position.y + 0.9, rb.global_position.y + h * 0.25)
+		game.knock(rb, dir * (target - have) * rb.mass * 0.5, at)
+
 func _step_up(before: Vector3, motion: Vector3, was_grounded: bool) -> void:
 	if not was_grounded or motion.length() < 0.001 or not is_on_wall():
 		return

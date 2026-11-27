@@ -133,6 +133,14 @@ func explode(src: Node, at: Vector3, dmg: float, radius: float) -> void:
 			if d > radius or not _space().intersect_ray(PhysicsRayQueryParameters3D.create(at, c, 1)).is_empty():
 				continue
 			o.take_damage(dmg * lerpf(1.0, 0.4, d / radius), src if is_instance_valid(src) else null)
+		if game.level:   # loose things in reach are thrown about
+			for l in game.level.loose:
+				var rb: RigidBody3D = l.body
+				var off: Vector3 = rb.global_position - at
+				var dl := off.length()
+				if dl < radius * 1.5:
+					var push := (off.normalized() + Vector3.UP * 0.6).normalized() * rb.mass * 7.0 * (1.0 - dl / (radius * 1.5))
+					game.knock(rb, push, rb.global_position + Vector3.UP * float(l.h) * 0.3)
 	for m in mines.duplicate():
 		if (m.pos as Vector3).distance_to(at) < radius and mines.has(m):
 			_boom_mine(m)
