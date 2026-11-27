@@ -187,7 +187,11 @@ def find_tails():
             continue
         P = T[comp]
         col = np.median(tc[comp], 0)
-        if not (np.linalg.norm(col - hair_col) < 0.12 and np.linalg.norm(col - cloth_col) > 0.25):
+        dh, dc = np.linalg.norm(col - hair_col), np.linalg.norm(col - cloth_col)
+        if dh < 0.25 and dc > 0.15 and not (dh < 0.12 and dc > 0.25):
+            rest.append(comp)   # a strand a little off the hair colour: joins only if it touches the tail (round 4: slivers)
+            continue
+        if not (dh < 0.12 and dc > 0.25):
             continue
         outside = P[:, 1].mean() > back_y or np.abs(P[:, 0]).mean() > half_w * 0.9    # behind the back or out wide
         if not outside:
@@ -207,8 +211,30 @@ def find_tails():
     for k, idx in out.items():
         if idx:
             t.vertex_groups.new(name='tail_' + k).add(idx, 1.0, 'REPLACE')
-    print('RIG tails', {k: len(v) for k, v in out.items()})
-    return {k: T[v] for k, v in out.items() if v}
+    # the top of each tail is in the head part (round 4: the halves moved apart): hair-coloured head vertices out at
+    # the sides, low on the head, joined on to the tail by distance, go on the tail's bone too
+    hx = (x0 + x1) / 2
+    cand = np.nonzero((np.linalg.norm(hc - hair_col, axis=1) < 0.2) & (u > 0.62) & (hg < 0.75))[0]
+    hout = {}
+    for k, idx in out.items():
+        if not idx or not len(cand):
+            continue
+        sel = set()
+        frontier = [Vector(T[i]) for i in idx]
+        ck = _tree([Vector(Hh[i]) for i in cand])
+        while frontier:
+            nxt = []
+            for pnt in frontier:
+                for (_, ci, dd) in ck.find_range(pnt, 0.05):
+                    if ci not in sel and ((Hh[cand[ci], 0] - hx) > 0) == (k == 'L'):
+                        sel.add(ci); nxt.append(Vector(Hh[cand[ci]]))
+            frontier = nxt
+        hidx = [int(cand[ci]) for ci in sel]
+        if hidx:
+            hd_o.vertex_groups.new(name='tail_' + k).add(hidx, 1.0, 'REPLACE')
+        hout[k] = hidx
+    print('RIG tails', {k: len(v) for k, v in out.items()}, 'and from the head', {k: len(v) for k, v in hout.items()})
+    return {k: np.vstack([T[v]] + ([Hh[hout[k]]] if hout.get(k) else [])) for k, v in out.items() if v}
 tails = find_tails()
 
 def add_core(n, sel, axis_of, colour_at):
@@ -587,9 +613,9 @@ for s, n in arms.items():
     d = np.linalg.norm(co - ja, axis=1)
     sx = arm_info[s]['sx']
     side = ((part_of == 'torso') | (part_of == n)) & (co[:, 0] * sx > 0.12)
-    r = ss((0.42 - d) / 0.15) * side                 # how far into the shoulder region
+    r = ss((0.6 - d) / 0.2) * side                   # how far into the shoulder region (wider since round 4: tears)
     t = (co[:, 0] - ja[0]) * sx                      # along the arm from the joint
-    a = ss((t + 0.1) / 0.25)                         # 0 body side .. 1 arm side
+    a = ss((t + 0.2) / 0.45)                         # 0 body side .. 1 arm side, spread so no strip of cloth stretches hard
     T = {'Spine2': (1 - a) * 0.7, s + 'Shoulder': 0.3 - 0.15 * a, s + 'Arm': 0.85 * a}
     for k in list(W.keys()):
         W[k] = W[k] * (1 - r)
@@ -633,7 +659,7 @@ for k, ti in tail_info.items():
     idx = np.array([v.index for v in me.vertices if any(e.group == g.index and e.weight > 0.5 for e in v.groups)], dtype=int)
     if not len(idx):
         continue
-    w = ss((ti['top'] - co[idx, 2]) / 0.25)
+    w = ss((ti['top'] - co[idx, 2]) / 0.35)   # one ramp from the very top of the tail (head and body halves alike)
     for kk in list(W.keys()):
         W[kk][idx] = 0.0
     W['Head'][idx] = 1.0 - w
