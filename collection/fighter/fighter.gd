@@ -20,6 +20,7 @@ const WeaponModel := preload("res://weapons/weapon_model.gd")
 const Effects := preload("res://weapons/effects.gd")
 const Sfx := preload("res://audio/sfx.gd")
 const CharacterModel := preload("res://characters/character_model.gd")
+const SwingTrail := preload("res://weapons/swing_trail.gd")
 
 const RADIUS := 0.45
 const HEIGHT := 2.25
@@ -151,6 +152,9 @@ var ads_k := 0.0                 # 0 = hip, 1 = fully aimed
 var dual_left := false
 var punch_left := false
 var swing_t := 0.0
+const SWING := 0.3               # a bat swing (or a punch) lasts this long on screen (Pete, 27 Nov: a more obvious swing; was 0.26)
+var _trail: MeshInstance3D       # the faint streak behind a swung bat (weapons/swing_trail.gd)
+var _bat_marks: Array = []       # the visible bat's tip and middle: [view tip, view mid, held tip, held mid]
 var kick_t := 0.0
 var shots := 0
 
@@ -332,6 +336,11 @@ func _refresh_weapon_models() -> void:
 	_held.add_child(_held_model)
 	_view_model = WeaponModel.make(id, bat_skin if id == "bat" else gun_skin)
 	_view.add_child(_view_model)
+	_bat_marks = []
+	if id == "bat":
+		for m in [_view_model, _held_model]:
+			_bat_marks.append(m.find_child("Tip", true, false))
+			_bat_marks.append(m.find_child("Mid", true, false))
 	for i in _gloves.size():   # gloves show with fists; the right glove also holds a bat; guns hide them
 		_gloves[i].visible = id == "fists" or (id == "bat" and i == 1)
 	weapon_changed.emit()
@@ -642,7 +651,7 @@ func _attack() -> void:
 		_shoot(id, g)
 
 func _melee(id: String, g: Dictionary) -> void:
-	swing_t = 0.26
+	swing_t = SWING
 	punch_left = not punch_left
 	if model:
 		model.attack(id, punch_left)
@@ -1085,7 +1094,7 @@ func _update_view(dt: float) -> void:
 	swing_t = maxf(0.0, swing_t - dt)
 	kick_t = maxf(0.0, kick_t - dt * 14.0)
 	if _view.visible:
-		var jab := sin((1.0 - swing_t / 0.26) * PI) if swing_t > 0.0 else 0.0
+		var jab := sin((1.0 - swing_t / SWING) * PI) if swing_t > 0.0 else 0.0
 		for i in _gloves.size():
 			var side := -1.0 if i == 0 else 1.0
 			var active := (i == 0) == punch_left
@@ -1100,13 +1109,16 @@ func _update_view(dt: float) -> void:
 				hip = Vector3(0.0, -0.2, -0.5)
 				aimed = Vector3(0.0, -0.15, -0.5)
 			elif current_weapon() == "bat":
-				# a full swing from over the right shoulder across to the left, in 0.26 s
-				hip = Vector3(0.24, -0.3, -0.38)
+				# a full swing from over the right shoulder across to the left, in SWING seconds
+				# at rest it leans out to the right, clear of the crosshair; drawn at 85% so the longer bat
+				# (27 Nov) doesn't fill the view
+				hip = Vector3(0.32, -0.36, -0.42)
 				aimed = hip
-				var u := 1.0 - swing_t / 0.26 if swing_t > 0.0 else 0.0
+				_view_model.scale = Vector3.ONE * 0.85
+				var u := 1.0 - swing_t / SWING if swing_t > 0.0 else 0.0
 				var e := u * u * (3.0 - 2.0 * u)
-				_view_model.rotation = Vector3(-0.5 * sin(u * PI), lerpf(0.9, -1.1, e) if swing_t > 0.0 else 0.0, -0.7 * sin(u * PI))
-				hip += Vector3(lerpf(0.0, -0.4, e), 0.08 * sin(u * PI), -0.1 * sin(u * PI)) if swing_t > 0.0 else Vector3.ZERO
+				_view_model.rotation = Vector3(-0.6 * sin(u * PI), lerpf(1.25, -1.45, e) if swing_t > 0.0 else -0.5, -0.8 * sin(u * PI) if swing_t > 0.0 else -0.3)
+				hip += Vector3(lerpf(0.05, -0.5, e), 0.1 * sin(u * PI), -0.14 * sin(u * PI)) if swing_t > 0.0 else Vector3.ZERO
 			var zoom_k := tan(deg_to_rad(Settings.fov) * 0.5) / tan(deg_to_rad(cam.fov) * 0.5)
 			_view_model.position = (hip.lerp(aimed, ads_k) + Vector3(0, 0, 0.045 * kick_t)) * zoom_k
 	if model:
@@ -1114,7 +1126,7 @@ func _update_view(dt: float) -> void:
 		_hold_in_hand()
 	# third person: the bat sweeps across from the right shoulder when swung; at rest it's held up and back
 	elif current_weapon() == "bat" and swing_t > 0.0:
-		var u2 := 1.0 - swing_t / 0.26
+		var u2 := 1.0 - swing_t / SWING
 		var e2 := u2 * u2 * (3.0 - 2.0 * u2)
 		_held.rotation = Vector3(0.6 * sin(u2 * PI), PI + lerpf(1.3, -1.4, e2), 0.0)
 	else:
@@ -1122,6 +1134,24 @@ func _update_view(dt: float) -> void:
 	_shell.visible = shield_t > 0.0 and _body_mesh.visible
 	if _shell.visible:
 		_shell_mat.albedo_color.a = 0.22 * clampf(shield_t / SHIELD, 0.0, 1.0)
+	_track_swing(dt)
+
+## the streak behind a swung bat: from the bat you can see (first person: yours on the camera; otherwise the one in
+## the hand, which is also the one everyone else sees)
+func _track_swing(dt: float) -> void:
+	if _trail == null:
+		_trail = SwingTrail.new()
+		add_child(_trail)
+	var ok := _bat_marks.size() == 4 and current_weapon() == "bat" and alive
+	if not ok:
+		if swing_t <= 0.0:
+			_trail.track(dt, false, Vector3.ZERO, Vector3.ZERO)
+		return
+	var k := 0 if _view.visible and _view_model and _view_model.visible else 2
+	var tip := _bat_marks[k] as Node3D
+	var mid := _bat_marks[k + 1] as Node3D
+	if tip and mid:
+		_trail.track(dt, swing_t > 0.0 and (k == 0 or _held.visible), tip.global_position, mid.global_position)
 
 ## the weapon in the model's hands, following the hands so it moves with every clip; third-person weapons are drawn
 ## at full size (the first-person models are made small for the camera)

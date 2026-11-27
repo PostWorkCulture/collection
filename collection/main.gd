@@ -27,6 +27,7 @@ const Hud := preload("res://ui/hud.gd")
 const Menu := preload("res://ui/menu.gd")
 const Sfx := preload("res://audio/sfx.gd")
 const Weapons := preload("res://weapons/weapons.gd")
+const WeaponModel := preload("res://weapons/weapon_model.gd")
 
 ## standing test dummies for the scripted combat and star checks (they never attack or collect): name, spot, facing, strafes?
 const DUMMIES := [
@@ -1358,6 +1359,31 @@ func _gadget_checks() -> void:
 	var hp_g: int = dg.hp
 	await _attack_until(dg, func(): return dg.downed or dg.hp < hp_g, 3.0)
 	_log("AUTOTEST gold bat: one hit took %d (a bat hit is %d)" % [hp_g - dg.hp if not dg.downed else hp_g, int(Weapons.stat("bat").dmg)])
+	# the bigger bat (Pete, 27 Nov): reaches 3.6 m; a swing seen from behind and from your eyes
+	player.bat_skin = "classic"
+	player._refresh_weapon_models()
+	var dr: Node = dummies[5]
+	dr.shield_t = 0.0
+	dr.hp = 100
+	player.place(dr.global_position + Vector3(0, 0, -3.3), 0.0)
+	_face(player, dr.global_position + Vector3.UP)
+	await _wait(0.4)
+	var hp_r: int = dr.hp
+	await _attack_until(dr, func(): return dr.downed or dr.hp < hp_r, 1.5)
+	_log("AUTOTEST bat reach: hit at 3.3 m=%s (reach %.1f m, arc %.0f deg each side), bat %.2f m long, streak=%s" % [dr.hp < hp_r or dr.downed, float(Weapons.stat("bat").reach), rad_to_deg(float(Weapons.stat("bat").arc)), WeaponModel.BAT_LEN, player._trail != null])
+	await _wait(0.7)
+	for view in ["third", "first"]:
+		Settings.camera_mode = view
+		player.apply_camera_mode()
+		await _wait(0.4)
+		await _snap("p2_12_bat_rest_%s.png" % view)
+		Input.action_press("fire")
+		await _wait(0.13)
+		await _snap("p2_12b_bat_swing_%s.png" % view)
+		Input.action_release("fire")
+		await _wait(0.7)
+	Settings.camera_mode = "third"
+	player.apply_camera_mode()
 
 # ---------------- phase 3 Collection rules checks ----------------
 func _active_stars() -> Array:

@@ -19,7 +19,7 @@ static func full(id: String) -> int:
 
 const STATS := {
 	"fists": {"name": "Fists", "melee": true, "dmg": 34.0, "head": 1.0, "rate": 0.36, "reach": 2.7, "arc": 1.15, "lunge": 3.0, "knock": 5.0, "zoom": 62.0},
-	"bat": {"name": "Bat", "melee": true, "dmg": 50.0, "head": 1.0, "rate": 0.55, "reach": 3.0, "arc": 1.05, "lunge": 5.0, "knock": 9.0, "zoom": 62.0},
+	"bat": {"name": "Bat", "melee": true, "dmg": 50.0, "head": 1.0, "rate": 0.55, "reach": 3.6, "arc": 1.2, "lunge": 5.0, "knock": 9.0, "zoom": 62.0},
 	"mp5": {"name": "MP5", "dmg": 16.0, "head": 1.6, "rate": 0.055, "spread": 0.8, "ads_spread": 0.9, "fall": [8.0, 26.0], "zoom": 48.0, "kick": 0.006, "bloom": 0.13, "weight": 1.04, "sound": ["smgnova", 1.0], "color": "#a05ad6"},
 	"uzi": {"name": "Uzi", "dmg": 18.0, "head": 1.7, "rate": 0.07, "spread": 1.5, "ads_spread": 0.75, "fall": [10.0, 30.0], "zoom": 60.0, "kick": 0.007, "bloom": 0.095, "weight": 1.06, "sound": ["smgnova", 0.9], "color": "#ffd21f"},
 	"vector": {"name": "Vector", "dmg": 14.0, "head": 1.6, "rate": 0.045, "spread": 0.75, "ads_spread": 0.8, "fall": [7.0, 22.0], "zoom": 50.0, "kick": 0.004, "bloom": 0.17, "weight": 1.05, "sound": ["smgnova", 1.12], "color": "#ff2e88"},

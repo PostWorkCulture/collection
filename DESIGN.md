@@ -59,7 +59,7 @@ dmg = damage per hit (100 HP players); rate = seconds between shots; fall = full
 | Weapon | dmg | head × | rate (s) | fall (m) | Notes |
 |---|---|---|---|---|---|
 | Fists | 34 | 1 | 0.36 | reach 2.7 | not used since 26 Nov (everyone has a bat); kept in the code |
-| Bat | 50 | 1 | 0.55 | reach 3.0 | 2 hits to down; big knockback (lunge 5) |
+| Bat | 50 | 1 | 0.55 | reach 3.6, ±69° | 2 hits to down; big knockback (lunge 5); 1.3 m long with a faint streak behind each 0.3 s swing **(Pete, 27 Nov: bigger, a clearer swing and reach; was 3.0 m, ±60°, 1.0 m, 0.26 s)** |
 | MP5 | 16 | 1.6 | 0.055 | 8–26 | shreds up close; hip spread 0.8° (1v1 now; was 1.6) |
 | Uzi | 18 | 1.7 | 0.07 | 10–30 | punchy close range |
 | Vector | 14 | 1.6 | 0.045 | 7–22 | fastest SMG, empties in ~1 s; hip spread 0.75° (was 1.5) |
@@ -215,6 +215,7 @@ Agreed with Pete in the rebuild plan ([`docs/collection/plan.md`](docs/collectio
 - Publishing method for the Windows PC build: not decided (platform decided 25 Nov: Windows PC first).
 
 ## Decision log
+- 2026-11-27 — Pete: the bat bigger so the swing and its range are clearer. The bat is 1.3 m (was 1.0) and thicker to match; it reaches 3.6 m (was 3.0) across ±69° (was ±60°); a swing shows for 0.3 s (was 0.26) with a wider sweep in first person; a faint white streak follows the bat's tip for 0.12 s, which everyone sees (no colour, nothing left behind). In first person the bat is drawn at 85% and leans out to the right at rest so it stays clear of the crosshair. Damage and rate are unchanged.
 - 2026-11-27 — Pete: walk over and into the hot tubs without jumping. The web's rim collider was a ring of blocks 0.55 m above the deck, exactly the highest step a player can take, and it didn't match the white stone you see (it started 0.3 m inside the water, where you'd stand on nothing, and stopped 0.3 m short of the stone's outside edge). Now the rim's collider is the stone you see (1.5–2.1 m out, 0.56 m tall), with a 0.45 m wide stone step outside and a 0.35 m seat inside, both 0.28 m high (× 1.25 across on the terrace tub). The check walks in and back out from six sides of each tub.
 - 2026-11-27 — Pete: "if you run into balls or other items they should move, fall over". The ball pit's balls already fly when you run or land in it; now walking slowly through it rolls them aside too (it used to ignore anything under 1.2 m/s). Items: the Mansion's small furniture standing on a floor (72 of them; picked by size and kind, so a re-export keeps working) are rigid bodies (5–40 kg by size) that people push as they run into them (high up, so tall things fall over), and hits and blasts knock. Bigger furniture stays put so rooms keep their shape. Smashing still works on the ones that are smashable.
 - 2026-11-27 — Pete: bring the SMGs and the crossbow over from 1v1. 1v1's SMGs now are the MP5, UMP and Vector (the Uzi, P90 and Sting are only in Collection, so they stay): their hip spread is halved as in 1v1 now (MP5 0.8°, UMP 0.75°, Vector 0.75°). The Crossbow joins the gun pool with 1v1's stats and model; choices: 10 bolts a pickup (the HUD and pickups show 10), 1.8 s between bolts (no reloads here), one bolt per trigger pull for the player; picking up a new gun starts it ready to fire rather than waiting out the old gun's gap.

@@ -126,8 +126,8 @@ static func tape_mat(skin: String) -> Material:
 	return _mats[key]
 
 # ---- the bat (1v1's barbed-wire bat): a turned body, grip tape, a band and ring, and two coils of barbed wire
-const BAT_LEN := 1.0     # (Pete, 26 Nov: a little longer than the old 0.82 so hits read clearly)
-const BAT_RK := 1.2      # the web profile's radii scaled to our length
+const BAT_LEN := 1.3     # (Pete, 27 Nov: bigger, so the swing and its reach read clearly; was 1.0, before that 0.82)
+const BAT_RK := 1.55     # the web profile's radii scaled to our length
 static var _bat_meshes := {}
 
 static func _bat_prof(t: float) -> float:
@@ -223,6 +223,11 @@ static func _bat(root: Node3D, skin: String) -> void:
 		mi.material_override = tape_mat(skin) if part[1] == "tape" else skin_mat(skin, part[1])
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 		bat.add_child(mi)
+	for mark in [["Tip", 0.98], ["Mid", 0.55]]:   # for the swing streak (weapons/swing_trail.gd)
+		var n := Node3D.new()
+		n.name = mark[0]
+		n.position = Vector3(0, (float(mark[1]) - 0.12) * BAT_LEN, 0)
+		bat.add_child(n)
 
 ## skin: one of SKINS (the bat's or the gun's finish)
 static func make(id: String, skin := "classic") -> Node3D:
