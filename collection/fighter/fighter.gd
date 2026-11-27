@@ -37,7 +37,7 @@ const ACC_AIR := 22.0           # was 28
 const GRAV := 36.0
 const JUMP := 12.0
 const STEP := 0.55
-const LADDER_SPEED := 3.0   # (Pete, 26 Nov: was the web's 6, too fast for a climb to look right)
+const LADDER_SPEED := 2.0   # (Pete, 27 Nov: 2 m/s so the climb plays at 3x, not 4.5x; 26 Nov: 3, the web's 6 before)
 const LADDER_HOLD := 0.34    # on the rungs the body is held this far out from them, in the middle of the ladder (Pete,
                              # 26 Nov: locked on and straight while climbing; only a jump takes you off)
 const LADDER_OFF := Vector2(4.5, 0.55)   # jumping off a ladder: out from the wall at 4.5 m/s, up at 0.55 of a jump
@@ -55,7 +55,7 @@ const GET_UP := 5.0
 const BLEED := 15.0
 const REGEN_DELAY := 3.0
 const REGEN_RATE := 10.0
-const CRAWL := 3.0
+const CRAWL := 1.2               # downed (Pete, 27 Nov: "crawl slowly"; was 3, which made the crawl glide)
 const RESPAWN := 3.0
 const SHIELD := 4.0   # spawn shield (Pete, 26 Nov: doubled from 2 s)
 const SWAP := 0.3

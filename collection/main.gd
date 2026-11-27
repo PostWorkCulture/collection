@@ -656,7 +656,7 @@ func _ladder_checks() -> void:
 	player.place(Vector3(-24, 0.05, -29.3), 0.0)
 	await _wait(0.4)
 	Input.action_press("move_forward")
-	await _wait(5.5)
+	await _wait(7.5)   # 11.35 m at 2 m/s (27 Nov)
 	Input.action_release("move_forward")
 	await _wait(0.5)
 	_log("AUTOTEST ladder to the top: ended at %v (top 11.35), on floor=%s" % [player.global_position, player.is_on_floor()])
