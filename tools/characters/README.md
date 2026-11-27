@@ -14,6 +14,11 @@ Needs Python 3 with `bpy` (Blender as a module, 5.x) and `numpy`.
 4. **All of it** — `sh build_character.sh wednesday <1v1 chars dir> <out dir>` rigs and retargets every clip in one
    go; copy `<out>/wednesday.glb` and `wednesday.json` into `collection/characters/wednesday/`.
 
+5. **Eyes** — `find_eyes.py <rig.blend> <collection/characters/<id>/<id>.json> [x,z x,z]` finds the eyes on the
+   face (for blinking) and writes them into the game json as `_eyes`; give the centres by hand when a fringe hides
+   them (Raven: `-0.067,2.586 0.064,2.586`). The rig also gets a `Hair` bone and, where the trousers have chains,
+   `LeftChain` / `RightChain` (bouncing hair and chains in the game).
+
 Checking: `anim_frames.py <anim.blend> <out dir> <clip>:<view>:<frames> ...` renders frames of clips (views front,
 side, three_q, back); `pose_test.py` renders the rest pose. In the game, `autotest.json` with `"character": true`
 plays every action on the lawn and saves side, front and gameplay shots to `shots/char_*.png`.

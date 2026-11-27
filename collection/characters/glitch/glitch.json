@@ -1,0 +1,408 @@
+{
+ "idle": {
+  "frames": 249,
+  "loop": true,
+  "speed": 0.0
+ },
+ "walk": {
+  "frames": 30,
+  "loop": true,
+  "speed": 1.8142
+ },
+ "run": {
+  "frames": 22,
+  "loop": true,
+  "speed": 4.08
+ },
+ "sprint": {
+  "frames": 17,
+  "loop": true,
+  "speed": 6.6769
+ },
+ "run_back": {
+  "frames": 18,
+  "loop": true,
+  "speed": 3.6598
+ },
+ "strafe_left": {
+  "frames": 21,
+  "loop": true,
+  "speed": 3.9136
+ },
+ "strafe_right": {
+  "frames": 21,
+  "loop": true,
+  "speed": 3.9136
+ },
+ "strafe_walk_left": {
+  "frames": 29,
+  "loop": true,
+  "speed": 2.1096
+ },
+ "strafe_walk_right": {
+  "frames": 29,
+  "loop": true,
+  "speed": 2.1082
+ },
+ "crouch_idle": {
+  "frames": 42,
+  "loop": true,
+  "speed": 0.0
+ },
+ "crouch_fwd": {
+  "frames": 35,
+  "loop": true,
+  "speed": 1.9161
+ },
+ "crouch_back": {
+  "frames": 38,
+  "loop": true,
+  "speed": 1.3919
+ },
+ "crouch_left": {
+  "frames": 36,
+  "loop": true,
+  "speed": 1.5438
+ },
+ "crouch_right": {
+  "frames": 39,
+  "loop": true,
+  "speed": 1.3244
+ },
+ "jump": {
+  "frames": 48,
+  "loop": false,
+  "speed": 0.0079
+ },
+ "fall": {
+  "frames": 22,
+  "loop": true,
+  "speed": 0.0
+ },
+ "land": {
+  "frames": 33,
+  "loop": false,
+  "speed": 0.1012
+ },
+ "ladder_climb": {
+  "frames": 24,
+  "loop": true,
+  "speed": 0.0381
+ },
+ "punch_jab": {
+  "frames": 32,
+  "loop": false,
+  "speed": 0.0
+ },
+ "punch_cross": {
+  "frames": 27,
+  "loop": false,
+  "speed": 0.0
+ },
+ "bat_swing": {
+  "frames": 73,
+  "loop": false,
+  "speed": 0.0
+ },
+ "smg_idle": {
+  "frames": 258,
+  "loop": true,
+  "speed": 0.0
+ },
+ "pistol_idle": {
+  "frames": 41,
+  "loop": true,
+  "speed": 0.0
+ },
+ "hit": {
+  "frames": 14,
+  "loop": false,
+  "speed": 0.0
+ },
+ "go_down": {
+  "frames": 136,
+  "loop": false,
+  "speed": 0.2435
+ },
+ "downed_crawl": {
+  "frames": 55,
+  "loop": true,
+  "speed": 0.5494
+ },
+ "get_up": {
+  "frames": 259,
+  "loop": false,
+  "speed": 0.0404
+ },
+ "death": {
+  "frames": 112,
+  "loop": false,
+  "speed": 0.3241
+ },
+ "box_guard": {
+  "frames": 67,
+  "loop": true,
+  "speed": 0.0
+ },
+ "box_jab": {
+  "frames": 53,
+  "loop": false,
+  "speed": 0.0
+ },
+ "box_cross": {
+  "frames": 65,
+  "loop": false,
+  "speed": 0.0
+ },
+ "box_hook": {
+  "frames": 61,
+  "loop": false,
+  "speed": 0.0
+ },
+ "bat_hit": {
+  "frames": 60,
+  "loop": false,
+  "speed": 0.5758
+ },
+ "smg_aim": {
+  "frames": 94,
+  "loop": true,
+  "speed": 0.0
+ },
+ "u_run_fwd": {
+  "frames": 23,
+  "loop": true,
+  "speed": 4.2494
+ },
+ "r_idle": {
+  "frames": 64,
+  "loop": true,
+  "speed": 0.0
+ },
+ "r_sprint_fwd": {
+  "frames": 16,
+  "loop": true,
+  "speed": 7.855
+ },
+ "r_sprint_back": {
+  "frames": 16,
+  "loop": true,
+  "speed": 7.855
+ },
+ "r_sprint_left": {
+  "frames": 16,
+  "loop": true,
+  "speed": 7.855
+ },
+ "r_sprint_right": {
+  "frames": 16,
+  "loop": true,
+  "speed": 7.855
+ },
+ "r_sprint_fwd_left": {
+  "frames": 16,
+  "loop": true,
+  "speed": 7.8551
+ },
+ "r_sprint_fwd_right": {
+  "frames": 16,
+  "loop": true,
+  "speed": 7.8549
+ },
+ "jump2": {
+  "frames": 58,
+  "loop": false,
+  "speed": 0.0
+ },
+ "death2": {
+  "frames": 111,
+  "loop": false,
+  "speed": 0.4069
+ },
+ "hit_light": {
+  "frames": 29,
+  "loop": false,
+  "speed": 0.0
+ },
+ "hit_medium": {
+  "frames": 38,
+  "loop": false,
+  "speed": 0.0
+ },
+ "crouch_idle2": {
+  "frames": 76,
+  "loop": true,
+  "speed": 0.0
+ },
+ "crouch_walk2": {
+  "frames": 32,
+  "loop": true,
+  "speed": 1.5416
+ },
+ "walk2": {
+  "frames": 36,
+  "loop": true,
+  "speed": 1.3781
+ },
+ "jump_run": {
+  "frames": 43,
+  "loop": false,
+  "speed": 2.7087
+ },
+ "death3": {
+  "frames": 79,
+  "loop": false,
+  "speed": 0.4115
+ },
+ "crouch_sneak": {
+  "frames": 51,
+  "loop": true,
+  "speed": 2.4068
+ },
+ "crawl2": {
+  "frames": 79,
+  "loop": true,
+  "speed": 0.3318
+ },
+ "fight_idle": {
+  "frames": 100,
+  "loop": true,
+  "speed": 0.0
+ },
+ "bat_swing2": {
+  "frames": 209,
+  "loop": false,
+  "speed": 0.0
+ },
+ "cel_victory": {
+  "frames": 257,
+  "loop": false,
+  "speed": 0.0
+ },
+ "cel_victory_idle_vegas": {
+  "frames": 57,
+  "loop": true,
+  "speed": 0.0
+ },
+ "cel_victory_idle_aj": {
+  "frames": 51,
+  "loop": true,
+  "speed": 0.0
+ },
+ "cel_cheer": {
+  "frames": 88,
+  "loop": false,
+  "speed": 0.0
+ },
+ "cel_flex": {
+  "frames": 117,
+  "loop": false,
+  "speed": 0.0
+ },
+ "cel_arms_back": {
+  "frames": 98,
+  "loop": false,
+  "speed": 0.0
+ },
+ "dance_kick_step": {
+  "frames": 191,
+  "loop": true,
+  "speed": 0.0
+ },
+ "dance_raise_roof": {
+  "frames": 124,
+  "loop": true,
+  "speed": 0.0008
+ },
+ "dance_running_man": {
+  "frames": 143,
+  "loop": true,
+  "speed": 0.0
+ },
+ "dance_arm_wave": {
+  "frames": 157,
+  "loop": true,
+  "speed": 0.0
+ },
+ "dance_shimmy": {
+  "frames": 360,
+  "loop": true,
+  "speed": 0.0
+ },
+ "dance_tut": {
+  "frames": 509,
+  "loop": true,
+  "speed": 0.0
+ },
+ "dance_step": {
+  "frames": 235,
+  "loop": true,
+  "speed": 0.3775
+ },
+ "dance_twist": {
+  "frames": 284,
+  "loop": true,
+  "speed": 0.0
+ },
+ "dance_salsa": {
+  "frames": 136,
+  "loop": true,
+  "speed": 0.0
+ },
+ "dance_side_to_side": {
+  "frames": 410,
+  "loop": true,
+  "speed": 0.0
+ },
+ "pose_hand_hip": {
+  "frames": 2,
+  "loop": true,
+  "speed": 0.0
+ },
+ "pose_happy_idle": {
+  "frames": 61,
+  "loop": true,
+  "speed": 0.0004
+ },
+ "pose_bored": {
+  "frames": 321,
+  "loop": true,
+  "speed": 0.0
+ },
+ "pose_bboy": {
+  "frames": 71,
+  "loop": false,
+  "speed": 0.1986
+ },
+ "_eyes": {
+  "eyes": [
+   {
+    "pos": [
+     0.0659,
+     2.5207,
+     0.3783
+    ],
+    "w": 0.0452,
+    "h": 0.0828
+   },
+   {
+    "pos": [
+     -0.0659,
+     2.5207,
+     0.3783
+    ],
+    "w": 0.0452,
+    "h": 0.0828
+   }
+  ],
+  "skin": [
+   0.996,
+   0.91,
+   0.749
+  ],
+  "uv": [
+   0.6608,
+   0.64992
+  ]
+ }
+}

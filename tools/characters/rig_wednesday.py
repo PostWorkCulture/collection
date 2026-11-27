@@ -72,6 +72,30 @@ def vertex_lum(n):
             cnt[vi] += 1
     return lum / np.maximum(cnt, 1)
 
+def vertex_rgb(n):
+    o = parts[n]
+    me = o.data
+    mat = me.materials[0]
+    img = None
+    for node in mat.node_tree.nodes:   # the colour texture (not the emissive one)
+        if node.type == 'TEX_IMAGE' and node.image and 'emiss' not in node.image.name.lower():
+            img = node.image
+            break
+    if img is None:
+        return None
+    w, h = img.size
+    px = np.array(img.pixels[:]).reshape(h, w, 4)
+    uvl = me.uv_layers.active.data
+    rgb = np.zeros((len(me.vertices), 3))
+    cnt = np.zeros(len(me.vertices))
+    for poly in me.polygons:
+        for li in poly.loop_indices:
+            vi = me.loops[li].vertex_index
+            u, v = uvl[li].uv
+            rgb[vi] += px[int((v % 1) * (h - 1)), int((u % 1) * (w - 1))][:3]
+            cnt[vi] += 1
+    return rgb / np.maximum(cnt, 1)[:, None]
+
 # ---------------------------------------------------------------- skeleton layout
 tor, hd = V['torso'], V['head']
 hips_z = float(tor[:, 2].min())               # bottom of the torso block (top of the legs)
@@ -131,6 +155,40 @@ for s, n in legs.items():
     J[s + 'Toe_End'] = Vector((cx, foot_front, 0.06))
     leg_info[s] = dict(top=top, knee=knee_z, ankle=ankle_z, toe_y=J[s + 'ToeBase'].y, cy=cy)
 
+# hair (27 Nov): what hangs off the head sways on its own bone. Hair is what lies low and out at the sides and back
+# of the head (hanging locks, tails, a bob), plus anything sticking up off the top (ears, bunches) at half; the face
+# and the front of the skull stay with the head. The bone pivots in the middle of the head.
+hx0, hx1 = float(hd[:, 0].min()), float(hd[:, 0].max())
+hy0, hy1 = float(hd[:, 1].min()), float(hd[:, 1].max())     # -y is the front
+hz0, hz1 = float(hd[:, 2].min()), float(hd[:, 2].max())
+hcx, hcy = (hx0 + hx1) * 0.5, (hy0 + hy1) * 0.5
+hcz = hz0 + (hz1 - hz0) * 0.55
+J['Hair'] = Vector((hcx, hcy, hcz))
+J['HairEnd'] = Vector((hcx, hy1, hz0))
+# trouser chains (27 Nov): grey metal on the front of a thigh swings from its top
+chain_info = {}
+for s, n in legs.items():
+    l = V[n]
+    rgb = vertex_rgb(n)
+    li = leg_info[s]
+    if rgb is None:
+        continue
+    mx, mn, lum = rgb.max(1), rgb.min(1), rgb.mean(1)
+    front = l[:, 1] < li['cy'] - 0.02
+    band = (l[:, 2] > li['knee'] - 0.05) & (l[:, 2] < li['top'] - 0.02)
+    grey = (mx - mn < 0.08) & (lum > 0.36) & (lum < 0.85)
+    m = front & band & grey
+    if m.sum() < 12 or m.sum() > 400:
+        continue
+    pts = l[m]
+    top = float(pts[:, 2].max())
+    cx = float(np.median(pts[:, 0]))
+    cy = float(np.median(pts[:, 1]))
+    J[s + 'Chain'] = Vector((cx, cy, top))
+    J[s + 'ChainEnd'] = Vector((cx, cy, float(pts[:, 2].min())))
+    chain_info[s] = dict(top=top, bot=float(pts[:, 2].min()), x0=float(pts[:, 0].min()) - 0.02,
+                         x1=float(pts[:, 0].max()) + 0.02, y1=cy + 0.06, g=grey)
+
 # ---------------------------------------------------------------- armature
 arm_data = bpy.data.armatures.new('Armature')
 rig = bpy.data.objects.new('Armature', arm_data)
@@ -163,6 +221,9 @@ for s in ('Left', 'Right'):
     bone(s + 'Leg', J[s + 'Leg'], J[s + 'Foot'], s + 'UpLeg')
     bone(s + 'Foot', J[s + 'Foot'], J[s + 'ToeBase'], s + 'Leg')
     bone(s + 'ToeBase', J[s + 'ToeBase'], J[s + 'Toe_End'], s + 'Foot')
+bone('Hair', J['Hair'], J['HairEnd'], 'Head')
+for s in chain_info:
+    bone(s + 'Chain', J[s + 'Chain'], J[s + 'ChainEnd'], s + 'UpLeg')
 bpy.ops.object.mode_set(mode='OBJECT')
 
 # ---------------------------------------------------------------- join + weights
@@ -232,6 +293,34 @@ for s, n in legs.items():
     w[s + 'Foot'] = w[s + 'Foot'] * (1 - toe)
     add(w, m)
 
+# hair: low and out at the sides and back, or up off the top
+m = part_of == 'head'
+u = np.abs(co[:, 0] - hcx) / max(0.01, (hx1 - hx0) * 0.5)
+v = (co[:, 1] - hcy) / max(0.01, (hy1 - hy0) * 0.5)         # + = back
+hgt = (co[:, 2] - hz0) / max(0.01, hz1 - hz0)
+rho = np.maximum(u, np.abs(v))
+low_out = ss((0.6 - hgt) / 0.35) * ss((rho - 0.62) / 0.25) * np.where(v < -0.25, ss((u - 0.82) / 0.12), 1.0)
+up_top = ss((hgt - 0.86) / 0.1) * 0.5
+hw = np.clip(np.maximum(low_out * 0.85, up_top), 0.0, 0.85) * m
+W['Hair'] = W['Head'] * hw
+W['Head'] = W['Head'] * (1 - hw)
+# chains: the grey links on the front of the thigh
+for s, ci in chain_info.items():
+    n = legs[s]
+    m = part_of == n
+    sel = (co[:, 0] > ci['x0']) & (co[:, 0] < ci['x1']) & (co[:, 2] > ci['bot'] - 0.02) & (co[:, 2] < ci['top'] + 0.02) & (co[:, 1] < ci['y1']) & m
+    # only the grey links (by colour), not the cloth round them
+    idx = np.nonzero(m)[0]
+    g = ci['g']
+    local = np.zeros(nv, dtype=bool)
+    if len(idx) == len(g):   # the join keeps each part's vertex order
+        local[idx] = g
+        sel = sel & local
+    cw = sel.astype(float) * ss((ci['top'] - co[:, 2]) / 0.12)   # pinned at the top, free below
+    for k in list(W.keys()):
+        W[k] = W[k] * (1 - cw)
+    W[s + 'Chain'] = cw
+
 for n, arr in W.items():
     vg = body.vertex_groups.get(n) or body.vertex_groups.new(name=n)
     for i in np.nonzero(arr > 0.002)[0]:
@@ -253,6 +342,7 @@ print('RIG verts', nv, 'unassigned', len(missing), 'bones', len(arm_data.bones))
 print('RIG joints', {k: tuple(round(c, 3) for c in v) for k, v in J.items()})
 print('RIG arms', arm_info)
 print('RIG legs', leg_info)
+print('RIG hair verts', int((W['Hair'] > 0.05).sum()), 'chains', {s: int((W[s + 'Chain'] > 0.05).sum()) for s in chain_info})
 
 bpy.ops.wm.save_as_mainfile(filepath=blend_out)
 bpy.ops.export_scene.gltf(filepath=dst, export_format='GLB', export_skins=True, export_animations=False,
