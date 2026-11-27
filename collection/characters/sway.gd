@@ -1,6 +1,7 @@
 extends SkeletonModifier3D
 ## Springy hair and trouser chains (Pete, 27 Nov; 1v1's springs as the model): the rig has a Hair bone (what hangs
-## off the head at the sides and back) and, where a character has one, a chain bone on the
+## off the head at the sides and back; long tails the 1v1 model kept with the body get HairL / HairR from where they
+## leave the head) and, where a character has one, a chain bone on the
 ## front of a thigh (tools/characters/rig_wednesday.py). After the animation each of those bones lags behind the way
 ## its tip is being thrown about: a damped spring on the tip's acceleration (stiffness, damping, how hard it's
 ## thrown, the most it moves), so hair bounces when she lands, swings when she turns and settles when she stops.
@@ -12,6 +13,8 @@ extends SkeletonModifier3D
 const SPRINGS := {
 	# bone: [stiffness, damping, gain, most it moves (m), length (model units, tip from the pivot)]
 	"Hair": [330.0, 8.5, 0.85, 0.13, 0.6],
+	"HairL": [140.0, 6.0, 1.0, 0.3, 1.3],    # long tails on their own bones (North West): softer, swing further
+	"HairR": [140.0, 6.0, 1.0, 0.3, 1.3],
 	"LeftChain": [210.0, 5.0, 1.5, 0.16, 0.3],
 	"RightChain": [210.0, 5.0, 1.5, 0.16, 0.3],
 }
@@ -62,7 +65,7 @@ func _process_modification() -> void:
 		var par := sk.get_bone_parent(b)
 		var pg := sk.get_bone_global_pose(par) if par >= 0 else Transform3D()
 		var hang := dir_w
-		if n == "Hair" and par >= 0:   # gravity: undo most of the head's tip for the hair
+		if n.begins_with("Hair") and par >= 0:   # gravity: undo the head's tip for the hair
 			var hu := (gt.basis * pg.basis.y).normalized()
 			var tilt := hu.angle_to(Vector3.UP)
 			if tilt > 0.05:

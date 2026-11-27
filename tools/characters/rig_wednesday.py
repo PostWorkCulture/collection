@@ -99,7 +99,13 @@ _ta = {n: _tree([parts[n].matrix_world @ v.co for v in parts[n].data.vertices]) 
 _tc = _rgb(parts['torso'])
 _ac = {n: (np.median(_rgb(parts[n]), 0) if _tc is not None else None) for n in ('armL', 'armR')}
 to_arm = {'armL': [], 'armR': []}
+_twa = np.array([c[:] for c in _tw])
+_shz = max(piv['armL'].z, piv['armR'].z)
+_fr = (_twa[:, 1] < np.percentile(_twa[:, 1], 30)) & (_twa[:, 2] > _shz - 0.5) & (_twa[:, 2] < _shz - 0.1)
+_cloth = np.median(_tc[_fr], 0) if (_tc is not None and _fr.sum() > 10) else None
 for comp in _islands(parts['torso'].data)[1:]:
+    if _cloth is not None and np.linalg.norm(np.median(_tc[comp], 0) - _cloth) < 0.2:
+        continue   # the jacket's own colour: a jacket panel, leave it with the jacket (round 3: Glitch's hoodie flaps)
     for n in ('armL', 'armR'):
         if np.mean([_tw[i].z for i in comp]) < piv[n].z - 0.45:   # only round the shoulder, where the flaps were
             continue
@@ -149,14 +155,72 @@ for n in ('armL', 'armR'):
 # hidden in 1v1 by arms hanging over them. Once the arms move (reaching, crawling, ragdolls) you could see into and
 # through the jacket. A convex hull of the trunk, pulled in a little, in the jacket's own colour, fills it: a gap now
 # shows more jacket, never the inside or the world behind.
+# --- long hair the 1v1 split put in the torso part (North West's tails): pieces in the head's hair colour, clearly
+# not the clothes' colour. They get their own bones (HairL / HairR, from where they leave the head) instead of
+# following the back, so they hang and swing (27 Nov review, round 3). Marked with tail_L / tail_R groups.
+def find_tails():
+    hd_o = parts['head']
+    Hh = np.array([v.co[:] for v in hd_o.data.vertices]); hc = _rgb(hd_o)
+    t = parts['torso']
+    T = np.array([v.co[:] for v in t.data.vertices]); tc = _rgb(t)
+    if hc is None or tc is None:
+        return {}
+    x0, x1 = Hh[:, 0].min(), Hh[:, 0].max(); y0, y1 = Hh[:, 1].min(), Hh[:, 1].max(); z0, z1 = Hh[:, 2].min(), Hh[:, 2].max()
+    u = np.abs(Hh[:, 0] - (x0 + x1) / 2) / max(0.01, (x1 - x0) / 2)
+    v = (Hh[:, 1] - (y0 + y1) / 2) / max(0.01, (y1 - y0) / 2)
+    hg = (Hh[:, 2] - z0) / max(0.01, z1 - z0)
+    side_back = (hg < 0.6) & (np.maximum(u, np.abs(v)) > 0.62) & (v > -0.25)
+    if side_back.sum() < 10:
+        return {}
+    hair_col = np.median(hc[side_back], 0)
+    sh_z = max(piv['armL'].z, piv['armR'].z)
+    front = (T[:, 1] < np.percentile(T[:, 1], 30)) & (T[:, 2] > sh_z - 0.5) & (T[:, 2] < sh_z - 0.1)
+    cloth_col = np.median(tc[front], 0) if front.sum() > 10 else np.median(tc, 0)
+    if np.linalg.norm(hair_col - cloth_col) < 0.25:
+        return {}   # hair the colour of the clothes: can't tell them apart, leave it
+    out = {'L': [], 'R': []}
+    half_w = (abs(piv['armL'].x) + abs(piv['armR'].x)) * 0.5
+    back_y = np.percentile(T[:, 1], 75)
+    seeds, rest = [], []
+    for comp in _islands(t.data):
+        if len(comp) < 10:
+            continue
+        P = T[comp]
+        col = np.median(tc[comp], 0)
+        if not (np.linalg.norm(col - hair_col) < 0.12 and np.linalg.norm(col - cloth_col) > 0.25):
+            continue
+        outside = P[:, 1].mean() > back_y or np.abs(P[:, 0]).mean() > half_w * 0.9    # behind the back or out wide
+        if not outside:
+            continue
+        hangs = P[:, 2].max() > z0 - 0.05 and (P[:, 2].max() - P[:, 2].min()) > 0.3     # from the head, and long
+        (seeds if hangs else rest).append(comp)
+    got = list(seeds)
+    grew = bool(got)
+    while grew and rest:   # the rest of each tail: hair-coloured pieces touching what's already in
+        grew = False
+        kt = _tree([Vector(T[i]) for c in got for i in c])
+        for comp in list(rest):
+            if min(kt.find(Vector(T[i]))[2] for i in comp) < 0.06:
+                got.append(comp); rest.remove(comp); grew = True
+    for comp in got:
+        out['L' if T[comp][:, 0].mean() > 0 else 'R'] += comp   # +x is her left
+    for k, idx in out.items():
+        if idx:
+            t.vertex_groups.new(name='tail_' + k).add(idx, 1.0, 'REPLACE')
+    print('RIG tails', {k: len(v) for k, v in out.items()})
+    return {k: T[v] for k, v in out.items() if v}
+tails = find_tails()
+
 def add_core(n, sel, axis_of, colour_at):
     """a closed hull of the part's vertices `sel`, pulled 4 cm inside its surface along lines out from `axis_of(p)`,
-    textured with the part's own colour at the surface point nearest `colour_at`, joined into the part"""
+    textured with the commonest colour of the part's outermost cloth, joined into the part (`colour_at` is unused)"""
     o = parts[n]
     me = o.data
     co_p = np.array([v.co[:] for v in me.vertices])
     gi = o.vertex_groups['part_' + n].index
-    own = np.array([any(g.group == gi and g.weight > 0.5 for g in v.groups) for v in me.vertices])   # not pieces sent to the trunk
+    tg = [o.vertex_groups[g].index for g in ('tail_L', 'tail_R') if o.vertex_groups.get(g)]
+    own = np.array([any(g.group == gi and g.weight > 0.5 for g in v.groups) and not any(g.group in tg for g in v.groups)
+                    for v in me.vertices])   # not pieces sent to the trunk, nor long hair (round 3: North West's tails)
     pts = co_p[sel(co_p) & own]
     if len(pts) < 20:
         return
@@ -171,7 +235,10 @@ def add_core(n, sel, axis_of, colour_at):
     bmesh.ops.subdivide_edges(bm, edges=bm.edges[:], cuts=2, use_grid_fill=True)
     bmesh.ops.triangulate(bm, faces=bm.faces[:])
     from mathutils.bvhtree import BVHTree
-    tree = BVHTree.FromPolygons([v.co.copy() for v in me.vertices], [tuple(p.vertices) for p in me.polygons])
+    polys = [p for p in me.polygons if all(own[i] for i in p.vertices)]
+    tree = BVHTree.FromPolygons([v.co.copy() for v in me.vertices], [tuple(p.vertices) for p in polys])
+    nohit = []
+    hz = []
     for v in bm.verts:
         a = axis_of(v.co)
         d = v.co - a
@@ -183,21 +250,38 @@ def add_core(n, sel, axis_of, colour_at):
         hit, nrm, idx, dist = tree.ray_cast(a, d.normalized(), L + 0.3)
         if hit is not None and dist - 0.04 < L:
             v.co = a + d.normalized() * max(0.02, dist - 0.04)
-    # the colour: the outermost surface near `colour_at` (the jacket, not a shirt under it)
-    dd = ((co_p - np.array(colour_at)) ** 2).sum(1)
-    near = np.nonzero(own & (dd < 0.2 ** 2))[0]
-    if len(near):
-        vi = int(max(near, key=lambda k: (Vector(co_p[k]) - axis_of(Vector(co_p[k]))).length))
-    else:
-        vi = int(np.argmin(dd))
+            hz.append((float(a.z), float(a.x), max(0.02, dist - 0.04)))
+        elif hit is None:
+            nohit.append(v)
+    # a point that sees no cloth at all (below a hem, between hanging pieces): no further out than the cloth found
+    # at that height (round 3: a flat sheet stuck out between North West's tails)
+    if hz:
+        H = np.array(hz)
+        for v in nohit:
+            a = axis_of(v.co)
+            d = v.co - a
+            near = H[(np.abs(H[:, 0] - a.z) < 0.12) & (np.abs(H[:, 1] - a.x) < 0.12)]
+            lim = float(np.median(near[:, 2])) if len(near) else float(np.median(H[:, 2]))
+            if d.length > lim:
+                v.co = a + d.normalized() * lim
+    # the colour: the commonest colour of the outermost cloth (rays from outside in, over the whole core), so a gap
+    # shows the jacket's main colour (round 3: not the hair, not a shirt under it, not one odd spot)
+    cols = _rgb(o)
+    q = []
+    for v in bm.verts:
+        a = axis_of(v.co)
+        d = v.co - a
+        if d.length < 1e-4:
+            continue
+        hit, nrm, idx, dist = tree.ray_cast(a + d.normalized() * 1.5, -d.normalized(), 1.5)
+        if hit is not None and cols is not None:
+            p = polys[idx]
+            q.append((tuple((cols[p.vertices[0]] * 8).astype(int)), p.loop_indices[0]))
     uv = None
-    for poly in me.polygons:
-        for li in poly.loop_indices:
-            if me.loops[li].vertex_index == vi:
-                uv = me.uv_layers.active.data[li].uv.copy()
-                break
-        if uv is not None:
-            break
+    if q:
+        keys = [k for k, _ in q]
+        common = max(set(keys), key=keys.count)
+        uv = me.uv_layers.active.data[q[keys.index(common)][1]].uv.copy()
     core = bpy.data.meshes.new('core_' + n)
     bm.to_mesh(core)
     bm.free()
@@ -217,10 +301,12 @@ def add_core(n, sel, axis_of, colour_at):
     o.vertex_groups['part_' + n].add(list(range(n0, len(o.data.vertices))), 1.0, 'REPLACE')
     print('CORE', n, len(o.data.vertices) - n0, 'verts, uv', tuple(uv) if uv is not None else None)
 
-_ct = np.array([v.co[:] for v in parts['torso'].data.vertices])
+_tg = [parts['torso'].vertex_groups[g].index for g in ('tail_L', 'tail_R') if parts['torso'].vertex_groups.get(g)]
+_ct = np.array([v.co[:] for v in parts['torso'].data.vertices if not any(g.group in _tg for g in v.groups)])   # not the tails
 _sh_z = max(piv['armL'].z, piv['armR'].z)
-_z0, _z1 = _ct[:, 2].min() + 0.04, _sh_z + 0.06
-_c = (_ct.min(0) + _ct.max(0)) * 0.5
+_legs_top = max(float(max((parts[n].matrix_world @ v.co).z for v in parts[n].data.vertices)) for n in ('legL', 'legR'))
+_z0, _z1 = max(_ct[:, 2].min() + 0.04, _legs_top + 0.05), _sh_z + 0.06   # from the top of the legs (no lower: round 3)
+_c = np.array([(piv['armL'].x + piv['armR'].x) * 0.5, (piv['armL'].y + piv['armR'].y) * 0.5, 0.0])   # between the shoulders
 add_core('torso', lambda P: (P[:, 2] > _z0) & (P[:, 2] < _z1), lambda p: Vector((_c[0], _c[1], min(max(p.z, _z0 + 0.1), _z1 - 0.1))),
          (_c[0] + (_ct[:, 0].max() - _c[0]) * 0.9, _c[1], _sh_z - 0.25))
 for _n in ('armL', 'armR'):   # the top of each sleeve (its open end at the shoulder)
@@ -412,6 +498,14 @@ for s in ('Left', 'Right'):
     bone(s + 'Foot', J[s + 'Foot'], J[s + 'ToeBase'], s + 'Leg')
     bone(s + 'ToeBase', J[s + 'ToeBase'], J[s + 'Toe_End'], s + 'Foot')
 bone('Hair', J['Hair'], J['HairEnd'], 'Head')
+tail_info = {}
+for k, P in tails.items():   # long tails: a bone each from where they leave the head down to their ends
+    top = float(P[:, 2].max()); bot = float(P[:, 2].min())
+    rt = P[P[:, 2] > top - 0.15]; bt = P[P[:, 2] < bot + 0.15]
+    root = Vector((float(rt[:, 0].mean()), float(rt[:, 1].mean()), top))
+    end = Vector((float(bt[:, 0].mean()), float(bt[:, 1].mean()), bot))
+    bone('Hair' + k, root, end, 'Head')
+    tail_info[k] = dict(top=top, root=root, end=end)
 for s in chain_info:
     bone(s + 'Chain', J[s + 'Chain'], J[s + 'ChainEnd'], s + 'UpLeg')
 bpy.ops.object.mode_set(mode='OBJECT')
@@ -531,12 +625,28 @@ for s, ci in chain_info.items():
         W[k] = W[k] * (1 - cw)
     W[s + 'Chain'] = cw
 
+# long tails: all on the head and their own bone (not the back), free below their roots
+for k, ti in tail_info.items():
+    g = body.vertex_groups.get('tail_' + k)
+    if not g:
+        continue
+    idx = np.array([v.index for v in me.vertices if any(e.group == g.index and e.weight > 0.5 for e in v.groups)], dtype=int)
+    if not len(idx):
+        continue
+    w = ss((ti['top'] - co[idx, 2]) / 0.25)
+    for kk in list(W.keys()):
+        W[kk][idx] = 0.0
+    W['Head'][idx] = 1.0 - w
+    W['Hair' + k] = np.zeros(nv)
+    W['Hair' + k][idx] = w
+    print('RIG tail', k, len(idx), 'verts, length', round((ti['root'] - ti['end']).length, 2))
+
 for n, arr in W.items():
     vg = body.vertex_groups.get(n) or body.vertex_groups.new(name=n)
     for i in np.nonzero(arr > 0.002)[0]:
         vg.add([int(i)], float(arr[i]), 'REPLACE')
 for g in list(body.vertex_groups):
-    if g.name.startswith('part_'):
+    if g.name.startswith('part_') or g.name.startswith('tail_'):
         body.vertex_groups.remove(g)
 
 body.parent = rig
