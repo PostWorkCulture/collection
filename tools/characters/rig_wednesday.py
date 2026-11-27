@@ -25,13 +25,99 @@ piv = {n: o.matrix_world.translation.copy() for n, o in parts.items()}
 def side_of(n):  # game armR / legR sit at +x = character's left
     return 'Left' if piv[n].x > 0 else 'Right'
 
+# --- pieces the 1v1 split put in an arm part that belong to the trunk (27 Nov review: Glitch's hip straps flew out
+# with the arms and hung off the forearms). Growing out from the arm's biggest piece, any loose piece of the arm part
+# that touches the arm (within 6 cm) stays with it; a piece left over that is nearer the torso than the arm goes to
+# the torso (marked here, moved back after the T-pose turn).
+from mathutils.kdtree import KDTree
+def _islands(me):
+    bm = bmesh.new(); bm.from_mesh(me); bm.verts.ensure_lookup_table()
+    seen = set(); out = []
+    for v in bm.verts:
+        if v.index in seen: continue
+        st = [v]; comp = []
+        while st:
+            x = st.pop()
+            if x.index in seen: continue
+            seen.add(x.index); comp.append(x.index)
+            for e in x.link_edges:
+                y = e.other_vert(x)
+                if y.index not in seen: st.append(y)
+        out.append(comp)
+    bm.free()
+    return sorted(out, key=len, reverse=True)
+def _tree(pts):
+    t = KDTree(len(pts))
+    for i, c in enumerate(pts): t.insert(c, i)
+    t.balance()
+    return t
+_tw = [parts['torso'].matrix_world @ v.co for v in parts['torso'].data.vertices]
+_kt = _tree(_tw)
+to_trunk = {}
+for n in ('armL', 'armR'):
+    o = parts[n]
+    W = [o.matrix_world @ v.co for v in o.data.vertices]
+    isl = _islands(o.data)
+    arm = list(isl[0]); left = isl[1:]
+    grew = True
+    while grew and left:
+        grew = False
+        ka = _tree([W[i] for i in arm])
+        for comp in list(left):
+            if min(ka.find(W[i])[2] for i in comp) < 0.06:
+                arm += comp; left.remove(comp); grew = True
+    ka = _tree([W[i] for i in arm])
+    move = []
+    for comp in left:
+        if min(_kt.find(W[i])[2] for i in comp) < min(ka.find(W[i])[2] for i in comp):
+            move += comp
+    to_trunk[n] = move
+    print('RIG', n, 'pieces to the torso', len(move), 'verts')
+# and the other way: loose pieces of the torso part lying on an arm (bits of sleeve or skin the split left in the
+# torso; with the arm raised they hung down the side as flaps). Most of the piece within 8 cm of the arm: it's the arm's.
+# (and in the arm's colour: a jacket panel hugging the arm stays with the jacket)
+def _rgb(o):
+    me = o.data
+    img = None
+    for node in me.materials[0].node_tree.nodes:
+        if node.type == 'TEX_IMAGE' and node.image and 'emiss' not in node.image.name.lower():
+            img = node.image
+            break
+    if img is None:
+        return None
+    w, h = img.size
+    px = np.array(img.pixels[:]).reshape(h, w, 4)
+    uvl = me.uv_layers.active.data
+    c = np.zeros((len(me.vertices), 3)); k = np.zeros(len(me.vertices))
+    for poly in me.polygons:
+        for li in poly.loop_indices:
+            vi = me.loops[li].vertex_index
+            u, v = uvl[li].uv
+            c[vi] += px[int((v % 1) * (h - 1)), int((u % 1) * (w - 1))][:3]; k[vi] += 1
+    return c / np.maximum(k, 1)[:, None]
+_ta = {n: _tree([parts[n].matrix_world @ v.co for v in parts[n].data.vertices]) for n in ('armL', 'armR')}
+_tc = _rgb(parts['torso'])
+_ac = {n: (np.median(_rgb(parts[n]), 0) if _tc is not None else None) for n in ('armL', 'armR')}
+to_arm = {'armL': [], 'armR': []}
+for comp in _islands(parts['torso'].data)[1:]:
+    for n in ('armL', 'armR'):
+        if np.mean([_tw[i].z for i in comp]) < piv[n].z - 0.45:   # only round the shoulder, where the flaps were
+            continue
+        if np.median([_ta[n].find(_tw[i])[2] for i in comp]) < 0.08 and \
+                (_tc is None or np.linalg.norm(np.median(_tc[comp], 0) - _ac[n]) < 0.25):
+            to_arm[n] += comp
+            break
+print('RIG pieces of the torso to the arms', {n: len(v) for n, v in to_arm.items()})
+
 # --- T-pose the arms: rotate about the shoulder pivot round the front-back axis
+_tpose = {}
 for n in ('armL', 'armR'):
     o = parts[n]
     p = piv[n]
     ang = -math.pi / 2 if p.x > 0 else math.pi / 2      # +x arm swings out to +x
     R = Matrix.Translation(p) @ Matrix.Rotation(ang, 4, 'Y') @ Matrix.Translation(-p)
     o.matrix_world = R @ o.matrix_world
+    _tpose[n] = R
 
 # bake transforms into the meshes, tag each part with a vertex group
 for n, o in parts.items():
@@ -39,6 +125,110 @@ for n, o in parts.items():
     o.matrix_world = Matrix.Identity(4)
     vg = o.vertex_groups.new(name='part_' + n)
     vg.add(list(range(len(o.data.vertices))), 1.0, 'REPLACE')
+# the arms' pieces from the torso: turned with the arm and weighted with it
+for n in ('armL', 'armR'):
+    if not to_arm.get(n):
+        continue
+    t = parts['torso']
+    for i in to_arm[n]:
+        t.data.vertices[i].co = _tpose[n] @ t.data.vertices[i].co
+    t.vertex_groups['part_torso'].remove(to_arm[n])
+    t.vertex_groups.new(name='part_' + n).add(to_arm[n], 1.0, 'REPLACE')
+# the trunk's pieces: turned back to where they were and weighted with the torso
+for n in ('armL', 'armR'):
+    if not to_trunk.get(n):
+        continue
+    o = parts[n]
+    back = _tpose[n].inverted()
+    for i in to_trunk[n]:
+        o.data.vertices[i].co = back @ o.data.vertices[i].co
+    o.vertex_groups['part_' + n].remove(to_trunk[n])
+    o.vertex_groups.new(name='part_torso').add(to_trunk[n], 1.0, 'REPLACE')
+
+# --- a closed core inside the trunk (27 Nov review): the 1v1 torsos are open shells with big holes at the sides,
+# hidden in 1v1 by arms hanging over them. Once the arms move (reaching, crawling, ragdolls) you could see into and
+# through the jacket. A convex hull of the trunk, pulled in a little, in the jacket's own colour, fills it: a gap now
+# shows more jacket, never the inside or the world behind.
+def add_core(n, sel, axis_of, colour_at):
+    """a closed hull of the part's vertices `sel`, pulled 4 cm inside its surface along lines out from `axis_of(p)`,
+    textured with the part's own colour at the surface point nearest `colour_at`, joined into the part"""
+    o = parts[n]
+    me = o.data
+    co_p = np.array([v.co[:] for v in me.vertices])
+    gi = o.vertex_groups['part_' + n].index
+    own = np.array([any(g.group == gi and g.weight > 0.5 for g in v.groups) for v in me.vertices])   # not pieces sent to the trunk
+    pts = co_p[sel(co_p) & own]
+    if len(pts) < 20:
+        return
+    bm = bmesh.new()
+    for p in pts:
+        bm.verts.new(p)
+    res = bmesh.ops.convex_hull(bm, input=bm.verts[:])
+    drop = list({g for g in res['geom_interior'] + res['geom_unused'] if isinstance(g, bmesh.types.BMVert)})
+    if drop:
+        bmesh.ops.delete(bm, geom=drop, context='VERTS')
+    bmesh.ops.triangulate(bm, faces=bm.faces[:])
+    bmesh.ops.subdivide_edges(bm, edges=bm.edges[:], cuts=2, use_grid_fill=True)
+    bmesh.ops.triangulate(bm, faces=bm.faces[:])
+    from mathutils.bvhtree import BVHTree
+    tree = BVHTree.FromPolygons([v.co.copy() for v in me.vertices], [tuple(p.vertices) for p in me.polygons])
+    for v in bm.verts:
+        a = axis_of(v.co)
+        d = v.co - a
+        L = d.length
+        if L < 1e-4:
+            continue
+        v.co = a + d * 0.9   # a little in to start with
+        L *= 0.9
+        hit, nrm, idx, dist = tree.ray_cast(a, d.normalized(), L + 0.3)
+        if hit is not None and dist - 0.04 < L:
+            v.co = a + d.normalized() * max(0.02, dist - 0.04)
+    # the colour: the outermost surface near `colour_at` (the jacket, not a shirt under it)
+    dd = ((co_p - np.array(colour_at)) ** 2).sum(1)
+    near = np.nonzero(own & (dd < 0.2 ** 2))[0]
+    if len(near):
+        vi = int(max(near, key=lambda k: (Vector(co_p[k]) - axis_of(Vector(co_p[k]))).length))
+    else:
+        vi = int(np.argmin(dd))
+    uv = None
+    for poly in me.polygons:
+        for li in poly.loop_indices:
+            if me.loops[li].vertex_index == vi:
+                uv = me.uv_layers.active.data[li].uv.copy()
+                break
+        if uv is not None:
+            break
+    core = bpy.data.meshes.new('core_' + n)
+    bm.to_mesh(core)
+    bm.free()
+    for uvl_name in [l.name for l in me.uv_layers]:
+        lay = core.uv_layers.new(name=uvl_name)
+        for d in lay.data:
+            d.uv = uv if uv is not None else (0.5, 0.5)
+    core.materials.append(me.materials[0])
+    co_obj = bpy.data.objects.new('core_' + n, core)
+    bpy.context.scene.collection.objects.link(co_obj)
+    bpy.ops.object.select_all(action='DESELECT')
+    co_obj.select_set(True)
+    o.select_set(True)
+    bpy.context.view_layer.objects.active = o
+    n0 = len(me.vertices)
+    bpy.ops.object.join()
+    o.vertex_groups['part_' + n].add(list(range(n0, len(o.data.vertices))), 1.0, 'REPLACE')
+    print('CORE', n, len(o.data.vertices) - n0, 'verts, uv', tuple(uv) if uv is not None else None)
+
+_ct = np.array([v.co[:] for v in parts['torso'].data.vertices])
+_sh_z = max(piv['armL'].z, piv['armR'].z)
+_z0, _z1 = _ct[:, 2].min() + 0.04, _sh_z + 0.06
+_c = (_ct.min(0) + _ct.max(0)) * 0.5
+add_core('torso', lambda P: (P[:, 2] > _z0) & (P[:, 2] < _z1), lambda p: Vector((_c[0], _c[1], min(max(p.z, _z0 + 0.1), _z1 - 0.1))),
+         (_c[0] + (_ct[:, 0].max() - _c[0]) * 0.9, _c[1], _sh_z - 0.25))
+for _n in ('armL', 'armR'):   # the top of each sleeve (its open end at the shoulder)
+    _p = piv[_n]
+    _sx = 1.0 if _p.x > 0 else -1.0
+    add_core(_n, lambda P, _p=_p, _sx=_sx: ((P[:, 0] - _p.x) * _sx > -0.05) & ((P[:, 0] - _p.x) * _sx < 0.42),
+             lambda p, _p=_p, _sx=_sx: Vector((min(max(p.x * _sx, _p.x * _sx + 0.04), _p.x * _sx + 0.38) * _sx, _p.y, _p.z)),
+             (_p.x + _sx * 0.25, _p.y, _p.z + 0.15))
 
 def verts(n):
     o = parts[n]
@@ -293,26 +483,25 @@ for s, n in legs.items():
     w[s + 'Foot'] = w[s + 'Foot'] * (1 - toe)
     add(w, m)
 
-# shoulders (27 Nov review: Puffa's jacket opened at the shoulder): the sleeve (arm part) and the jacket (torso part)
-# are separate shells that met only at the T-pose. Round each shoulder joint the torso takes some of the arm's turn
-# and the top of the sleeve some of the chest's, so lowering the arms bends the seam instead of opening it.
+# shoulders (27 Nov review: jackets opened and cloth flapped at the shoulder). The 1v1 parts overlap there in
+# pieces (bits of sleeve in the torso part, bits of jacket in the arm part), so part-by-part weights tore them apart
+# as soon as the arm moved. Round each shoulder joint every vertex, whichever part it came from, is weighted by
+# where it is: chest on the body side of the joint, arm on the arm side, a smooth blend across it. Overlapping
+# pieces then move together like one skin.
 for s, n in arms.items():
     ja = np.array(J[s + 'Arm'][:])
     d = np.linalg.norm(co - ja, axis=1)
     sx = arm_info[s]['sx']
-    m = (part_of == 'torso') & (co[:, 0] * sx > 0.2)
-    f = ss((0.34 - d) / 0.26) * m
+    side = ((part_of == 'torso') | (part_of == n)) & (co[:, 0] * sx > 0.12)
+    r = ss((0.42 - d) / 0.15) * side                 # how far into the shoulder region
+    t = (co[:, 0] - ja[0]) * sx                      # along the arm from the joint
+    a = ss((t + 0.1) / 0.25)                         # 0 body side .. 1 arm side
+    T = {'Spine2': (1 - a) * 0.7, s + 'Shoulder': 0.3 - 0.15 * a, s + 'Arm': 0.85 * a}
     for k in list(W.keys()):
-        W[k] = W[k] * (1 - 0.75 * f)
-    W.setdefault(s + 'Arm', np.zeros(nv)); W.setdefault(s + 'Shoulder', np.zeros(nv))
-    W[s + 'Arm'] += 0.5 * f
-    W[s + 'Shoulder'] += 0.25 * f
-    m = part_of == n
-    g = ss((0.22 - d) / 0.2) * m
-    for k in list(W.keys()):
-        W[k] = W[k] * (1 - 0.55 * g)
-    W['Spine2'] += 0.35 * g
-    W[s + 'Shoulder'] += 0.2 * g
+        W[k] = W[k] * (1 - r)
+    for k, v in T.items():
+        W.setdefault(k, np.zeros(nv))
+        W[k] = W[k] + v * r
 
 # hair: low and out at the sides and back, or up off the top
 m = part_of == 'head'
