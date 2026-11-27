@@ -65,6 +65,7 @@ func _ready() -> void:
 	_inputs()
 	Sfx.setup()
 	_environment()
+	_apply_display()
 	level = LevelBuilder.new()
 	level.name = "Level"
 	add_child(level)
@@ -118,6 +119,8 @@ func _ready() -> void:
 	add_child(hud)
 	menu = Menu.new()
 	menu.defaults = _key_defaults
+	menu.game = game
+	menu.player = player
 	add_child(menu)
 	menu.play.connect(_on_play)
 	menu.resume.connect(_on_resume)
@@ -170,6 +173,16 @@ func _on_settings_changed(what: String) -> void:
 			_apply_quality()
 			if lights:
 				lights.set_quality(String(Settings.quality))
+		"display":
+			_apply_display()
+		"all":   # Reset all settings
+			_apply_quality()
+			if lights:
+				lights.set_quality(String(Settings.quality))
+			_apply_display()
+			player.apply_camera_mode()
+			Sfx.apply_volumes()
+			set_bot_difficulty(Settings.bots)
 		"view":
 			player.apply_camera_mode()
 		"audio":
@@ -368,9 +381,44 @@ func _apply_quality() -> void:
 	_sun.light_volumetric_fog_energy = 0.8
 	_sun.directional_shadow_max_distance = 60.0 if low else 120.0
 	_sun.shadow_blur = 1.0 if low else 1.5
-	get_viewport().msaa_3d = Viewport.MSAA_DISABLED if low else Viewport.MSAA_2X
+	_apply_aa()
 	if _probes:
 		_probes.visible = high
+
+## anti-aliasing (Settings → Graphics): off, FXAA, MSAA 2× / 4×, or TAA
+func _apply_aa() -> void:
+	var vp := get_viewport()
+	var aa: String = Settings.aa
+	vp.msaa_3d = Viewport.MSAA_2X if aa == "msaa2" else (Viewport.MSAA_4X if aa == "msaa4" else Viewport.MSAA_DISABLED)
+	vp.screen_space_aa = Viewport.SCREEN_SPACE_AA_FXAA if aa == "fxaa" else Viewport.SCREEN_SPACE_AA_DISABLED
+	vp.use_taa = aa == "taa"
+
+## Settings → Display and Graphics: window mode, v-sync, frame-rate limit, the 3D view's resolution, brightness,
+## anti-aliasing and the size of the HUD and menus
+func _apply_display() -> void:
+	if DisplayServer.get_name() != "headless":
+		var mode := DisplayServer.WINDOW_MODE_WINDOWED
+		match String(Settings.window_mode):
+			"borderless": mode = DisplayServer.WINDOW_MODE_FULLSCREEN
+			"fullscreen": mode = DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN
+		if DisplayServer.window_get_mode() != mode and not (mode == DisplayServer.WINDOW_MODE_WINDOWED and DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_MAXIMIZED):
+			DisplayServer.window_set_mode(mode)
+		DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_ENABLED if Settings.vsync else DisplayServer.VSYNC_DISABLED)
+	Engine.max_fps = int(Settings.max_fps)
+	var vp := get_viewport()
+	vp.scaling_3d_mode = Viewport.SCALING_3D_MODE_FSR if int(Settings.render_scale) < 100 else Viewport.SCALING_3D_MODE_BILINEAR
+	vp.scaling_3d_scale = clampf(float(Settings.render_scale) / 100.0, 0.5, 1.0)
+	get_window().content_scale_factor = clampf(float(Settings.ui_scale) / 100.0, 0.75, 1.5)
+	if _env:
+		_env.adjustment_brightness = clampf(float(Settings.brightness) / 100.0, 0.5, 1.5)
+	_apply_aa()
+
+## Settings → Sound → Mute in the background
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_APPLICATION_FOCUS_OUT and Settings.mute_unfocused:
+		AudioServer.set_bus_mute(0, true)
+	elif what == NOTIFICATION_APPLICATION_FOCUS_IN:
+		AudioServer.set_bus_mute(0, false)
 
 ## one reflection probe per room (5 × 3 a floor), captured once, so glossy floors and glass show the room around
 ## them; High only
@@ -1637,23 +1685,46 @@ func _menu_checks() -> void:
 	_log("AUTOTEST menu: after Play state=%s hud=%s" % [game.state, hud.visible])
 	while game.state != "fight":
 		await get_tree().physics_frame
+	var cfg_before := FileAccess.get_file_as_string(Settings.PATH) if FileAccess.file_exists(Settings.PATH) else ""
+	await _wait(1.5)
 	await _press(KEY_ESCAPE)
 	await _wait(0.2)
 	_log("AUTOTEST pause: paused=%s screen=%s" % [get_tree().paused, menu.screen])
-	menu.show_settings("pause")
-	await get_tree().process_frame
-	await _snap("p5_02_settings.png")
+	await _snap("p5_04_pause.png")
+	# every settings tab (Pete, 27 Nov: professional menus, 1v1's as the base)
+	var rows := {}
+	for t in menu.TABS:
+		menu.show_settings("pause", t[0])
+		await get_tree().process_frame
+		await get_tree().process_frame
+		rows[t[0]] = menu._root.find_children("*", "HSlider", true, false).size() + menu._root.find_children("*", "Button", true, false).filter(func(b): return (b as Button).toggle_mode).size()
+		await _snap("p5_02_settings_%s.png" % t[0])
+	_log("AUTOTEST settings tabs: %s (sliders + choice buttons each)" % str(rows))
 	for q in ["low", "medium", "high"]:
 		Settings.quality = q
 		_on_settings_changed("quality")
 		await get_tree().process_frame
 		_log("AUTOTEST quality %s: sdfgi=%s ssr=%s fog=%s ssil=%s probes=%s msaa=%d" % [q, _env.sdfgi_enabled, _env.ssr_enabled, _env.volumetric_fog_enabled, _env.ssil_enabled, _probes.visible if _probes else false, get_viewport().msaa_3d])
+	# display options take effect
+	var keep := {"aa": Settings.aa, "max_fps": Settings.max_fps, "render_scale": Settings.render_scale, "brightness": Settings.brightness, "ui_scale": Settings.ui_scale}
+	Settings.aa = "fxaa"
+	Settings.max_fps = 60
+	Settings.render_scale = 77
+	Settings.brightness = 120
+	Settings.ui_scale = 110
+	_on_settings_changed("display")
+	await get_tree().process_frame
+	_log("AUTOTEST display: fxaa=%s msaa=%d max_fps=%d 3d scale %.2f (%s) brightness %.2f ui %.2f" % [get_viewport().screen_space_aa == Viewport.SCREEN_SPACE_AA_FXAA, get_viewport().msaa_3d, Engine.max_fps, get_viewport().scaling_3d_scale, "FSR" if get_viewport().scaling_3d_mode == Viewport.SCALING_3D_MODE_FSR else "bilinear", _env.adjustment_brightness, get_window().content_scale_factor])
+	for k in keep:
+		Settings.set(k, keep[k])
+	_on_settings_changed("display")
 	Settings.vol_weapons = 3
 	_on_settings_changed("audio")
 	_log("AUTOTEST volume: Weapons bus %.1f dB (setting 3 = 30%%)" % AudioServer.get_bus_volume_db(AudioServer.get_bus_index("Weapons")))
 	Settings.vol_weapons = 8
 	_on_settings_changed("audio")
-	menu.show_keys()
+	menu.show_keys("pause")
+	await get_tree().process_frame
 	await get_tree().process_frame
 	await _snap("p5_03_keys.png")
 	var before: String = menu.key_name("jump")
@@ -1664,7 +1735,52 @@ func _menu_checks() -> void:
 	_log("AUTOTEST rebind: jump %s -> %s" % [before, menu.key_name("jump")])
 	menu._bind("jump", _key_defaults["jump"], false)
 	_log("AUTOTEST rebind reset: jump %s" % menu.key_name("jump"))
+	# a key already in use swaps over: jump onto crouch's key
+	var crouch_key: String = menu.key_name("crouch")
+	menu._bind("jump", (menu._kb_event("crouch") as InputEvent).duplicate(), true)
+	_log("AUTOTEST rebind swap: jump -> %s, crouch now %s (was %s)" % [menu.key_name("jump"), menu.key_name("crouch"), crouch_key])
+	menu._set_event("jump", _key_defaults["jump"], false)
+	menu._set_event("crouch", _key_defaults["crouch"], false)
+	# Reset all settings puts every option back
+	Settings.fov = 95.0
+	Settings.xh_style = "circle"
+	Settings.reset_all()
+	_log("AUTOTEST reset all: fov %.0f, crosshair %s, keys saved %d" % [Settings.fov, Settings.xh_style, Settings.keys.size()])
+	# leave the saved settings as they were before the checks
+	if cfg_before != "":
+		var fw := FileAccess.open(Settings.PATH, FileAccess.WRITE)
+		fw.store_string(cfg_before)
+		fw.close()
+	else:
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(Settings.PATH))
+	Settings._ready()
+	_on_settings_changed("all")
 	menu.hide_menu()
 	_on_resume()
 	await get_tree().process_frame
 	_log("AUTOTEST resume: paused=%s" % get_tree().paused)
+	# the crosshair (Pete, 27 Nov): red over an enemy in reach, and a different style from the settings
+	if not dummies.is_empty():
+		var dx: Node = dummies[0]
+		dx.shield_t = 0.0
+		player.give_gun("mp5", 20)
+		Settings.camera_mode = "first"   # (so the crosshair is on the line _face aims down)
+		player.apply_camera_mode()
+		player.place(dx.global_position + Vector3(0, 0.05, -10.0), 0.0)
+		_face(player, dx.global_position + Vector3.UP * 1.2)
+		await _wait(0.5)
+		var red_on: bool = hud._on_target
+		await _snap("p5_05_crosshair_on_target.png")
+		player.yaw += 0.5
+		await _wait(0.2)
+		var red_off: bool = hud._on_target
+		Settings.xh_style = "circle"
+		Settings.xh_color = "#3dff6e"
+		Settings.xh_size = "l"
+		await _wait(0.2)
+		await _snap("p5_06_crosshair_circle_green.png")
+		_log("AUTOTEST crosshair: red on an enemy=%s, off them=%s, style %s" % [red_on, red_off, Settings.xh_style])
+		Settings._ready()   # back to what's saved
+		player.apply_camera_mode()
+		player.gun_id = ""
+		player.select_slot("melee")

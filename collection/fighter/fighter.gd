@@ -138,6 +138,7 @@ var has_mine := false             # gadgets (Pete, 26 Nov; gadgets/gadgets.gd): 
 var has_stun := false
 var last_item := ""               # "mine" or "stun": the one picked up last, which right click uses first (Pete, 27 Nov)
 var _aim_eaten := false           # this press of aim (right click) used an item, so it doesn't aim too
+var _aim_on := false              # Settings → aim toggle: aiming until you press aim again
 var boost_t := 0.0                # speed boost left (seconds)
 var daze_t := 0.0                 # stunned: a quarter speed, can't attack
 var flash_a := 0.0                # the white flash of a stun grenade on your own screen (the player)
@@ -388,18 +389,21 @@ func _unhandled_input(e: InputEvent) -> void:
 	elif e is InputEventJoypadButton or e is InputEventJoypadMotion:
 		_pad_used = true
 	if e is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
-		var s := 0.0006 * (0.5 + Settings.sensitivity * 0.25) * (lerpf(1.0, 0.65, ads_k))
+		# aiming down sights slows the look to 65% of your sensitivity, times Settings → Aim sensitivity
+		var s := 0.0006 * (0.5 + Settings.sensitivity * 0.25) * (lerpf(1.0, 0.65 * Settings.ads_sensitivity / 100.0, ads_k))
 		yaw -= e.relative.x * s
-		pitch = clamp(pitch - e.relative.y * s, -1.45, 1.45)
+		pitch = clamp(pitch - e.relative.y * s * (-1.0 if Settings.invert_y else 1.0), -1.45, 1.45)
 	if e.is_action_pressed("camera_toggle"):
 		Settings.camera_mode = "first" if Settings.camera_mode == "third" else "third"
 		Settings.save()
 		apply_camera_mode()
-	if e.is_action_pressed("crouch") and not downed:
+	if e.is_action_pressed("crouch") and not downed and not Settings.crouch_hold:
 		_set_crouch(not crouching)
 	if e.is_action_pressed("aim") and (has_mine or has_stun) and not downed:
 		use_item()   # right click uses your item; with none, it aims (Pete, 27 Nov)
 		_aim_eaten = true
+	elif e.is_action_pressed("aim") and Settings.aim_toggle:
+		_aim_on = not _aim_on
 	if e.is_action_pressed("weapon_melee"):
 		select_slot("melee")
 	elif e.is_action_pressed("weapon_gun"):
@@ -421,20 +425,26 @@ func _read_player_input(dt: float) -> void:
 	in_fire = Input.is_action_pressed("fire") and (Input.mouse_mode == Input.MOUSE_MODE_CAPTURED or force_input)
 	if not Input.is_action_pressed("aim"):
 		_aim_eaten = false
-	in_aim = Input.is_action_pressed("aim") and not _aim_eaten
+	if Settings.aim_toggle:
+		_aim_on = _aim_on and not Weapons.is_melee(current_weapon()) and not downed and alive
+		in_aim = _aim_on
+	else:
+		in_aim = Input.is_action_pressed("aim") and not _aim_eaten
+	if Settings.crouch_hold and not downed and Input.is_action_pressed("crouch") != crouching:
+		_set_crouch(Input.is_action_pressed("crouch"))
 	# controller right stick looks around
 	var look := Input.get_vector("look_left", "look_right", "look_up", "look_down")
 	if look.length() > 0.12:
 		_pad_used = true
-		var r := 2.6 * (0.5 + Settings.sensitivity * 0.15) * lerpf(1.0, 0.6, ads_k)
+		var r := 2.6 * (0.5 + Settings.pad_sensitivity * 0.15) * lerpf(1.0, 0.6 * Settings.ads_sensitivity / 100.0, ads_k)
 		yaw -= look.x * r * dt
-		pitch = clamp(pitch - look.y * r * 0.7 * dt, -1.45, 1.45)
+		pitch = clamp(pitch - look.y * r * 0.7 * dt * (-1.0 if Settings.pad_invert_y else 1.0), -1.45, 1.45)
 	_aim_assist(dt)
 
-## controller only, Easy only (plan: "aim assist on Easy"): while you look around with the stick or fire with the
+## controller only; on Easy by default (plan: "aim assist on Easy"; Settings → Aim assist: Off / Easy only / On): while you look around with the stick or fire with the
 ## trigger, your aim drifts gently onto anyone within 8° of it and 40 m away, in sight
 func _aim_assist(dt: float) -> void:
-	if not _pad_used or Settings.bots != "easy" or game == null:
+	if not _pad_used or game == null or Settings.aim_assist == "off" or (Settings.aim_assist == "easy" and Settings.bots != "easy"):
 		return
 	var pad_active := Input.get_vector("look_left", "look_right", "look_up", "look_down").length() > 0.12 or Input.get_action_strength("fire") > 0.3
 	if not pad_active:

@@ -11,6 +11,7 @@ const Weapons := preload("res://weapons/weapons.gd")
 const Minimap := preload("res://ui/minimap.gd")
 const WeaponModel := preload("res://weapons/weapon_model.gd")
 const Sfx := preload("res://audio/sfx.gd")
+const Crosshair := preload("res://ui/crosshair.gd")
 
 const WHITE := Color(1, 1, 1)
 const GREY := Color(0.62, 0.62, 0.62)
@@ -58,6 +59,9 @@ var _hurt: ColorRect
 var _cross: Control
 var _hit_t := 0.0
 var _hit_head := false
+var _hit_down := false
+var _on_target := false    # an enemy under the crosshair, in reach (it turns red)
+var _fps: Label
 var _shield: Label
 var _lb: GridContainer
 var _lb_t := 0.0
@@ -111,6 +115,9 @@ func _ready() -> void:
 	_pin(_help, Control.PRESET_CENTER_BOTTOM, -400, -16, false, true)
 	_help.custom_minimum_size.x = 800
 	_help.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_fps = _label(11, Color(0.75, 0.75, 0.75, 0.85))   # Settings → Display → Show FPS
+	_pin(_fps, Control.PRESET_TOP_RIGHT, -6, 2, true, false)
+	add_child(_fps)
 	add_child(_help)
 	_build_phase3()
 	# health card, bottom left
@@ -435,9 +442,13 @@ func add_feed(text: String, mine: bool) -> void:
 	tw.tween_callback(c.queue_free)
 
 func _on_dealt_hit(target: Node, amount: int, head: bool, finished: bool) -> void:
-	_hit_t = 0.18
-	_hit_head = head or finished
-	Sfx.play_ui(self, "headshot" if head else "hit", -6.0, 1.0 if head else 1.05)
+	_hit_t = 0.22
+	_hit_head = head
+	_hit_down = finished or target.downed or not target.alive
+	if Settings.hit_sound:
+		Sfx.play_ui(self, "headshot" if head else "hit", -6.0, 1.0 if head else 1.05)
+	if not Settings.dmg_numbers:
+		return
 	# a floating damage number over them
 	var n := Label3D.new()
 	n.text = str(amount)
@@ -528,7 +539,11 @@ func _process(dt: float) -> void:
 			Weapons.stat(player.gun_id).name, player.ammo, Weapons.stat(offer.id).name, offer.ammo]
 	_shield.visible = player.alive and player.shield_t > 0.0
 	_perf_tick(dt)
-	_help.text = "imok Collection · Godot · WASD move · Space jump · C crouch · V camera · LMB attack · RMB aim or item · 1 bat · 2 gun · E swap gun · Q mine · G stun · F3 bot view · Esc pause · %d fps" % Engine.get_frames_per_second()
+	_help.visible = Settings.show_help
+	_help.text = "imok Collection · Godot · WASD move · Space jump · C crouch · V camera · LMB attack · RMB aim or item · 1 bat · 2 gun · E swap gun · Q mine · G stun · F3 bot view · Esc pause"
+	_fps.visible = Settings.show_fps
+	_fps.text = "%d FPS" % Engine.get_frames_per_second()
+	_on_target = _enemy_in_sights()
 	_process_phase3(dt)
 	_cross.queue_redraw()
 
@@ -599,28 +614,42 @@ func _process_phase3(dt: float) -> void:
 			_results_card.visible = true
 			_fill_table(_results, 16)
 
-## crosshair: four ticks that open with the gun's current spread; a dot with fists or a bat; hidden when aiming
-## down iron sights in first person; the hit marker is an X (red for a headshot or a down)
+## the crosshair (ui/crosshair.gd, set up in Settings → Crosshair & hits): its arms open with the gun's current spread;
+## a dot with the bat; hidden when aiming down iron sights in first person; red over an enemy in reach; the hit marker
 func _draw_cross() -> void:
 	if player == null or not player.alive or (game and game.state == "won"):
 		return
 	var c := _cross.size * 0.5
 	var id: String = player.current_weapon()
-	var outline := Color(0, 0, 0, 0.6)
+	var melee: bool = Weapons.is_melee(id) or player.downed
 	var aimed_fp: bool = player.first_person() and player.ads_k > 0.8
-	if Weapons.is_melee(id) or player.downed:
-		_cross.draw_circle(c, 3.0, outline)
-		_cross.draw_circle(c, 2.0, WHITE)
-	elif not aimed_fp:
-		var fov: float = player.cam.fov
-		var gap := tan(deg_to_rad(player.current_spread())) / tan(deg_to_rad(fov * 0.5)) * _cross.size.y * 0.5 + 5.0
-		for d in [Vector2.RIGHT, Vector2.LEFT, Vector2.UP, Vector2.DOWN]:
-			var a: Vector2 = c + d * gap
-			var b: Vector2 = c + d * (gap + 9.0)
-			_cross.draw_line(a, b, outline, 4.0)
-			_cross.draw_line(a, b, WHITE, 2.0)
-	if _hit_t > 0.0:
-		var col := RED if _hit_head else WHITE
-		col.a = clampf(_hit_t / 0.18, 0.0, 1.0)
-		for d in [Vector2(1, 1), Vector2(-1, 1), Vector2(1, -1), Vector2(-1, -1)]:
-			_cross.draw_line(c + d * 7.0, c + d * 14.0, col, 2.0)
+	if melee or not aimed_fp:
+		var spread_px := 0.0
+		if not melee and Settings.xh_dynamic:
+			var fov: float = player.cam.fov
+			spread_px = tan(deg_to_rad(player.current_spread())) / tan(deg_to_rad(fov * 0.5)) * _cross.size.y * 0.5
+		Crosshair.draw(_cross, c, Settings, spread_px, melee, _on_target and Settings.xh_red)
+	if _hit_t > 0.0 and Settings.hit_marker:
+		Crosshair.draw_hit(_cross, c, Settings, _hit_t / 0.22, _hit_head, _hit_down)
+
+## an enemy right under the crosshair and in reach: guns 150 m, the bat (or fists) its reach
+func _enemy_in_sights() -> bool:
+	if player == null or not player.alive or player.downed or game == null or player.cam == null:
+		return false
+	var cam: Camera3D = player.cam
+	var id: String = player.current_weapon()
+	var reach: float = float(Weapons.stat(id).get("reach", 3.0)) if Weapons.is_melee(id) else 150.0
+	var from := cam.global_position
+	var dir := -cam.global_basis.z
+	var to := from + dir * (reach + from.distance_to(player.eye_pos()) + 0.5)
+	var q := PhysicsRayQueryParameters3D.create(from, to, player.SHOT_MASK, [player.get_rid()])
+	var hit: Dictionary = player.get_world_3d().direct_space_state.intersect_ray(q)
+	if hit.is_empty():
+		return false
+	var o: Object = hit.collider
+	if not (o in game.fighters) or o == player or not o.alive:
+		return false
+	if Weapons.is_melee(id):
+		var d: Vector3 = (o as Node3D).global_position - player.global_position
+		return Vector2(d.x, d.z).length() <= reach
+	return true
