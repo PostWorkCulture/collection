@@ -492,7 +492,7 @@ func _process(dt: float) -> void:
 	if Weapons.is_melee(id):
 		_wpn_ammo.text = "—"
 	else:
-		_wpn_ammo.text = "%d / %d" % [player.ammo, Weapons.AMMO]
+		_wpn_ammo.text = "%d / %d" % [player.ammo, Weapons.full(player.gun_id)]
 	_wpn_ammo.add_theme_color_override("font_color", RED if not Weapons.is_melee(id) and player.ammo <= 5 else WHITE)
 	var melee_name := "BAT" if player.has_bat else "FISTS"   # (everyone carries a bat now)
 	var gun_name := String(Weapons.stat(player.gun_id).name).to_upper() if player.gun_id != "" else "—"

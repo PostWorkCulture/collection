@@ -784,6 +784,17 @@ func _mansion_checks() -> void:
 	player.invulnerable = false
 
 # ---------------- phase 2 combat checks ----------------
+## one trigger pull: hold fire until a shot goes off (or a second passes), then let go
+func _pull_once() -> void:
+	var a0: int = player.ammo
+	Input.action_press("fire")
+	for i in 60:
+		await get_tree().physics_frame
+		if player.ammo < a0:
+			break
+	Input.action_release("fire")
+	await get_tree().physics_frame
+
 func _face(f: Node, target: Vector3) -> void:
 	var d: Vector3 = target - f.eye_pos()
 	f.yaw = atan2(d.x, d.z)
@@ -1023,14 +1034,48 @@ func _combat_checks() -> void:
 	_log("AUTOTEST duals: 8 shots, %d hits at ~7 m on a strafing target" % hits[0])
 	# every gun fires its 20 and drops back to the bat
 	for id in Weapons.CO_GUNS:
-		player.give_gun(id)
+		player.give_gun(id, Weapons.AMMO if id != "crossbow" else 2)
 		var t1 := Time.get_ticks_msec()
 		Input.action_press("fire")
-		while player.gun_id != "" and Time.get_ticks_msec() - t1 < 4000:
+		while player.gun_id != "" and Time.get_ticks_msec() - t1 < 6000:
 			await get_tree().physics_frame
+			if id == "crossbow":   # one bolt a pull: let go and pull again
+				Input.action_release("fire")
+				await get_tree().physics_frame
+				Input.action_press("fire")
 		Input.action_release("fire")
 		_log("AUTOTEST %s: emptied in %.2f s, back to %s" % [id, (Time.get_ticks_msec() - t1) / 1000.0, player.current_weapon()])
 		await _wait(0.4)
+	# the crossbow (Pete, 27 Nov): a bolt at a dummy 15 m off, in the body, then one in the head
+	var xd: Node = dummies[4]
+	xd.place(Vector3(-2, 0.05, -31), PI * 0.5)   # out on the front path, a clear line 15 m along it
+	xd.shield_t = 0.0
+	var xhp: int = xd.hp
+	player.place(Vector3(13, 0.05, -31), -PI * 0.5)
+	player.give_gun("crossbow", Weapons.BOLTS)
+	player.select_slot("gun")
+	_face(player, xd.global_position + Vector3.UP * 0.9)
+	await _wait(0.5)
+	await _pull_once()
+	await _wait(0.4)
+	var body_dmg: int = xhp - xd.hp
+	await _snap("p2_11_crossbow_third.png")
+	Settings.camera_mode = "first"
+	player.apply_camera_mode()
+	await _wait(0.3)
+	await _snap("p2_11b_crossbow_first.png")
+	Settings.camera_mode = "third"
+	player.apply_camera_mode()
+	await _wait(1.3)
+	xd.hp = 100
+	_face(player, xd.global_position + Vector3.UP * (xd.HEIGHT - 0.25))
+	await _wait(0.2)
+	await _pull_once()
+	await _wait(0.4)
+	_log("AUTOTEST crossbow: body bolt %d damage, head bolt downed=%s (hp %d), bolts left %d, stuck bolts on it %d, daze %.2f" % [body_dmg, xd.downed, xd.hp, player.ammo, xd.find_children("*", "Node3D", false, false).filter(func(n): return n.get_child_count() == 3).size(), player.daze_t])
+	player.gun_id = ""
+	player.select_slot("melee")
+	xd.place(xd.home[0], xd.home[1])
 	# switching weapons with real key and wheel presses
 	player.give_gun("mp5")
 	await _wait(0.4)

@@ -250,6 +250,21 @@ static func make(id: String, skin := "classic") -> Node3D:
 				_box(p, Vector3(0.032, 0.11, 0.05), Vector3(0, -0.05, 0.0), black)
 				_box(p, Vector3(0.036, 0.012, 0.16), Vector3(0, 0.048, -0.06), accent)
 				_muzzle(p, Vector3(0, 0.02, -0.17), "Muzzle" if side < 0 else "Muzzle2")
+		"crossbow":   # 1v1's crossbow (its gunModel 'crossbow' at our scale, facing -z): stock, limbs, rail, grip, string, a bolt
+			_box(root, Vector3(0.066, 0.077, 0.45), Vector3(0, 0, -0.11), black)
+			_box(root, Vector3(0.42, 0.028, 0.066), Vector3(0, 0.022, -0.3), accent)
+			_box(root, Vector3(0.017, 0.017, 0.385), Vector3(0, 0.05, -0.25), steel)
+			_box(root, Vector3(0.033, 0.088, 0.055), Vector3(0, -0.072, 0.028), black)
+			_box(root, Vector3(0.05, 0.06, 0.16), Vector3(0, -0.01, 0.17), black)   # shoulder stock
+			for side in [-1.0, 1.0]:   # the string, from each limb tip back to the latch
+				var st := _box(root, Vector3(0.004, 0.004, 0.27), Vector3(side * 0.105, 0.04, -0.21), _mat(Color(0.85, 0.85, 0.8), 0.0, 0.6))
+				st.rotation.y = side * -0.95
+			_cyl(root, 0.0055, 0.4, Vector3(0, 0.062, -0.29), _mat(Color(0.14, 0.15, 0.17), 0.4, 0.45))   # the bolt on the rail
+			var nock := _cyl(root, 0.008, 0.012, Vector3(0, 0.062, -0.08), _mat(Color("#3bff7a"), 0.0, 0.4))
+			(nock.material_override as StandardMaterial3D).emission_enabled = true
+			(nock.material_override as StandardMaterial3D).emission = Color("#3bff7a")
+			(nock.material_override as StandardMaterial3D).emission_energy_multiplier = 2.0
+			_muzzle(root, Vector3(0, 0.062, -0.5))
 		_:
 			# SMG family: receiver, barrel, magazine, grip, stock and iron sights, sized per gun
 			var length := 0.42

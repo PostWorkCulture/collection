@@ -140,6 +140,7 @@ var daze_t := 0.0                 # stunned: a quarter speed, can't attack
 var flash_a := 0.0                # the white flash of a stun grenade on your own screen (the player)
 var zip_ride := false             # on a zipline (ziplines/ziplines.gd moves you)
 var zip_handle := Vector3.INF     # where the handle is, for the hands
+var _fire_was := false            # fire was held last tick (single-shot weapons need a fresh pull)
 var _fire_ads_t := 0.0            # firing aims for you (Pete, 26 Nov): you stay aimed this long after letting go
 var slot := "melee"              # "melee" (fists or bat) or "gun"
 var fire_t := 0.0
@@ -484,6 +485,7 @@ func give_gun(id: String, bullets := Weapons.AMMO, skin := "classic") -> void:
 	ammo = bullets
 	slot = "gun"
 	swap_t = float(Weapons.stat(id).get("swap", SWAP))
+	fire_t = 0.0   # a new gun doesn't wait out the last one's gap (the crossbow's 1.8 s)
 	_refresh_weapon_models()
 
 func give_bat() -> void:
@@ -728,6 +730,20 @@ func _shoot(id: String, g: Dictionary) -> void:
 	var world := get_parent()
 	var origin := eye_pos()
 	var dir := Weapons.spread_dir(aim_direction(), current_spread())
+	if g.get("proj", false):   # the crossbow: a bolt that flies (weapons/bolts.gd), silent, no flash
+		var mzp := muzzle_pos()
+		if game and game.bolts:
+			# from the bow, aimed where the eye ray lands so the bolt goes where the crosshair is
+			var aim_hit := get_world_3d().direct_space_state.intersect_ray(PhysicsRayQueryParameters3D.create(origin, origin + dir * 250.0, SHOT_MASK, [get_rid()]))
+			var to: Vector3 = aim_hit.position if aim_hit else origin + dir * 250.0
+			var start := origin if mzp.distance_to(origin) > 1.5 else mzp
+			game.bolts.fire(self, start, (to - start).normalized())
+		var snd0: Array = g.sound
+		Sfx.play(world, snd0[0], mzp, -4.0, float(snd0[1]), 25.0, 0.03)
+		if is_player:
+			pitch = clamp(pitch + float(g.kick) * (0.6 if ads else 1.0), -1.45, 1.45)
+		_after_shot(world)
+		return
 	var q := PhysicsRayQueryParameters3D.create(origin, origin + dir * 250.0, SHOT_MASK, [get_rid()])
 	var hit := get_world_3d().direct_space_state.intersect_ray(q)
 	var end := origin + dir * 180.0
@@ -758,6 +774,10 @@ func _shoot(id: String, g: Dictionary) -> void:
 		var k: float = g.kick
 		pitch = clamp(pitch + k * (0.6 if ads else 1.0), -1.45, 1.45)
 		yaw += (randf() - 0.5) * k * 0.4
+	_after_shot(world)
+
+## out of bullets: back to the bat
+func _after_shot(world: Node) -> void:
 	if ammo <= 0:
 		gun_id = ""
 		slot = "melee"
@@ -819,10 +839,12 @@ func _physics_process(dt: float) -> void:
 	daze_t = maxf(0.0, daze_t - dt)
 	flash_a = maxf(0.0, flash_a - dt * 1.2)
 	ads_k = move_toward(ads_k, 1.0 if ads else 0.0, dt / Weapons.ADS_TIME)
-	if in_fire and fire_t <= 0.0 and can_attack():
+	var semi: bool = Weapons.stat(id).get("semi", false) and is_player and not autopilot
+	if in_fire and fire_t <= 0.0 and can_attack() and not (semi and _fire_was):   # (the crossbow: one bolt per pull)
 		_attack()
 		id = current_weapon()
 		melee = Weapons.is_melee(id)
+	_fire_was = in_fire
 	# movement
 	var mv := in_move
 	var jump := in_jump and not downed
@@ -1110,7 +1132,7 @@ func _update_view(dt: float) -> void:
 const GUN_SCALE := 1.7
 const GUN_GRIP := Vector3(0.0, -0.08, 0.03)      # where the right hand holds an SMG, in the gun model
 const PISTOL_GRIP := Vector3(0.0, -0.05, 0.0)
-const GUN_LEN := {"mp5": 0.42, "uzi": 0.3, "vector": 0.38, "p90": 0.45, "ump": 0.46, "sting": 0.26}   # weapon_model.gd
+const GUN_LEN := {"mp5": 0.42, "uzi": 0.3, "vector": 0.38, "p90": 0.45, "ump": 0.46, "sting": 0.26, "crossbow": 0.45}   # weapon_model.gd
 const BAT_TILT := 0.52                           # the bat model points this far above its -Z
 func _hold_in_hand() -> void:
 	var w := current_weapon()

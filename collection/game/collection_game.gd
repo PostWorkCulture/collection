@@ -31,6 +31,7 @@ const Sfx := preload("res://audio/sfx.gd")
 const Pickup := preload("res://pickups/pickup.gd")
 const Star := preload("res://stars/star.gd")
 const Gadgets := preload("res://gadgets/gadgets.gd")
+const Bolts := preload("res://weapons/bolts.gd")
 const WeaponModel := preload("res://weapons/weapon_model.gd")
 
 const STARS := 10             # to win
@@ -78,6 +79,7 @@ var shop_i := 0                      # which of level.shop_spots is open
 var shop_t := SHOP_MOVE              # seconds until it moves on its own
 var _pad: MeshInstance3D
 var gadgets: Node3D                  # mines and stun grenades in play (gadgets/gadgets.gd)
+var bolts: Node3D                    # crossbow bolts in flight (weapons/bolts.gd)
 var _beam: MeshInstance3D
 var nav_region: NavigationRegion3D
 var ladder_links := 0
@@ -109,6 +111,10 @@ func start(begin := true) -> void:
 	gadgets.name = "Gadgets"
 	gadgets.game = self
 	add_child(gadgets)
+	bolts = Bolts.new()
+	bolts.name = "Bolts"
+	bolts.game = self
+	add_child(bolts)
 	for i in ON_MAP:
 		var s := Star.new()
 		add_child(s)
@@ -145,6 +151,8 @@ func begin_countdown() -> void:
 	reset_props()
 	if gadgets:
 		gadgets.clear_all()
+	if bolts:
+		bolts.clear_all()
 	countdown = COUNTDOWN
 	_set_state("countdown")
 	center_msg.emit("COLLECTION · 8 PLAYERS · THE MANSION", "Start with a bat · find 10 hidden stars · cash them in at the shop outside · first to cash in wins", COUNTDOWN)
@@ -609,6 +617,7 @@ func place_pickup(p: Node) -> void:
 	if p.kind == "gun":
 		id = Weapons.CO_GUNS[randi() % Weapons.CO_GUNS.size()]
 		p.skin = WeaponModel.SKINS.pick_random()   # (Pete, 26 Nov: every gun has a random skin)
+		p.ammo = Weapons.full(id)
 	p.show_at(spot, id)
 
 ## a gun swapped for another, lying where it was dropped for 20 s with the bullets it had left
@@ -631,7 +640,7 @@ func forget_pickup(p: Node) -> void:
 
 func feed_pickup(f: Node, p: Node) -> void:
 	var sk: String = WeaponModel.SKIN_NAMES.get(p.skin, "")
-	var what := "a bat" if p.kind == "bat" else "a %s%s (%d bullets)" % [(sk + " ") if sk != "" else "", Weapons.stat(p.id).name, p.ammo]
+	var what := "a bat" if p.kind == "bat" else "a %s%s (%d %s)" % [(sk + " ") if sk != "" else "", Weapons.stat(p.id).name, p.ammo, "bolts" if p.id == "crossbow" else "bullets"]
 	match String(p.kind):
 		"mine": what = "a proximity mine"
 		"stun": what = "a stun grenade"

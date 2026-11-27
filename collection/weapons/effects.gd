@@ -136,7 +136,7 @@ static func downed_wisp(world: Node, pos: Vector3) -> void:
 	_burst(world, pos, _puff_mesh(Color(0.45, 0.06, 0.09)), 1, 0.8, Vector2(0.2, 0.4), -0.5, Vector3.UP, 15.0, Vector2(0.25, 0.4), _fade_ramp())
 
 ## a short thin warm-white streak leaving the muzzle (not a beam to the target), gone in 0.05 s
-static func tracer(world: Node, a: Vector3, b: Vector3) -> void:
+static func tracer(world: Node, a: Vector3, b: Vector3, col := Color(1.0, 0.97, 0.9, 0.7), width := 0.013) -> void:
 	var L := a.distance_to(b)
 	if L < 1.5:
 		return
@@ -145,11 +145,11 @@ static func tracer(world: Node, a: Vector3, b: Vector3) -> void:
 	var len := minf(L - minf(1.2, L * 0.15), 7.0)
 	var mi := MeshInstance3D.new()
 	var bm := BoxMesh.new()
-	bm.size = Vector3(0.013, 0.013, len)
+	bm.size = Vector3(width, width, len)
 	var m := StandardMaterial3D.new()
 	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	m.albedo_color = Color(1.0, 0.97, 0.9, 0.7)
+	m.albedo_color = col
 	bm.material = m
 	mi.mesh = bm
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF

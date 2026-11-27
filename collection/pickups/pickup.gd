@@ -150,7 +150,7 @@ func swap(f: Node) -> void:
 		_remove()
 	else:
 		wait(PICK_BACK)
-	ammo = Weapons.AMMO
+	ammo = Weapons.full(id)
 
 func _remove() -> void:
 	active = false

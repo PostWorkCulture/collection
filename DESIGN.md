@@ -37,7 +37,7 @@ Units: metres, seconds. Y is up.
 
 ## 4. Weapon pickups
 - 8 pickups, all guns (`GUN_PICKS = 8`, `BAT_PICKS = 0`; the two bat pickups became guns when everyone got a bat, 26 Nov).
-- Gun pool (random each time): MP5, Uzi, Vector, P90, UMP, Sting (SMGs) and Dual Pistols.
+- Gun pool (random each time): MP5, Uzi, Vector, P90, UMP, Sting (SMGs), Dual Pistols and the Crossbow **(Pete, 27 Nov: the SMGs and crossbow from 1v1)**. A crossbow pickup holds 10 bolts; the rest hold 20 bullets.
 - 20 bullets, no reloading. Empty → automatically back to the bat ("out of bullets: back to the bat").
 - Walking over a gun takes it if you have no gun or yours has under 10 bullets. If yours still has 10+ and the one on the floor is a different gun, you can swap **(Pete, 26 Nov)**: the screen shows "E  Swap your MP5 (14) for the UMP (20)" (E, or X on a controller; rebindable as "Swap gun"); yours drops there with the bullets it had left and lies 20 s for anyone, like the dropped stars. Bots don't swap yet.
 - Placement: 70% inside the house, 20% on the roof, 10% on the lawns, at least 10 m from other stars, pickups and players on the same floor **(Pete, 26 Nov: never grouped, mostly inside or on the roof; was 80% inside, 20% lawns, 6 m)**.
@@ -60,13 +60,14 @@ dmg = damage per hit (100 HP players); rate = seconds between shots; fall = full
 |---|---|---|---|---|---|
 | Fists | 34 | 1 | 0.36 | reach 2.7 | not used since 26 Nov (everyone has a bat); kept in the code |
 | Bat | 50 | 1 | 0.55 | reach 3.0 | 2 hits to down; big knockback (lunge 5) |
-| MP5 | 16 | 1.6 | 0.055 | 8–26 | shreds up close |
+| MP5 | 16 | 1.6 | 0.055 | 8–26 | shreds up close; hip spread 0.8° (1v1 now; was 1.6) |
 | Uzi | 18 | 1.7 | 0.07 | 10–30 | punchy close range |
-| Vector | 14 | 1.6 | 0.045 | 7–22 | fastest SMG, empties in ~1 s |
+| Vector | 14 | 1.6 | 0.045 | 7–22 | fastest SMG, empties in ~1 s; hip spread 0.75° (was 1.5) |
 | P90 | 15 | 1.5 | 0.06 | 9–26 | near-perfect hip fire |
-| UMP | 18 | 1.6 | 0.095 | 20–48 | longer range |
+| UMP | 18 | 1.6 | 0.095 | 20–48 | longer range; hip spread 0.75° (was 1.5) |
 | Sting | 8 | 1.5 | 0.036 | 6–18 | machine pistol, quickest swap |
 | Dual Pistols | 30 | 1.8 | 0.16 | 10–28 | alternate fire |
+| Crossbow | 83 | 2 | 1.8 | none | 1v1's: a silent bolt at 200 m/s with a little drop (1.5), one per pull (its 0.9 s shot plus 1.8 s reload, as there are no reloads here: 1.8 s), a thin green streak to follow, bolts stick in walls and people for 6 s; a body hit plus any other hit downs, a headshot downs outright |
 
 SMGs: iron sights only, aim-down-sights in 0.07 s. Firing a gun aims down the sights by itself (and stays aimed 0.35 s after you let go) **(Pete, 26 Nov)**; the aim button still aims without firing. With the bat out you run 20% faster. Aiming with the bat does nothing.
 
@@ -179,7 +180,7 @@ CollectionGame is **not** an autoload: it is a node (`collection/game/collection
 | Godot project skeleton | done (phase 1) |
 | The Mansion | grey-box from `mansion_layout.json`, ladders, shop placeholder (phase 1); the web Mansion's own look in `level/mansion.glb` (every room's finishes, furniture, lamps, signs, ladders, the shop kiosk) over the same colliders; sunk indoor pool; fireman's pole, 2 lifts, gym trampolines (launch one up to the trophy room), 2 portal pairs, wading and springboard, ball pit, ballroom dance floor / disco ball / moving beams / music; bots use the lifts, pole, launch trampoline and portals (phase 6, first part); smooth stairs, windows you can jump through or climb over, each room's own lights (phase 6, second part); all the web's furniture, and 247 smashable pieces (furniture, crates, hedges, lamps) that grow back after 40 s (phase 6, third part); hot tub jets, splashes and wading; small things have a draw distance and a floor's furniture hides when you can't see that floor (phase 6, last part); tidied for flow: slower running, 4.4 m doorways, no glass walls, bigger windows, mirror maze gone, furniture against the walls (24 Nov) |
 | Fighter / player movement | movement, jump, crouch, ladders, third/first-person camera (phase 1) |
-| Weapons + pickups | fists, bat, 6 SMGs + Dual Pistols with the web stats; 20-bullet pickups (8 guns since 26 Nov; everyone carries a bat with one of 1v1's six skins (gold hits double), and guns get random skins too; swap a gun for a different one with E); first-person hands and iron-sight aiming (phase 2); gadgets: mines, stun grenades, speed boosts, and auto-aim on firing (26 Nov) |
+| Weapons + pickups | fists, bat, 6 SMGs + Dual Pistols with the web stats, and the Crossbow (27 Nov); 20-bullet pickups (8 guns since 26 Nov; everyone carries a bat with one of 1v1's six skins (gold hits double), and guns get random skins too; swap a gun for a different one with E); first-person hands and iron-sight aiming (phase 2); gadgets: mines, stun grenades, speed boosts, and auto-aim on firing (26 Nov) |
 | Health, down, death, respawn | 100 HP + regen, downed (30 HP, crawl, up after 5 s), finished = dead, respawn 3 s furthest from others, 4 s spawn shield (phase 2; doubled 26 Nov) |
 | Effects + sound | red spray + mist on hits, muzzle flash, thin tracers, dust, dark-red downed wisps (phase 2); glass breaks into shards that bounce and settle (pooled, 360 max); sounds on Weapons / SFX / Music / Voice buses, muffled through walls (duller behind one wall, more behind two or a floor), room echo (hall rings, ground floor some, upstairs soft, outside dry), footsteps and landings from 1v1, menu and match-end music from 1v1 (phase 5) |
 | Look | AgX tonemapping, sun shadows, colour grading; Medium adds bounce light (SDFGI), ambient occlusion, glow; High adds indirect light (SSIL), screen-space reflections, a reflection probe per room, light shafts / haze (volumetric fog); Low is plain and fast (phase 5); surface detail and roughness on the Mansion's 36 patterns (wood, tile, marble, brick, carpet, fabric, plaster, metal, grass), clear pool and hot-tub water with moving light on the pool floor, a sky with soft clouds, skirting boards (AAA phase 3, first part) |
@@ -213,6 +214,7 @@ Agreed with Pete in the rebuild plan ([`docs/collection/plan.md`](docs/collectio
 - Publishing method for the Windows PC build: not decided (platform decided 25 Nov: Windows PC first).
 
 ## Decision log
+- 2026-11-27 — Pete: bring the SMGs and the crossbow over from 1v1. 1v1's SMGs now are the MP5, UMP and Vector (the Uzi, P90 and Sting are only in Collection, so they stay): their hip spread is halved as in 1v1 now (MP5 0.8°, UMP 0.75°, Vector 0.75°). The Crossbow joins the gun pool with 1v1's stats and model; choices: 10 bolts a pickup (the HUD and pickups show 10), 1.8 s between bolts (no reloads here), one bolt per trigger pull for the player; picking up a new gun starts it ready to fire rather than waiting out the old gun's gap.
 - 2026-11-26 — Pete: ziplines either side of the top of the main stairs, zipping up to the roof through a big glass pane each that rebuilds after 5 s. Choices: the pads are on the walkway either side of where the grand staircase arrives (x ±3, z 7.5); the panes are the hall's two front skylight panes; jump on the pad to grab; 11 m/s (about 1.4 s); you land on the roof just past the skylights; the handle slides back down for the next rider; bots don't use them yet.
 - 2026-11-26 — Pete: collectables spread out, never grouped, mostly inside or on the roof: pickups and stars keep 10 m apart (was 6 and 7); pickups 70% inside, 20% roof, 10% lawns; 15% of stars on the roof. Pete: the weapons and skins from 1v1, every gun and bat with a random skin, gold bat double damage: 1v1's barbed-wire bat and its six skins (its BAT_SKINS) on every bat and gun; the Gold Bat does 100 (double); 1v1 has no gun skins, so a gun's coloured body takes the same six. 1v1's guns are block models like ours, so the gun shapes stay; which more of 1v1's guns (rifles, snipers, shotguns, rockets) to add is asked of Pete.
 - 2026-11-26 — Pete: auto-aim with the fire button; proximity mines (only 1), stuns (1) and a 10 s speed boost. Choices: the web game's lethal numbers (mine 60 damage, 3.4 m, triggers at 1.7 m; stun 6.5 m, 1 s); 2 of each on the map; Q and G (D-pad left and right); the boost is half as fast again; gadgets are lost on death; the web's explosion and stun sounds; shooting a mine doesn't set it off (only blasts do).
