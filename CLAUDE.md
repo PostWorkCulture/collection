@@ -15,6 +15,9 @@ Read this file and `DESIGN.md` before doing anything. If a request conflicts wit
 2. **Same-commit rule.** Any change to a design decision updates DESIGN.md (and its Decision log) in the same commit as the code.
 3. **No silent scope creep.** Ideas go in DESIGN.md → "Parking lot", not into code.
 4. **Start every session with:** `git pull`, read CLAUDE.md + DESIGN.md, `git status`. Say if the working tree is dirty before touching it.
+   The active plan is `docs/collection/plan_aaa.md` (the finished one is `docs/collection/plan.md`); read its Status line and the phase you're working on.
+   **After a context compaction** (or when unsure what was agreed), do the same before carrying on: re-read DESIGN.md (Build status, Known issues, latest Decision log entries) and the plan's Status line, and run `git status` and `git log --oneline -10`. Chat history before the compaction is not a source of truth.
+   **Keep the logs current as you go:** anything agreed with Pete, tried and rejected, or left half done goes into DESIGN.md (Decision log / Known issues / Build status) in the same commit, and the plan's Status line moves when a phase does. Before a long task or a natural break, write down where things stand so nothing lives only in the chat.
 5. **One task per commit.** Don't bundle unrelated fixes.
 6. If something in the code disagrees with DESIGN.md, report it; don't "fix" either side on your own.
 
