@@ -1,6 +1,6 @@
 # Collection: plan to AAA
 
-**Status:** approved by Pete on 25 Nov 2026, after he signed off all six phases of `plan.md`. Phase 0 done. Phase 1 (characters): all ten characters rigged and animated and pushed (`e843186`, 27 Nov) without the reviewer's AAA sign-off; more animation work on hold since 28 Nov (Pete, see DESIGN.md Decision log). Phase 3 (materials and light) built and waiting for Pete (28 Nov): materials and light first part, then baked lighting; light shafts and wear dropped and trees and hedges moved to phase 4 (Pete, 28 Nov).
+**Status:** approved by Pete on 25 Nov 2026, after he signed off all six phases of `plan.md`. Phase 0 done. Phase 1 (characters): all ten characters rigged and animated and pushed (`e843186`, 27 Nov) without the reviewer's AAA sign-off; more animation work on hold since 28 Nov (Pete, see DESIGN.md Decision log). Phase 3 (materials and light) built and waiting for Pete (28 Nov): materials and light first part, then baked lighting; light shafts and wear dropped and trees and hedges moved to phase 4 (Pete, 28 Nov). Phase 4 (props and set dressing): a picture shortlist of 51 Tripo gallery models for the vertical slice and the grounds is waiting for Pete's picks (28 Nov); nothing exported or imported yet.
 
 **Goal:** the same game, which is still DESIGN.md (Collection mode, 8 players, The Mansion, 10 stars), made to look, sound and feel like a premium shooter all the way through.
 
