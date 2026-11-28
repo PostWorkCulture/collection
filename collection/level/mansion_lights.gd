@@ -9,6 +9,10 @@ extends Node3D
 ##   floor, plus the hall and the atrium (open to each other)
 
 const DIM_NO_FITTINGS := ["cinema", "observ", "ballroom", "panic"]   # moody rooms: no ceiling fittings
+## baked lighting (AAA phase 3): the steady lamps' bounce light is baked into the lightmap while their direct light stays
+## real-time (so the pools of light and the shine on glossy floors stay as they were); the lights that move (cinema
+## flicker, pool shimmer, panic pulse, lab glow, the hall of mirrors' colour) and the garage strips aren't baked at all
+const ANIMATED := ["cinema", "pool", "panic", "lab", "mirrors"]
 const H1 := 5.5
 
 var rooms: Array = []
@@ -19,8 +23,10 @@ var _tubes: Array = []      # garage: [light, bad, on, timer]
 var _t := 0.0
 var _cell := Vector3i(-99, -99, -99)
 var _shadows := true        # the mood light of the room you're in casts shadows (Medium and High)
+var _baked := false         # a lightmap is in: the moving lights are kept out of it
 
-func setup(layout: Dictionary, quality: String) -> void:
+func setup(layout: Dictionary, quality: String, baked: bool = false) -> void:
+	_baked = baked
 	rooms = layout.get("rooms", [])
 	_shadows = quality != "low"
 	for r in rooms:
@@ -42,12 +48,15 @@ func setup(layout: Dictionary, quality: String) -> void:
 			if DIM_NO_FITTINGS.has(nm):
 				e = maxf(e, 3.0)   # moody, not black
 			var l := _light(Vector3(cx, top - 1.4, cz), col, e, 10.5 if top > 6.0 else 9.5, false)
+			if ANIMATED.has(nm):
+				_live(l)
 			list.append([l, l.light_energy])
 			_accent[nm] = l
 		_room_lights[nm] = list
 	# garage: five strip lights, cool white, humming and stuttering
 	for t in [[28.0, 13.5, false], [32.5, 13.5, false], [28.0, 22.0, true], [32.5, 22.0, false], [36.0, 22.5, false]]:
 		var l := _light(Vector3(t[0], H1 - 0.35, t[1]), Color("#cfe6ff"), 1.3, 7.5, false)
+		_live(l)
 		_tubes.append([l, t[2], true, randf() * 4.0])
 		(_room_lights["garage"] as Array).append([l, l.light_energy])
 
@@ -64,8 +73,14 @@ func _light(p: Vector3, col: Color, energy: float, rng: float, shadows: bool) ->
 	l.omni_attenuation = 1.3
 	l.shadow_enabled = shadows
 	l.light_specular = 0.6
+	l.light_bake_mode = Light3D.BAKE_DYNAMIC   # steady: its bounce is baked, its direct light stays real-time
 	add_child(l)
 	return l
+
+## a light that moves (pulses, flickers, changes colour) stays real-time and out of the lightmap
+func _live(l: OmniLight3D) -> void:
+	if _baked:
+		l.light_bake_mode = Light3D.BAKE_DISABLED
 
 ## which room a point is in (row, column, floor), or (-1, -1, floor) outside
 func _cell_of(p: Vector3) -> Vector3i:

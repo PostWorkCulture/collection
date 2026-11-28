@@ -1,6 +1,6 @@
 # Collection: plan to AAA
 
-**Status:** approved by Pete on 25 Nov 2026, after he signed off all six phases of `plan.md`. Phase 0 done. Phase 1 (characters): all ten characters rigged and animated and pushed (`e843186`, 27 Nov) without the reviewer's AAA sign-off; more animation work on hold since 28 Nov (Pete, see DESIGN.md Decision log). Phase 3 (materials and light), first part ready for Pete.
+**Status:** approved by Pete on 25 Nov 2026, after he signed off all six phases of `plan.md`. Phase 0 done. Phase 1 (characters): all ten characters rigged and animated and pushed (`e843186`, 27 Nov) without the reviewer's AAA sign-off; more animation work on hold since 28 Nov (Pete, see DESIGN.md Decision log). Phase 3 (materials and light) built and waiting for Pete (28 Nov): materials and light first part, then baked lighting; light shafts and wear dropped and trees and hedges moved to phase 4 (Pete, 28 Nov).
 
 **Goal:** the same game, which is still DESIGN.md (Collection mode, 8 players, The Mansion, 10 stars), made to look, sound and feel like a premium shooter all the way through.
 
@@ -172,6 +172,14 @@ Nothing new gets built until Pete approves it. The new features below were appro
 - **Still to do in phase 3:** baked lighting inside (a lightmap bake in the editor), window light shafts, trims and wear, real trees and hedges outside (with phase 4's models).
 - **Window light shafts, first try (28 Nov, not kept):** indoor haze lit by the sun read as mist, not beams, because the windows and skylights are as wide as the beams; from outside the windows went milky. See DESIGN.md Decision log.
 - **Pete, 28 Nov:** light shafts dropped; no wear on the walls (trims done with the skirting); real trees and hedges moved to phase 4. What's left of phase 3 is the baked lighting.
+
+### Phase 3 · The Mansion: materials and light, baked lighting (28 Nov 2026)
+
+- **Baked lighting:** the sky light, the sun's bounce and the steady lamps' bounce are baked into a lightmap of the house (1,594 meshes, 18.6 MB) on every quality setting; the sun's and lamps' direct light stays real-time, and the moving lights stay out of the bake. Characters and moving parts are lit by the bake's probes. The real-time bounce light (SDFGI) is off when the bake is in.
+- **How to re-bake:** `tools/lightmap/bake.ps1` (about a minute, editor closed). Needed whenever the Mansion's layout or furniture changes.
+- **Frame rate (High, same conditions):** hall 105 → 131, library 113 → 127, study 116 → 161, gallery 132 → 166; master bedroom, ballroom and lawns about the same. All headless checks pass.
+- **Pictures:** `docs/screenshots/aaa_phase3_bake/` (before on the left).
+- **Phase 3 is then complete** apart from Pete's walk-through: light shafts and wear dropped, trees and hedges moved to phase 4 (Pete, 28 Nov).
 
 ## How progress is tracked
 

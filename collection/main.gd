@@ -13,6 +13,7 @@ const LevelBuilder := preload("res://level/level_builder.gd")
 const MansionFeatures := preload("res://level/mansion_features.gd")
 const Ziplines := preload("res://ziplines/ziplines.gd")
 const MansionLights := preload("res://level/mansion_lights.gd")
+const Lightmap := preload("res://level/lightmap.gd")
 const CollectionGame := preload("res://game/collection_game.gd")
 const DummyBrain := preload("res://fighter/dummy_brain.gd")
 const CharacterModel := preload("res://characters/character_model.gd")
@@ -54,6 +55,7 @@ var music: AudioStreamPlayer
 var _env: Environment
 var _sun: DirectionalLight3D
 var _probes: Node3D
+var _lightmap: LightmapGI    # the baked lighting, when level/lightmap/ has a bake
 var _key_defaults := {}
 
 var _t_start := 0
@@ -71,10 +73,11 @@ func _ready() -> void:
 	add_child(level)
 	level.build()
 	if level.dressed and level.layout.has("rooms"):
+		_add_lightmap()
 		lights = MansionLights.new()
 		lights.name = "MansionLights"
 		add_child(lights)
-		lights.setup(level.layout, String(Settings.quality))
+		lights.setup(level.layout, String(Settings.quality), _lightmap != null)
 		lights.level_ref = level
 	else:
 		_house_lights()
@@ -360,7 +363,8 @@ func _apply_quality() -> void:
 	_env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR if low else Environment.AMBIENT_SOURCE_SKY
 	_env.ambient_light_color = Color(0.66, 0.64, 0.6)
 	_env.ambient_light_energy = 1.0 if low else 0.8
-	_env.sdfgi_enabled = not low
+	_env.sdfgi_enabled = not low and _lightmap == null   # with the bake in, its light and probes replace the real-time bounce
+	_indoors = -1   # _process sets the reflections again
 	_env.sdfgi_use_occlusion = true
 	_env.sdfgi_energy = 1.2
 	_env.ssao_enabled = not low
@@ -419,6 +423,37 @@ func _notification(what: int) -> void:
 		AudioServer.set_bus_mute(0, true)
 	elif what == NOTIFICATION_APPLICATION_FOCUS_IN:
 		AudioServer.set_bus_mute(0, false)
+
+## baked surfaces get no reflections from the real-time bounce light, so indoors the glossy floors reflected the open
+## blue sky (white tiles went blue): with the bake in and the camera inside the house, reflections come from the room
+## probes and the screen only; outside, the sky is reflected as before
+var _indoors := -1
+
+func _process(_dt: float) -> void:
+	if _lightmap == null or _env == null:
+		return
+	var cam := get_viewport().get_camera_3d()
+	if cam == null:
+		return
+	var p := cam.global_position
+	var inside := 1 if absf(p.x) < 40.0 and absf(p.z) < 27.0 and p.y < 11.3 else 0
+	if inside != _indoors:
+		_indoors = inside
+		_env.reflected_light_source = Environment.REFLECTION_SOURCE_DISABLED if inside == 1 else Environment.REFLECTION_SOURCE_BG
+
+## baked lighting (AAA phase 3, level/lightmap.gd): the sun's and sky's bounce light and the steady lamps, baked in the
+## editor, on every quality setting; what moves is lit by the bake's probes. Without a bake the game lights as before.
+func _add_lightmap() -> void:
+	if not Lightmap.available():
+		return
+	var data := load(Lightmap.DATA_PATH) as LightmapGIData
+	if data == null or data.get_user_count() == 0:
+		return   # not baked yet
+	Lightmap.prepare(level)
+	_lightmap = Lightmap.make_node()
+	_lightmap.light_data = data
+	level.add_child(_lightmap)
+	_apply_quality()
 
 ## one reflection probe per room (5 × 3 a floor), captured once, so glossy floors and glass show the room around
 ## them; High only

@@ -43,7 +43,7 @@ One Godot project in `/collection/` (open `collection/project.godot`). Folders a
 /collection/autotest.json  scripted checks ("enabled": true runs them and quits; "combat" and "stars" check fights and Collection rules on standing dummies; "bots_match" plays a whole 8-bot match, with "difficulty", "match_secs" and "speed"; "menu" walks the start screen, pause, settings and rebinding; "mansion" rides the lifts, pole, trampolines and portals and tries the pool and ball pit; "bots": false leaves the house empty for preview shots; "shots" are the 33 AAA reference spots and each run writes `shots/perf.csv` with fps, worst frame, draw calls and triangles per spot)
 /collection/<feature>/     new features get their own folder
 /docs/screenshots/         preview images for Pete, one folder per phase
-/tools/                    helpers outside the game (mansion_export: rebuilds level/mansion.glb from the web game, then surface_pass.py adds its normal and roughness maps; characters: rigs a 1v1 model and moves the Mixamo clips onto it, see its README; hall_of_fame: makes the trophy room's posters)
+/tools/                    helpers outside the game (mansion_export: rebuilds level/mansion.glb from the web game, then surface_pass.py adds its normal and roughness maps; characters: rigs a 1v1 model and moves the Mixamo clips onto it, see its README; hall_of_fame: makes the trophy room's posters; lightmap: bake.ps1 re-bakes the house's lighting into level/lightmap/, using the addons/lightmap_bake plugin for one editor run)
 ```
 Update DESIGN.md → "Build status" when a part moves forward.
 
@@ -58,6 +58,7 @@ Update DESIGN.md → "Build status" when a part moves forward.
 
 ## Before committing
 - Run the checks: set `collection/autotest.json` to `"enabled": true` (with `"combat"`, `"stars"` and `"mansion"` true), run it (Godot MCP `run_project`, or headless: `godot --headless --path collection`), read the results in `collection/shots/autotest.txt` and any script errors in the console (`get_debug_output`), then set it back to `false`. Headless runs skip the screenshots.
+- If the Mansion's layout, furniture or lamps changed, re-bake its lighting first (`.\tools\lightmap\bake.ps1`, editor closed) and commit `collection/level/lightmap/` with it.
 - Commit message: `<area>: <what changed>` e.g. `stars: add spawn spacing`, `bots: add room exploring`, `docs: update DESIGN.md`.
 - Studio rules (DESIGN.md §10) apply to every change: no confetti/coloured particles, red spray + mist for hits, realistic premium look, white ladders.
 

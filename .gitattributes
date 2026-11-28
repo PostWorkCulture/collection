@@ -15,3 +15,6 @@
 *.mp3 binary
 *.ttf binary
 *.otf binary
+*.exr binary
+*.lmbake binary
+*.unwrap_cache binary

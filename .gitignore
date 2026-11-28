@@ -29,3 +29,8 @@ collection/shots/
 
 # Mixamo source clips stay on the PC (see tools/characters/README.md)
 tools/characters/mixamo/*.fbx
+
+# Lightmap bake scene: made by tools/lightmap/make_bake_scene.gd, only its bake output is committed
+collection/level/lightmap/*.scn
+collection/level/lightmap/bake.log
+collection/level/lightmap/bake_result.txt
