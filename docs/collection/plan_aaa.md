@@ -169,6 +169,7 @@ Nothing new gets built until Pete approves it. The new features below were appro
 - **Detail on surfaces:** skirting boards along every inside wall on both floors (235, drawn in one call).
 - **Frame rate (High, two runs):** every one of the 33 spots is at 120 fps or above, including the five that were under it (games room 134–147, cinema 145–149, lawn front 122–125, lawn back 124–127, kitchen 120–122). The pool view costs most (155 → 131) because of its water. A clear-coat on the big glossy floors cost the kitchen about 10 fps, so only marble keeps it. Before/after pictures and the numbers: `docs/screenshots/aaa_phase3/`.
 - **Still to do in phase 3:** baked lighting inside (a lightmap bake in the editor), window light shafts, trims and wear, real trees and hedges outside (with phase 4's models).
+- **Window light shafts, first try (28 Nov, not kept):** indoor haze lit by the sun read as mist, not beams, because the windows and skylights are as wide as the beams; from outside the windows went milky. See DESIGN.md Decision log.
 
 ## How progress is tracked
 
