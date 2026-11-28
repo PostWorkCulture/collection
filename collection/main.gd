@@ -565,8 +565,9 @@ func _run_autotest(cfg: Dictionary) -> void:
 			frames += 1
 		var draws: int = int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME))
 		var tris: int = int(Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME))
-		var img := get_viewport().get_texture().get_image()
-		img.save_png(ProjectSettings.globalize_path("res://shots/" + sh.file))
+		if DisplayServer.get_name() != "headless":   # no pictures without a screen (the checks still run)
+			var img := get_viewport().get_texture().get_image()
+			img.save_png(ProjectSettings.globalize_path("res://shots/" + sh.file))
 		_log("AUTOTEST shot %s: %d fps, worst frame %.1f ms, %d draw calls, %dk triangles" % [sh.file, frames, worst, draws, tris / 1000])
 		perf_rows.append("%s,%s,%d,%.1f,%d,%d" % [sh.file, Settings.quality, frames, worst, draws, tris])
 	if not perf_rows.is_empty() and DisplayServer.get_name() != "headless":
