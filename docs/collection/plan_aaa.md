@@ -106,6 +106,7 @@ Nothing new gets built until Pete approves it. The new features below were appro
 - **Signature pieces:** 3–5 per room, made with Tripo or Meshy and picked through the picture shortlist (the triposelect skill), replacing the blockiest web props.
 - **Physics:** chairs and small items that get knocked about. Smashable pieces get proper breakage, with debris in their own colours.
 - **Flow:** the flow rules are kept: furniture against the walls, windows clear.
+- **Outside (moved from phase 3, Pete 28 Nov):** real trees, clipped hedges and topiary, picked from the same shortlist.
 
 ### 5 · Sound and music
 
@@ -170,6 +171,7 @@ Nothing new gets built until Pete approves it. The new features below were appro
 - **Frame rate (High, two runs):** every one of the 33 spots is at 120 fps or above, including the five that were under it (games room 134–147, cinema 145–149, lawn front 122–125, lawn back 124–127, kitchen 120–122). The pool view costs most (155 → 131) because of its water. A clear-coat on the big glossy floors cost the kitchen about 10 fps, so only marble keeps it. Before/after pictures and the numbers: `docs/screenshots/aaa_phase3/`.
 - **Still to do in phase 3:** baked lighting inside (a lightmap bake in the editor), window light shafts, trims and wear, real trees and hedges outside (with phase 4's models).
 - **Window light shafts, first try (28 Nov, not kept):** indoor haze lit by the sun read as mist, not beams, because the windows and skylights are as wide as the beams; from outside the windows went milky. See DESIGN.md Decision log.
+- **Pete, 28 Nov:** light shafts dropped; no wear on the walls (trims done with the skirting); real trees and hedges moved to phase 4. What's left of phase 3 is the baked lighting.
 
 ## How progress is tracked
 
